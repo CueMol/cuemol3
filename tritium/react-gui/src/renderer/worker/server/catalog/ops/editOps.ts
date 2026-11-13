@@ -60,6 +60,8 @@ export const resetProp = defineOp({
     'the node at once (Reset all in the inspector).',
   params: { path: propPath('The property, or node.* for all of them.') },
   mutates: true,
+  coalesce: 'last',
+  coalesceKey: ['path'],
   describe: (a) => `Reset ${a.path}`,
   expose: EXPOSE,
   group: 'properties',

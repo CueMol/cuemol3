@@ -72,6 +72,11 @@ const StepFields: React.FC<{ step: ActionStepView }> = ({ step }) => (
     <PropertyField label="State">
       <Value text={step.undone ? 'Undone (on the redo side)' : 'Done'} />
     </PropertyField>
+    {step.mergedCount > 1 && (
+      <PropertyField label="Merged">
+        <Value text={`${step.mergedCount} edits of the same kind`} />
+      </PropertyField>
+    )}
   </>
 )
 
@@ -109,8 +114,11 @@ export const ActionStepInspector: React.FC<ActionStepInspectorProps> = ({
   onHeaderChange,
 }) => {
   const { steps } = useActionSteps(cm, sceneId)
-  const step = steps.find((s) => s.id === stepId)
-  const entry = step && entryIndex !== undefined ? step.entries[entryIndex] : undefined
+  // A step merged into an older run's row since it was opened shows that
+  // row (its op index named the old row's ops, so the row itself is shown).
+  const direct = steps.find((s) => s.id === stepId)
+  const step = direct ?? steps.find((s) => s.mergedIds.includes(stepId))
+  const entry = direct && entryIndex !== undefined ? direct.entries[entryIndex] : undefined
   const count = step?.entries.length ?? 0
 
   useEffect(() => {
@@ -119,7 +127,7 @@ export const ActionStepInspector: React.FC<ActionStepInspectorProps> = ({
     else onHeaderChange(step.text, count > 1 ? `${count} ops` : step.undone ? 'undone' : '')
   }, [step, entry, entryIndex, count, onHeaderChange])
 
-  if (!step || (entryIndex !== undefined && !entry)) {
+  if (!step || (direct && entryIndex !== undefined && !entry)) {
     return <div className="inspector-empty">This step is no longer in the undo history.</div>
   }
 

@@ -41,6 +41,10 @@ export interface ActionStepView {
   time: string | null
   /** On the redo side. */
   undone: boolean
+  /** How many commits it stands for: more than 1 for a merged run of the same edit. */
+  mergedCount: number
+  /** The ids of the steps merged into it, so a selection of them can follow it. */
+  mergedIds: number[]
   entries: ActionEntryView[]
 }
 

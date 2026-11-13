@@ -25,6 +25,13 @@
  *   did is recorded as the native ops it amounted to, never as PyMOL text;
  * - nothing, for a service with no op: the row then carries only its label.
  *
+ * Runs are merged once the undo stack is long: while it holds more than
+ * MAX_UNDO_STEPS steps, each run of adjacent GUI rows that did the same thing
+ * to the same target (same label, same op keys) is merged, oldest run first:
+ * its undo steps into one in C++ (`Scene.mergeUndoSteps`) and its rows into
+ * one here, so an undo takes it back at once. Only adjacent rows are merged: every remaining step boundary
+ * is still a state the scene was in. See docs/architecture/action-log.md.
+ *
  * Session only: nothing here is saved with the scene.
  */
 
@@ -80,6 +87,12 @@ export interface ActionRow {
   entries: ActionEntry[]
   /** Undone (the redo side of the stack). */
   undone: boolean
+  /** How many commits this row stands for: more than 1 once a run was merged into it. */
+  mergedCount?: number
+  /** The ids of the rows merged into this one (it keeps the newest one's id). */
+  mergedIds?: number[]
+  /** A merged row's run signature, so rows that age into the run later join it. */
+  runKey?: string
 }
 
 /** A transaction open on a scene. */
@@ -96,6 +109,37 @@ interface SceneLog {
   frames: Frame[]
   /** Ops running now; a service they call must not record itself again. */
   opDepth: number
+}
+
+/** Whether old runs of the same edit are merged (off: every commit stays its own step, as before). */
+let COALESCE_STEPS = true
+
+/** Runs are merged only while the undo stack holds more steps than this. */
+let MAX_UNDO_STEPS = 20
+
+/** Change the merging settings. Tests only. */
+export function setCoalescing(on: boolean, maxSteps = 20): void {
+  COALESCE_STEPS = on
+  MAX_UNDO_STEPS = maxSteps
+}
+
+/**
+ * What an op says about merging (`Op.coalesce` / `Op.coalesceKey`), looked up
+ * by name. Set by the op catalogue, which this module cannot import (the
+ * catalogue's ops import the services that record into it).
+ */
+export interface OpCoalesceInfo {
+  /** Its last call alone gives the state (it sets values, not toggles). */
+  last: boolean
+  /** Arguments besides its node arguments that say what it writes. */
+  key: readonly string[]
+}
+
+let coalesceInfoOf: (op: string) => OpCoalesceInfo | undefined = () => undefined
+
+/** Say where op merging information comes from (the catalogue does at load). */
+export function setOpCoalesceLookup(fn: (op: string) => OpCoalesceInfo | undefined): void {
+  coalesceInfoOf = fn
 }
 
 const logs = new Map<number, SceneLog>()
@@ -236,7 +280,95 @@ export function txnEnd(scene: Scene, committed: boolean): void {
     })
   }
   reconcile(scene, log)
+  if (COALESCE_STEPS) mergeOldRuns(scene, log)
   notify(sceneId)
+}
+
+/**
+ * What an op entry writes: its name, its node arguments (by uid) and the
+ * arguments its op names as its key (a property name, a path). Values are
+ * not part of it.
+ */
+function entryKey(e: OpEntry): string {
+  const names = [...Object.keys(e.refs), ...(coalesceInfoOf(e.op)?.key ?? [])].sort()
+  return JSON.stringify([e.op, ...names.map((n) => [n, e.args[n] ?? null])])
+}
+
+/** The run a row can be part of, or null when it cannot be merged with anything. */
+function runSignature(row: ActionRow): string | null {
+  if (row.source !== 'gui' || row.undone) return null
+  if (row.runKey !== undefined) return row.runKey
+  if (row.entries.length === 0) return null
+  const keys: string[] = []
+  for (const e of row.entries) {
+    if (e.kind !== 'op') return null
+    keys.push(entryKey(e))
+  }
+  return JSON.stringify([row.label, keys])
+}
+
+/**
+ * One row for a run of rows, oldest first. It keeps the newest row's id and
+ * time. When every op of the run only sets values, the newest row's ops give
+ * the whole result (the rows write the same keys), so only they are kept;
+ * otherwise the ops are kept in order.
+ */
+function mergeRows(run: readonly ActionRow[]): ActionRow {
+  const newest = run[run.length - 1]
+  const allLast = run.every((r) => r.entries.every((e) => e.kind === 'op' && coalesceInfoOf(e.op)?.last === true))
+  return {
+    id: newest.id,
+    label: run[0].label,
+    source: newest.source,
+    time: newest.time,
+    entries: allLast ? newest.entries : run.flatMap((r) => r.entries),
+    undone: false,
+    mergedCount: run.reduce((n, r) => n + (r.mergedCount ?? 1), 0),
+    mergedIds: run.flatMap((r) => (r === newest ? r.mergedIds ?? [] : [r.id, ...(r.mergedIds ?? [])])),
+    runKey: runSignature(run[0]) ?? undefined,
+  }
+}
+
+/**
+ * While the undo stack holds more than MAX_UNDO_STEPS steps, merge the oldest
+ * run of two or more same-signature rows; stop when it fits or no run is left.
+ * The C++ position of a run counts from the newest step, so merging an older
+ * run does not move the newer ones; the rows are scanned again after each
+ * merge.
+ */
+function mergeOldRuns(scene: Scene, log: SceneLog): void {
+  const s = scene as unknown as { mergeUndoSteps?: (start: number, count: number) => boolean }
+  if (typeof s.mergeUndoSteps !== 'function') return
+  for (;;) {
+    const undoSize = log.rows.filter((r) => !r.undone).length
+    if (undoSize <= MAX_UNDO_STEPS) return
+    const limit = undoSize
+    let start = -1
+    let end = -1
+    for (let i = 0; i < limit; ) {
+      const sig = runSignature(log.rows[i])
+      let j = i + 1
+      if (sig !== null) while (j < limit && runSignature(log.rows[j]) === sig) j++
+      if (sig !== null && j - i >= 2) {
+        start = i
+        end = j
+        break
+      }
+      i = j
+    }
+    if (start < 0) return
+    let merged = false
+    try {
+      merged = s.mergeUndoSteps(undoSize - end, end - start) === true
+    } catch (e) {
+      console.warn('[actionLog] mergeUndoSteps failed:', e)
+    }
+    if (!merged) {
+      reconcile(scene, log)
+      return
+    }
+    log.rows = [...log.rows.slice(0, start), mergeRows(log.rows.slice(start, end)), ...log.rows.slice(end)]
+  }
 }
 
 /**

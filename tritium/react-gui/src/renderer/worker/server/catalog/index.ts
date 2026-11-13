@@ -12,6 +12,7 @@
  */
 
 import type { AnyOp } from './op'
+import { setOpCoalesceLookup } from '../actions/actionLog'
 import { ANALYSIS_OPS } from './ops/analysisOps'
 import { ANIM_OPS } from './ops/animOps'
 import { APBS_OPS } from './ops/apbsOps'
@@ -96,3 +97,9 @@ export const CONSOLE_COMMAND_OPS: readonly AnyOp[] = OPS.filter((op) => op.expos
 export function findOp(name: string): AnyOp | undefined {
   return OPS.find((op) => op.name === name)
 }
+
+// The action log merges old runs of the same edit by what each op says.
+setOpCoalesceLookup((name) => {
+  const op = findOp(name)
+  return op ? { last: op.coalesce === 'last', key: op.coalesceKey ?? [] } : undefined
+})

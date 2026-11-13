@@ -108,8 +108,18 @@ export const ActionHistoryPane: React.FC<ActionHistoryPaneProps> = ({ collapsed,
 
     // Rows can go away under the selection (dropped redo side, a collapse).
     const live = useMemo(() => new Set(rowIds), [rowIds])
-    const sel = useMemo(() => new Set([...selected].filter((id) => live.has(id))), [selected, live])
-    const active = anchor !== null && live.has(anchor) ? anchor : null
+    // A step merged into an older run's row is selected as that row.
+    const mergedInto = useMemo(() => {
+        const m = new Map<string, string>()
+        for (const s of steps) for (const old of s.mergedIds) m.set(stepRowId(old), stepRowId(s.id))
+        return m
+    }, [steps])
+    const sel = useMemo(
+        () => new Set([...selected].map((id) => mergedInto.get(id) ?? id).filter((id) => live.has(id))),
+        [selected, live, mergedInto],
+    )
+    const anchorRow = anchor !== null ? mergedInto.get(anchor) ?? anchor : null
+    const active = anchorRow !== null && live.has(anchorRow) ? anchorRow : null
 
     /** The steps of the selection, oldest first; an op row counts as its step. */
     const selectedStepIds = useMemo(() => {
@@ -318,7 +328,7 @@ export const ActionHistoryPane: React.FC<ActionHistoryPaneProps> = ({ collapsed,
                 .join(' ')
             return {
                 id,
-                label: rowLabel(id, step.text, ''),
+                label: rowLabel(id, step.mergedCount > 1 ? `${step.text} ×${step.mergedCount}` : step.text, ''),
                 secondaryLabel: step.source ? <span className="action-row-source type-caption">{step.source}</span> : undefined,
                 isSelected: sel.has(id),
                 isExpanded: expandable && expanded.has(id),
