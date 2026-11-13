@@ -11,6 +11,7 @@
 #include "ObjWriter.hpp"
 #include "style/AutoStyleCtxt.hpp"
 #include "style/StyleSet.hpp"
+#include "anim/AnimObj.hpp"
 #include "QdfStream.hpp"
 
 #include <boost/filesystem/operations.hpp>
@@ -289,6 +290,7 @@ qlib::LScrSp<qlib::LByteArray> SceneXMLWriter::toByteArray(const qlib::LScrSp<ql
   RendererPtr pRend;
   CameraPtr pCam;
   StyleSetPtr pStySet;
+  AnimObjPtr pAnimObj;
   bool bEmbed = false;
 
   if (!pObj.isnull()) {
@@ -336,8 +338,15 @@ qlib::LScrSp<qlib::LByteArray> SceneXMLWriter::toByteArray(const qlib::LScrSp<ql
           top_type = "styles";
         }
         else {
-          MB_THROW(qlib::InvalidCastException, "toXML: obj is not obj or renderer or camera");
-          return qlib::LScrSp<qlib::LByteArray>();
+          pAnimObj = AnimObjPtr(pSObj, qlib::no_throw_tag());
+          if (!pAnimObj.isnull()) {
+            // pSObj is an animation element (the qsc <motion> element)
+            top_type = "motion";
+          }
+          else {
+            MB_THROW(qlib::InvalidCastException, "toXML: obj is not obj or renderer or camera");
+            return qlib::LScrSp<qlib::LByteArray>();
+          }
         }
       }
     }
@@ -373,6 +382,10 @@ qlib::LScrSp<qlib::LByteArray> SceneXMLWriter::toByteArray(const qlib::LScrSp<ql
     // pChNode->setAttrFlag(true);
   }
   else if (!pStySet.isnull()) {
+  }
+  else if (!pAnimObj.isnull()) {
+    // Same form as AnimMgr::writeTo2 writes each element in a qsc
+    pChNode->setTypeNameByObj(pAnimObj.get());
   }
   else {
     MB_ASSERT(false);

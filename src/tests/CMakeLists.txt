@@ -207,6 +207,7 @@ gtest_discover_tests(test_molvis PROPERTIES LABELS "test_molvis")
 add_executable(test_anim
   modules/anim/test_main.cpp
   modules/anim/test_morphmol_crdarray.cpp
+  modules/anim/test_animobj_xml.cpp
 )
 target_include_directories(test_anim PRIVATE
   ${CMAKE_SOURCE_DIR}/src

@@ -16,6 +16,7 @@
 #include "RendererFactory.hpp"
 #include "style/AutoStyleCtxt.hpp"
 #include "style/StyleFile.hpp"
+#include "anim/AnimObj.hpp"
 
 #include <qlib/FileStream.hpp>
 #include <qlib/StringStream.hpp>
@@ -382,6 +383,12 @@ qlib::LScrObjBasePtr SceneXMLReader::fromByteArray(const qlib::LByteArrayPtr &pb
     StyleFile sfile;
     StyleSetPtr pStySet = sfile.loadNodes(pNode);
     pSObj = pStySet;
+  }
+  else if (tag.equals("motion") && !type_name.isEmpty()) {
+    // pbuf contains an animation element (as AnimMgr::readFrom2 reads it)
+    AnimObjPtr pAnimObj = pNode->createObjByTypeNameT<AnimObj>();
+    pAnimObj->readFrom2(pNode);
+    pSObj = pAnimObj;
   }
   else {
     MB_DPRINTLN("readRendFromXML> ERROR, Invalid QSC XML: <%s>", tag.c_str());
