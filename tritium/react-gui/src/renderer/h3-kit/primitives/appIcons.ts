@@ -98,6 +98,7 @@ import {
   TreeStructure,
   Trash,
   Wrench,
+  DotsThree,
   X,
 } from "@phosphor-icons/react";
 // Data-layer icons (scene/struct tree nodes, tabs, settings tree, anim tracks).
@@ -230,6 +231,8 @@ export const APP_ICONS = {
   "ui.add": { lib: "phosphor", Comp: Plus },
   "ui.remove": { lib: "phosphor", Comp: Minus },
   "ui.trash": { lib: "phosphor", Comp: Trash },
+  // Overflow menu of a toolbar that ran out of width.
+  "ui.more": { lib: "phosphor", Comp: DotsThree },
   // Clipboard trio. Copy reuses `ui.duplicate` (same glyph, already the
   // copy-to-clipboard button in RenderResultPane).
   "ui.duplicate": { lib: "phosphor", Comp: Copy },

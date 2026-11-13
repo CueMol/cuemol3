@@ -17,6 +17,17 @@
   background: var(--bg-panel-header);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  /* Never wraps: groups that do not fit move into the "more" popover
+     (usePriorityOverflow), so nothing is clipped by the fixed row height. */
+  overflow: hidden;
+}
+
+.anim-transport > * {
+  flex-shrink: 0;
+}
+
+.anim-transport .h3-form-btn-row {
+  flex-wrap: nowrap;
 }
 
 .anim-readout {
@@ -49,8 +60,23 @@
   width: var(--anim-startcam-w);
 }
 
-.anim-zoom {
+/* Zoom and the "more" button sit at the right end; whichever comes first
+   takes the free space. */
+.anim-zoom,
+.anim-overflow {
   margin-left: auto;
+}
+
+.anim-zoom + .anim-overflow {
+  margin-left: 0;
+}
+
+/* "More" popover: the header groups that did not fit, one form row each. */
+.anim-overflow-menu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
 }
 
 /* ── Body: channel list + scrollable timeline ── */
