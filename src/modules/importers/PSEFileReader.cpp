@@ -48,6 +48,50 @@ using molstr::MolAtom;
 using molstr::MolAtomPtr;
 using molstr::ResidIndex;
 
+namespace {
+
+/// Appends pAtom to pMol, renaming it when its name clashes with an atom
+/// already in the residue. PyMOL allows duplicate atom names in a residue
+/// (e.g. a ligand whose atoms are all named after their element), but
+/// MolCoord identifies atoms by chain, residue and name, so the duplicates
+/// would be dropped. The new names follow PDBFileReader::readAtom():
+/// <name><NN> ("C00", "C01", ...), and <N><name><NN> ("1H00", ...) for
+/// one-letter names past 100 duplicates.
+/// @param rbRenamed set to true when the atom got a new name
+/// @return the atom ID, or -1 when the atom could not be appended
+int appendAtomRenamingDup(MolCoordPtr pMol, MolAtomPtr pAtom, bool &rbRenamed)
+{
+  const LString aname = pAtom->getName();
+  rbRenamed = false;
+  for (int inum = 0;; ++inum) {
+    const int aid = pMol->appendAtom(pAtom);
+    if (aid >= 0)
+      return aid;
+
+    // a failure other than a name clash is not retried
+    MolAtomPtr pClash = pMol->getAtom(pAtom->getChainName(), pAtom->getResIndex(),
+                                      pAtom->getName(), pAtom->getConfID());
+    if (pClash.isnull())
+      return -1;
+
+    LString newname;
+    if (inum < 100) {
+      if (aname.length() > 2)
+        return -1;
+      newname = LString::format("%s%02d", aname.c_str(), inum % 100);
+    }
+    else {
+      if (aname.length() > 1 || inum >= 1000)
+        return -1;
+      newname = LString::format("%d%s%02d", inum / 100, aname.c_str(), inum % 100);
+    }
+    pAtom->setName(newname);
+    rbRenamed = true;
+  }
+}
+
+}  // namespace
+
 PSEFileReader::PSEFileReader()
   : m_pSet(NULL), m_bColorWarned(false)
 {
@@ -469,6 +513,7 @@ void PSEFileReader::parseObjectMolecule(LVarList *pData, MolCoordPtr pMol)
   qlib::RangeSet<int> rsSurface;
 
   std::map<int, LString> labelMap;
+  int nRenamed = 0;
 
   for (i=0; i<nind; ++i) {
     int aid = pIdxToAtm->getInt(i);
@@ -500,11 +545,16 @@ void PSEFileReader::parseObjectMolecule(LVarList *pData, MolCoordPtr pMol)
     int ncol = pAtmDat->getInt(AT_COLOR);
     pAtom->setAtomPropInt("col", convColor(ncol));
 
-    int res = pMol->appendAtom(pAtom);
+    bool bRenamed;
+    int res = appendAtomRenamingDup(pMol, pAtom, bRenamed);
     if (res<0) {
       LString msg = "Append atom failed: " + pAtom->formatMsg();
       LOG_DPRINTLN(msg);
+      // not in the molecule: keep it out of the renderer selections
+      continue;
     }
+    if (bRenamed)
+      ++nRenamed;
 
     LVarList *pVisReps = NULL;
     int bitmask = 0;
@@ -544,6 +594,10 @@ void PSEFileReader::parseObjectMolecule(LVarList *pData, MolCoordPtr pMol)
       labelMap.insert(std::pair<int, LString>(res, label));
     }
   }
+
+  if (nRenamed > 0)
+    LOG_DPRINTLN("PSEFileReader> %d atoms with duplicate names in their residue were renamed",
+                 nRenamed);
 
   pMol->applyTopology();
   pMol->calcProt2ndry(-500.0);
