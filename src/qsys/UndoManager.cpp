@@ -222,6 +222,33 @@ void UndoManager::clearAllInfo()
   }
 }
 
+bool UndoManager::mergeSteps(int start, int count)
+{
+  if (isDisabled() || m_pPendInfo!=NULL)
+    return false;
+  if (start<0 || count<2 || start+count>int(m_udata.size()))
+    return false;
+
+  // m_udata runs newest first: the group is [start, start+count), its
+  // oldest step at the end. Fold the newer ones into the oldest from the
+  // one next to it up to the newest, so the newest records end up in front.
+  UndoInfoList::iterator first = m_udata.begin();
+  std::advance(first, start);
+  UndoInfoList::iterator oldest = first;
+  std::advance(oldest, count-1);
+  UndoInfo *pTarget = *oldest;
+  UndoInfoList::iterator iter = oldest;
+  while (iter!=first) {
+    --iter;
+    pTarget->absorbNewer(*iter);
+    delete *iter;
+  }
+  m_udata.erase(first, oldest);
+
+  MB_DPRINTLN("===== Merged %d undo steps =====", count);
+  return true;
+}
+
 void UndoManager::startTxn(const LString &desc)
 {
   if (isDisabled()) return; // ignore nested txn !!

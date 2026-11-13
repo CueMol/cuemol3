@@ -41,6 +41,8 @@ const step = (id: number, undone: boolean, n = 1): ActionStepView => ({
   source: 'gui',
   time: null,
   undone,
+  mergedCount: 1,
+  mergedIds: [],
   entries: Array.from({ length: n }, (_, i) => entry(`op ${id}.${i}`)),
 })
 

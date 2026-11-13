@@ -95,6 +95,8 @@ export function rowView(row: ActionRow): ActionStepView {
     source: row.source,
     time: row.time,
     undone: row.undone,
+    mergedCount: row.mergedCount ?? 1,
+    mergedIds: row.mergedIds ?? [],
     entries: row.entries.map((e) => ({
       kind: e.kind,
       op: e.kind === 'op' ? e.op : null,

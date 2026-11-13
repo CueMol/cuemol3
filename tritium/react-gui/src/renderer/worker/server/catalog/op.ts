@@ -183,6 +183,20 @@ export interface Op<P extends ParamMap = ParamMap> {
    */
   replay?: boolean | ((args: Readonly<Record<string, unknown>>) => boolean)
   /**
+   * How a recorded call merges with the same call repeated (action log, old
+   * runs of the same edit). `'last'`: it sets values rather than changing
+   * them relative to before, so the last of a run of identical calls gives
+   * the whole result and the earlier ones can be dropped. Left out, the
+   * calls are kept in order.
+   */
+  coalesce?: 'last'
+  /**
+   * Arguments besides its node arguments that say what a call writes (a
+   * property name, a path): calls that differ in them are different edits,
+   * never merged or dropped for one another. Values are never part of it.
+   */
+  coalesceKey?: readonly string[]
+  /**
    * One short line saying what a recorded call did, for the undo history
    * (`Set width = 2.5 on 1crn/cartoon1`). `name` gives a node argument by the
    * path it had when the call ran, or `#uid`. Without it the history shows
