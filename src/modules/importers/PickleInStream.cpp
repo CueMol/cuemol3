@@ -7,11 +7,64 @@
 
 #include "PickleInStream.hpp"
 
+#include <cerrno>
+#include <cstdlib>
 #include <memory>
 #include <string>
 #include <utility>
 
 using namespace importers;
+
+namespace {
+
+/// Recognizes _codecs.encode(<str>, "latin1"), which is how Python 3 writes a
+/// bytes object under pickle protocols 0-2 (e.g. the "wizard" entry of PyMOL
+/// 2.x sessions), and returns the bytes it encodes. The str argument arrives
+/// as BINUNICODE, i.e. UTF-8, so every code point (at most 0xFF for latin1)
+/// is mapped back to one byte.
+bool decodeLatin1Bytes(const LVariant *pFunc, const LVariant *pArgs, LString &rBytes)
+{
+  // GLOBAL pushes ["global", module, name]; TUPLE / EMPTY_TUPLE push a list
+  if (!pFunc->isList() || !pArgs->isList())
+    return false;
+  const LVarList *pf = pFunc->getListPtr();
+  const LVarList *pa = pArgs->getListPtr();
+  if (pf->size() != 3 || !pf->at(1)->isString() || !pf->at(2)->isString())
+    return false;
+  if (!(pf->getString(1) == "_codecs") || !(pf->getString(2) == "encode"))
+    return false;
+  if (pa->size() != 2 || !pa->at(0)->isString() || !pa->at(1)->isString())
+    return false;
+  const LString &enc = pa->at(1)->getStringValue();
+  if (!(enc == "latin1") && !(enc == "latin-1"))
+    return false;
+
+  const LString &text = pa->at(0)->getStringValue();
+  std::string out;
+  out.reserve(text.length());
+  for (int i = 0; i < text.length(); ++i) {
+    const unsigned char c = static_cast<unsigned char>(text.getAt(i));
+    if (c < 0x80) {
+      out += char(c);
+    }
+    else if ((c & 0xE0) == 0xC0 && i + 1 < text.length()) {
+      // two-byte sequence: U+0080..U+07FF; only U+0080..U+00FF is latin1
+      const unsigned char c2 = static_cast<unsigned char>(text.getAt(++i));
+      const unsigned int cp = ((c & 0x1Fu) << 6) | (c2 & 0x3Fu);
+      if ((c2 & 0xC0) != 0x80 || cp > 0xFF)
+        return false;
+      out += char(cp);
+    }
+    else {
+      // longer sequences encode code points above 0xFF: not latin1
+      return false;
+    }
+  }
+  rBytes = LString(out);
+  return true;
+}
+
+}  // namespace
 
 PickleInStream::~PickleInStream()
 {
@@ -128,14 +181,14 @@ LVariant *PickleInStream::getMap()
       
     case BINPUT: {
       int i = read();
-      putMemo(i, false);
+      putMemo(i);
       // MB_DPRINTLN("BINPUT %d OK", i);
       break;
     }
       
     case LONG_BINPUT: {
       int i = readIntLE();
-      putMemo(i, true);
+      putMemo(i);
       // MB_DPRINTLN("LONG_BINPUT %d OK", i);
       break;
     }
@@ -302,6 +355,61 @@ LVariant *PickleInStream::getMap()
       int i = getMark();
       push(getObjects(i));
       // MB_DPRINTLN("TUPLE %d", i);
+      break;
+    }
+
+    case EMPTY_TUPLE:
+      // tuples are represented as lists, as for TUPLE
+      push(createList());
+      break;
+
+    case REDUCE: {
+      // callable(*args). Python 3 writes it for objects such as the
+      // pymol.Session_Storage in PyMOL 2.x sessions, and for every bytes
+      // value under protocols 0-2 (as _codecs.encode).
+      if (m_stack.size() < 2) {
+        MB_THROW(qlib::FileFormatException, "Invalid pickle format (REDUCE stack underflow)");
+        return NULL;
+      }
+      std::unique_ptr<LVariant> pArgs(pop());
+      std::unique_ptr<LVariant> pFunc(pop());
+      LString bytes;
+      if (decodeLatin1Bytes(pFunc.get(), pArgs.get(), bytes)) {
+        push(createString(bytes));
+      }
+      else {
+        // keep the call unevaluated, in the same shape as GLOBAL
+        LVariant *o = createList();
+        o->getListPtr()->push_back(createString("reduce"));
+        o->getListPtr()->push_back(pFunc.release());
+        o->getListPtr()->push_back(pArgs.release());
+        push(o);
+      }
+      break;
+    }
+
+    case LONG: {
+      // Python 3 writes an int outside the signed 32-bit range as
+      // "L<digits>L\n" under protocols 0-1, e.g. the PyMOL 2.x atom flags
+      // 0x88000040. A value that fits in 32 bits keeps its 32-bit pattern,
+      // as INT does for the same flags in Python 2 sessions; a larger one
+      // is kept as a real so that its magnitude is not lost.
+      LString s = readString();
+      if (!s.isEmpty() && s.getAt(s.length() - 1) == 'L')
+        s = s.substr(0, s.length() - 1);
+      const char *cstr = s.c_str();
+      char *pend = NULL;
+      errno = 0;
+      const long long v = std::strtoll(cstr, &pend, 10);
+      if (pend == cstr || *pend != '\0') {
+        LString msg = LString::format("Invalid pickle format (invalid LONG op %s)", s.c_str());
+        MB_THROW(qlib::FileFormatException, msg);
+        return NULL;
+      }
+      if (errno != ERANGE && v >= -2147483648LL && v <= 4294967295LL)
+        push(createInt(static_cast<int>(static_cast<unsigned int>(v & 0xffffffffLL))));
+      else
+        push(createFloat(std::strtod(cstr, NULL)));
       break;
     }
 

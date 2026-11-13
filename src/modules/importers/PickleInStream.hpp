@@ -83,6 +83,9 @@ namespace importers {
     static const int LONG_BINGET = 106; /* j */
     static const int TUPLE = 116; /* t */
     static const int INT = 73; /* I */
+    static const int EMPTY_TUPLE = 41; /* ) */
+    static const int REDUCE = 82; /* R */
+    static const int LONG = 76; /* L */
 
     typedef qlib::LVariant variant_t;
 
@@ -224,18 +227,17 @@ namespace importers {
     ValTable m_memo;
     int m_retrieveCount;
 
-    void putMemo(int i, bool doCheck)
+    void putMemo(int i)
     {
       LVariant *o = peek();
 
-      if (o->isString()) {
-        // XXX: handle the inMovie case
-        // if (doCheck && markCount >= 6 || markCount == 3 && inMovie)
-        //  return;
-        if (doCheck && m_markCount >= 6)
-          return;
+      // Only strings are memoized; containers are not shared in PSE files.
+      // Every string must be kept, however deep: Python 3 pickles (PyMOL
+      // 2.x sessions) memoize per-atom strings such as residue numbers once
+      // and reuse them through LONG_BINGET. (The Jmol original skipped
+      // LONG_BINPUT strings at mark depth >= 6, which loses those.)
+      if (o->isString())
         m_memo[i] = *o;
-      }
     }
 
     /// Returns a new copy of the memoized value (owned by the caller),
