@@ -10,12 +10,18 @@
  * The one exception is `addElement`, which can seed the manager's start camera
  * (UXP parity, see `ensureStartCam` worker-side). That is a manager property
  * change with no event behind it, so the post-add snapshot is pushed to
- * `onMgrState` instead of being waited for.
+ * `onMgrState` instead of being waited for. A paste can seed it the same way,
+ * so the snapshot is read once it is done.
+ *
+ * Copy and paste go through the OS clipboard like the other panes' copy and
+ * paste (`hooks/sceneTree/sceneClipIo.ts`): the worker serializes the element,
+ * main owns the clipboard.
  */
 
 import { useCallback, useRef } from "react";
 import type { AsyncCueMol } from "@renderer/worker/client/AsyncCueMol";
 import type { AnimAddType, AnimMgrState } from "@renderer/types";
+import { readSceneClip, writeSceneClip } from "@renderer/hooks/sceneTree/sceneClipIo";
 
 interface UseAnimEditOptions {
   cm: AsyncCueMol | null;
@@ -41,6 +47,14 @@ export interface UseAnimEditResult {
    * a refetch is actually coming.
    */
   setElementTime: (uid: number, startMs: number, endMs: number) => Promise<boolean>;
+  /** Put the element `uid` on the clipboard. Resolves true once it is there. */
+  copyElement: (uid: number) => Promise<boolean>;
+  /**
+   * Paste the clipboard's animation element before `insertIndex` (append when
+   * omitted). Resolves the new element's uid, or null when nothing was pasted
+   * (the clipboard holds something else, or the worker refused).
+   */
+  pasteElement: (insertIndex?: number) => Promise<number | null>;
 }
 
 /**
@@ -133,5 +147,45 @@ export function useAnimEdit({
     [],
   );
 
-  return { addElement, removeElement, moveElement, setElementTime };
+  const copyElement = useCallback((uid: number): Promise<boolean> => {
+    const c = cmRef.current;
+    const sid = sceneIdRef.current;
+    if (!c || sid === undefined) return Promise.resolve(false);
+    return c
+      .invokeService("copyNode", { sceneId: sid, nodeId: uid, nodeType: "anim" })
+      .then((res) => writeSceneClip(res))
+      .catch((e: unknown) => {
+        failed("copyNode")(e);
+        return false;
+      });
+  }, []);
+
+  const pasteElement = useCallback(async (insertIndex?: number): Promise<number | null> => {
+    const c = cmRef.current;
+    const sid = sceneIdRef.current;
+    if (!c || sid === undefined) return null;
+    const clip = await readSceneClip();
+    if (!clip || clip.kind !== "anim") return null;
+    try {
+      const res = await c.invokeService("pasteNode", {
+        sceneId: sid,
+        ...clip,
+        insertIndex,
+        viewId: viewIdRef.current,
+      });
+      // The start camera may have been seeded (no event behind it).
+      const mgr = await c.invokeService("animGetMgrState", { sceneId: sid });
+      onMgrStateRef.current?.(mgr);
+      if (!res.ok) {
+        onErrorRef.current?.("The animation element could not be pasted.");
+        return null;
+      }
+      return res.newId;
+    } catch (e) {
+      failed("pasteNode")(e);
+      return null;
+    }
+  }, []);
+
+  return { addElement, removeElement, moveElement, setElementTime, copyElement, pasteElement };
 }

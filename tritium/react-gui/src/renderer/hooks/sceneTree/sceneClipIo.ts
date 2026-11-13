@@ -11,7 +11,7 @@
 import { IPC } from '@shared/ipcChannels'
 
 /** The scene-node kinds that travel on the CueMol clipboard. */
-export type SceneClipKind = 'object' | 'renderer' | 'style' | 'camera'
+export type SceneClipKind = 'object' | 'renderer' | 'style' | 'camera' | 'anim'
 
 /** What a copy service returns for the caller to put on the clipboard. */
 export interface SceneClipPayload {

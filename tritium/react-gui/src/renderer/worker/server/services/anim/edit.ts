@@ -20,6 +20,7 @@ import type { WorkerContext } from "@renderer/worker/server/types/WorkerContext"
 import type { AnimAddType } from "@renderer/types";
 import { fail, ok } from "@renderer/worker/shared/result";
 import {
+  getAnimMgrOrNull,
   isFiniteMs,
   makeTimeValue,
   readAnimGraph,
@@ -32,7 +33,7 @@ import { undoTxnResult } from "../withUndoTxn";
 import { animElementSpec, findByUid } from "./detail";
 import { recordOp } from "@renderer/worker/server/actions/serviceOps";
 import { applyTiming } from "./elementWrites";
-import { readMgrState } from "./read";
+import { readElement, readMgrState } from "./read";
 import type { TimeRefNode } from "./timeRefGraph";
 import { goneFail, noMgrFail } from "./types";
 import type {
@@ -325,4 +326,79 @@ export function moveElement(
     else mgr.append(found.obj);
     return ok();
   });
+}
+
+/** What `pasteElement` needs besides the scene. */
+export interface PasteElementArgs {
+  /** The element's XML (`StreamManager.toXML` of an AnimObj), as a C++ byte array. */
+  xml: unknown;
+  /** Insert before this strip index; past the end (or absent) appends. */
+  insertIndex?: number;
+  /** The view whose camera seeds the start camera when the scene has none. */
+  viewId?: number;
+  /**
+   * Record the paste for the action log, with the element it goes before
+   * (as `add_anim` names it), or null when it is appended. Called inside the
+   * undo transaction.
+   */
+  record: (before: string | null) => void;
+}
+
+/**
+ * Restore a copied element into the scene and place it in time after the
+ * element before it.
+ *
+ * Its own properties come from the XML. Its name is made unique, and its
+ * timing keeps only the length: it chains to the element before the
+ * insertion point with no delay, as an added element does, or, when that
+ * element cannot be chained to, starts as an absolute time where that element
+ * ends (as the strip shows it). The source's own chain is never kept: it may
+ * name an element this scene does not have.
+ */
+export function pasteElement(ctx: WorkerContext, scene: Scene, args: PasteElementArgs): AnimAddResult {
+  const mgr = getAnimMgrOrNull(scene);
+  if (!mgr) return noMgrFail();
+  ensureStartCam(scene, mgr, args.viewId);
+  const read = readAnimGraph(mgr);
+  const r = undoTxnResult(scene, "Paste animation element", () => {
+    const obj = ctx.strMgr.fromXML(args.xml as Parameters<typeof ctx.strMgr.fromXML>[0], scene.uid) as unknown as AnimObj | null;
+    if (!obj || typeof (obj as unknown as { timeRefName?: unknown }).timeRefName !== "string") {
+      return fail("The clipboard does not hold an animation element.", "invalid-args");
+    }
+    const name = safeStr(() => obj.name);
+    let taken = name === "";
+    try {
+      taken = taken || !!mgr.getByName(name);
+    } catch {
+      /* treat as free */
+    }
+    if (taken) obj.name = uniqueElementName(mgr, name.replace(/\d+$/, "") || "anim");
+
+    const size = mgr.size;
+    const insertAt =
+      args.insertIndex !== undefined && args.insertIndex >= 0 && args.insertIndex < size ? args.insertIndex : size;
+
+    const lengthMs = Math.max(0, safeNum(() => obj.end.millisec) - safeNum(() => obj.start.millisec));
+    const chain = autoChainName(mgr, read, insertAt);
+    let startMs = 0;
+    if (chain === "" && insertAt > 0) {
+      const prev = mgr.getAt(insertAt - 1) as AnimObj | null;
+      if (prev) startMs = readElement(prev, insertAt - 1, read.graph.byUid.get(safeNum(() => prev.uid))).absEndMs;
+    }
+    obj.timeRefName = chain;
+    const tvS = makeTimeValue(ctx, startMs);
+    const tvE = makeTimeValue(ctx, startMs + lengthMs);
+    if (!tvS || !tvE) return fail("TimeValue create failed", "native");
+    obj.start = tvS;
+    obj.end = tvE;
+
+    const beforeUid = insertAt < size ? safeNum(() => (mgr.getAt(insertAt) as AnimObj).uid) : null;
+    args.record(beforeUid === null ? null : animElementSpec(mgr, beforeUid));
+
+    if (insertAt < size) mgr.insertBefore(insertAt, obj);
+    else mgr.append(obj);
+    return ok({ uid: obj.uid, index: insertAt });
+  });
+  if (!r.ok) return { ...r, mgr: readMgrState(mgr) };
+  return ok({ uid: r.uid, index: r.index, mgr: readMgrState(mgr) });
 }

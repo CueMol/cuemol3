@@ -40,6 +40,7 @@ import { useAnimTimeline } from "./useAnimTimeline";
 import { useAnimTransport } from "./useAnimTransport";
 import { useAnimEdit } from "./useAnimEdit";
 import { useInspectorActions } from "@renderer/state/inspector";
+import { useClipboardScope } from "@renderer/hooks/useClipboardScope";
 import { useShowErrorAlert } from "@renderer/dialogs/ErrorAlertDialogProvider";
 import { AnimTransport } from "@renderer/features/animation/anim/AnimTransport";
 import { AnimTimeRuler } from "@renderer/features/animation/anim/AnimTimeRuler";
@@ -142,7 +143,7 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
     baseMgr: timeline?.mgr ?? null,
     onError: onTransportError,
   });
-  const { addElement, removeElement, moveElement, setElementTime } = useAnimEdit({
+  const { addElement, removeElement, moveElement, setElementTime, copyElement, pasteElement } = useAnimEdit({
     cm,
     sceneId: activeSceneId,
     viewId: activeMolViewId,
@@ -360,6 +361,35 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
     setSelectedUid(next?.uid ?? null);
   }, [selectedIndex, selectedUid, elements, removeElement]);
 
+  // A pasted element is selected before the refetched timeline lists it (the
+  // refetch follows the worker's event, debounced). Until it shows up, the
+  // effect below must not take it for a deleted element and drop it.
+  const pendingUidRef = useRef<number | null>(null);
+
+  // Edit > Cut / Copy / Paste while the panel is where the user is working.
+  // A paste goes right after the selected element (the end without one),
+  // as Add does, and selects what it pasted.
+  useClipboardScope("anim-strip", {
+    copy: () => {
+      if (selectedUid !== null) void copyElement(selectedUid);
+    },
+    cut: () => {
+      if (selectedUid === null) return;
+      const uid = selectedUid;
+      // Delete only once the copy is on the clipboard (Camera pane rule).
+      void copyElement(uid).then((ok) => {
+        if (ok) handleDelete();
+      });
+    },
+    paste: () => {
+      void pasteElement(addInsertIndex).then((uid) => {
+        if (uid === null) return;
+        pendingUidRef.current = uid;
+        setSelectedUid(uid);
+      });
+    },
+  });
+
   // Reset the selection on scene switch so a stale uid from the previous scene
   // is never emitted against the new scene's inspector.
   useEffect(() => {
@@ -402,7 +432,10 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
     }
     const el = elements.find((e) => e.uid === selectedUid);
     if (el) {
+      if (pendingUidRef.current === el.uid) pendingUidRef.current = null;
       showAnimElement(activeSceneId, el.uid);
+    } else if (pendingUidRef.current === selectedUid) {
+      // Just pasted; the timeline has not caught up yet.
     } else {
       setSelectedUid(null);
       clearAnimElement(activeSceneId);
@@ -423,7 +456,7 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
   }
 
   return (
-    <div className="animation-panel">
+    <div className="animation-panel" data-clipboard-scope="anim-strip">
       <AnimTransport
         mgr={tmgr}
         fps={timeline?.fps ?? 30}

@@ -19,7 +19,7 @@ import type { ClipForm, ClipKind, PaintClipEntry } from '../cuemolClipboard'
  */
 export type CuemolClipWriteReq =
   | {
-      kind: 'object' | 'renderer' | 'camera' | 'style'
+      kind: 'object' | 'renderer' | 'camera' | 'style' | 'anim'
       /** Renderer payload shape; 'rendArray' for a group / multi copy. */
       form?: ClipForm
       bytes: Uint8Array
@@ -34,7 +34,7 @@ export type CuemolClipWriteReq =
  */
 export type CuemolClipReadRes =
   | {
-      kind: 'object' | 'renderer' | 'camera' | 'style'
+      kind: 'object' | 'renderer' | 'camera' | 'style' | 'anim'
       form: ClipForm
       bytes: Uint8Array
     }
