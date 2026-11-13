@@ -309,3 +309,45 @@ TEST(UndoManagerTest, FailedRollbackDropsTheHistory)
     commitOne(um, "later", new CountEditInfo());
     EXPECT_EQ(um.getUndoSize(), 1);
 }
+
+namespace {
+
+// An EditInfo that logs the order its undo / redo run in.
+class OrderEditInfo : public EditInfo {
+public:
+    std::string *log;
+    std::string name;
+    OrderEditInfo(std::string *p, const char *n) : log(p), name(n) {}
+    bool undo() override { *log += "u" + name + " "; return true; }
+    bool redo() override { *log += "r" + name + " "; return true; }
+    bool isUndoable() const override { return true; }
+    bool isRedoable() const override { return true; }
+};
+
+}  // namespace
+
+// Adjacent steps merged into one keep their order: undo runs the newest
+// record first, redo the oldest; the step keeps the oldest description.
+TEST(UndoManagerTest, MergeStepsKeepsOrderAndOldestDesc)
+{
+    UndoManager um;
+    std::string log;
+    commitOne(um, "a", new OrderEditInfo(&log, "a"));
+    commitOne(um, "b", new OrderEditInfo(&log, "b"));
+    commitOne(um, "c", new OrderEditInfo(&log, "c"));
+
+    EXPECT_FALSE(um.mergeSteps(2, 2));  // past the stack
+    ASSERT_TRUE(um.mergeSteps(1, 2));   // a and b, below the newest
+    EXPECT_EQ(um.getUndoSize(), 2);
+    LString desc;
+    ASSERT_TRUE(um.getUndoDesc(1, desc));
+    EXPECT_STREQ(desc.c_str(), "a");
+
+    ASSERT_TRUE(um.undo());
+    ASSERT_TRUE(um.undo());
+    EXPECT_EQ(log, "uc ub ua ");
+    log.clear();
+    ASSERT_TRUE(um.redo());
+    EXPECT_EQ(log, "ra rb ");
+    EXPECT_EQ(um.getRedoSize(), 1);
+}

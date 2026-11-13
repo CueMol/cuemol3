@@ -44,6 +44,12 @@ namespace qsys {
         m_data.push_front(pei);
       }
 
+      /// Take over the records of the step committed right after this one:
+      /// they go in front, so undo still runs them first and redo last.
+      void absorbNewer(UndoInfo *pNewer) {
+        m_data.splice(m_data.begin(), pNewer->m_data);
+      }
+
       void clear() {
         while (m_data.size()>0) {
           EditInfo *pei = m_data.front();
@@ -141,6 +147,13 @@ namespace qsys {
 
     /// Discard all Undo/Redo infomation
     void clearAllInfo();
+
+    /// Merge `count` adjacent undo steps into one, starting `start` steps
+    /// below the newest (0 is the newest) and going older. The merged step
+    /// keeps the oldest step's description; undoing it takes the scene back
+    /// to before the oldest step. Does nothing (false) inside a transaction,
+    /// for count < 2, or for a range outside the undo stack.
+    bool mergeSteps(int start, int count);
 
     void startTxn(const LString &desc);
     void addEditInfo(EditInfo *pei);

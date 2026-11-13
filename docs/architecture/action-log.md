@@ -63,6 +63,39 @@ undo / redo、`clearUndoData`、scene の読み込み (`clearAllData`) など、
 - `undone` の印は `getUndoSize()` に合わせる。
 - scene が無くなっていたら、その記録を消す。
 
+### 1.3 同じ編集の run をまとめる
+
+マウス操作などで、同じ対象への同じ編集が続けて何十 step も積まれることがある (Inspector の数値を
+何度も変える、など)。そこで commit のたびに (`txnEnd`、reconcile の後)、undo stack が
+`MAX_UNDO_STEPS` (20) 件より多い間は、まとめられる run を古い方から 1 つずつまとめる。20 件以下に
+なるか、まとめられる run が無くなったら止める。まとめられる run が無ければ、20 件を超えたまま
+残る。
+
+- **run**: 隣り合った 2 行以上で、signature が同じもの。signature は label と、各 op の key の並び。
+  - op の key = op 名 + node 引数 (`refs` の key) + op が `coalesceKey` で名指す引数
+    (`set_node_prop` なら `nodeType` / `nodeId` / `prop`、`reset_prop` なら `path`)。値は含めない。
+    property 名を含めるので、同じ renderer の別の property への書き込みは別の run になる。
+  - signature を持つのは、`source` が `gui` で、undone でなく、entries がすべて op の行だけ。
+    `cmd` / `pym` / `mcp` / `ai` / `qax` と、reconcile で作り直した行 (`source` が null) はまとめず、
+    run を区切る。script や MCP の実行は対象にならない。
+- **隣り合ったものだけ**: 間に別の操作がある行どうしはまとめない。まとめても、残った step の
+  境目はどれも、scene が実際に通った状態のままになる (Undo / Go to step で行ける状態が変わらない)。
+- **C++**: `Scene.mergeUndoSteps(start, count)` (`UndoManager::mergeSteps`)。新しい方から数えた
+  位置 `start` から `count` 個の step を、一番古い step に吸収して 1 つにする。説明文は一番古い
+  step のもの。undo は新しい edit から順に戻し、redo は古い順にやり直すので、1 回の undo / redo
+  で run 全体が戻る / 進む。txn が開いている間と、範囲が stack からはみ出すときは false を返す。
+- **行**: run を 1 行にする。id・time・source は一番新しい行のもの、label は一番古い行のもの。
+  `mergedCount` (何 commit 分か)、`mergedIds` (吸収した行の id)、`runKey` (signature) を持つ。
+  `runKey` があるので、後から隣に来た同じ編集の行も同じ run としてまとまる。
+- **entries の圧縮**: run の op がすべて値を設定するだけの op (`Op.coalesce: 'last'`。
+  `set_node_prop`、`reset_prop`、`set_mol_selection`) なら、一番新しい行の op だけを残す。どの行も
+  同じ key に書くので、最後の書き込みだけで結果が決まる。それ以外の run は op を古い順に全部並べる。
+- C++ の結合が失敗したら (false か例外)、reconcile して止める。
+- **保存で区切らない**: 保存 (`saveScene.ts`) は `clearUndoData` で undo stack を空にするので、
+  保存の前後の行がまとまることはない。
+- **切り替え**: `actionLog.ts` の `COALESCE_STEPS` (既定 true)。GUI からは切り替えない。問題が
+  出たときに false にしてリリースするためのもの。false なら、今までどおり commit ごとに 1 step。
+
 ## 2. 何が記録されるか
 
 ### 2.1 op (console・MCP・agent・qax の再生)
@@ -379,6 +412,8 @@ activity bar の **Actions** view (built-in。`shell/ActivityBar.tsx`、`shell/S
 - 表示文は行の幅で省略 (`...`) される。省略された行は、hover で全文を kit の `Tooltip` に出す
   (list-kit の `TruncatedText`。ラベルの右側、省略されていない行には出さない)。
 - op が 2 つ以上ある行だけを展開でき、子行は op ごとの表示文になる。
+- run をまとめた行 (§1.3) は、表示文の後ろに `×N` (`mergedCount`) を付ける。選択や Inspector の
+  対象だった行がまとめられたら、まとめた行に付け替える (`mergedIds` から引く)。
 - 行の id は `initial` / `s:<step id>` / `e:<step id>:<op index>`。
 - 取得は `useActionSteps` (`useLiveFetch` + `SEM_SCENE` の listener) と、§5.5 の push。
 
@@ -422,10 +457,11 @@ handler は `features/actions/useActionCommands.ts`)。
 - 他の Inspector ページと同じ部品で組む (`FlatSection` の見出しと、`PropertyField` + readonly の
   `TextField` の行。`docs/migration/ui-style-guide.md` §0)。
 - **Step** 欄: Undo label (C++ の説明文)、From (source)、Time、State (done / undone)。op が複数なら
-  Ops 行 (個数)。
+  Ops 行 (個数)。まとめた行 (§1.3) なら Merged 行 (何 step 分か)。
 - **Op** 欄 (op が 1 つの step と、op の子行): Name、Command (コマンド行)、引数ごとの行。op が
   複数の step は op を列挙せず、各 op は子行から見る。
 - header の名前は step (または op) の表示文で、本文では繰り返さない。
+- 対象の step が run としてまとめられたら、まとめた行の Step 欄を出す (Op 欄は出さない)。
 - step が履歴から消えたら、閉じずに「This step is no longer in the undo history.」を出す。
 
 ### 5.4 表示文
@@ -499,6 +535,8 @@ Render image、360 degree spin、Front, side and top cameras。既存の op で�
 |---|---|
 | `tritium/react-gui/src/renderer/__test__/actionLog.test.ts` | nest した txn が 1 行になる / rollback と空の commit では行が増えない / undo・redo への追従と redo 側の切り捨て / stack の clear と scene 破棄後の reconcile / op を実行前の path で 1 回だけ記録し、replay の op は commit 時だけ残す / service の記録が、op 側の `readToolArgs` で読める引数になっている |
 | 同上 (GUI 向け) | `getUndoState` の表示文 (`describe`、fallback、`(+N more)`、op の無い行は説明文) / undo の service の後に actions-changed を通知する / step id で選んだ行の qax 書き出しと、消えた step の拒否 |
+| `tritium/react-gui/src/renderer/__test__/actionLogCoalesce.test.ts` | 上限まではまとめず、超えたら最新を含む全 run を一度にまとめる (C++ の stack も同じ数になる) / 後から来た同じ編集の行が run に加わる / key の違い・間の別の操作・GUI 以外の source ではまとめない / 値を設定する run は最新の op だけ (別 property の書き込みは残る)、それ以外は全 op を残す / `COALESCE_STEPS` が false ならまとめない |
+| `src/tests/qsys/test_undomanager.cpp` (`MergeStepsKeepsOrderAndOldestDesc`) | `UndoManager::mergeSteps` が一番古い説明文を残し、undo は新しい順、redo は古い順に実行する / 範囲外は false |
 | `tritium/react-gui/src/renderer/__test__/actionLibrary.test.ts` | step をマクロにして保存・読み込みし、別の object に束縛すると、その object と renderer の path になる / 2 object、範囲外の renderer の拒否 / 複数の target で 1 txn、型の違う object を飛ばして failures に返す |
 | `tritium/react-gui/src/renderer/__test__/defaultActions.test.ts` | 同梱の preset が読め、実行できる形で、全 op の引数を catalog が受け付ける |
 | `tritium/react-gui/src/renderer/__test__/actionHistoryPane.test.tsx` | 行の click / double-click / 子行の click は Inspector に出すだけで、Go to step を出さない / `goToStep` の undo・redo の量 |

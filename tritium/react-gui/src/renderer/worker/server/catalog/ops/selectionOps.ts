@@ -132,6 +132,7 @@ export const setMolSelection = defineOp({
     selection: selection('Selection expression. Empty string clears the selection.'),
   },
   mutates: true,
+  coalesce: 'last',
   describe: (a, n) => (a.selection ? `Select ${a.selection} in ${n('objId')}` : `Clear the selection of ${n('objId')}`),
   expose: { tool: 'core', console: true },
   group: 'selections',

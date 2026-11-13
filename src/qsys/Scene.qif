@@ -216,6 +216,10 @@ runtime_class Scene
   // clear all undo/redo data
   void clearUndoData() => clearUndoDataScr;
 
+  // merge `count` adjacent undo steps into one, `start` steps below the
+  // newest (0 is the newest); false when the range cannot be merged
+  boolean mergeUndoSteps(integer start, integer count);
+
   ////////////////////
   // Animation manager
   object<AnimMgr$> getAnimMgr();

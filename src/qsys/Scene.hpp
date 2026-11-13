@@ -610,6 +610,10 @@ namespace qsys {
     // this method fires event (sceneundoinfo)
     void clearUndoDataScr();
 
+    /// Merge adjacent undo steps (UndoManager::mergeSteps); fires the
+    /// undo-info event when it merged.
+    bool mergeUndoSteps(int start, int count);
+
     ////////////////////////////////////////////////
     // Animation management
   private:

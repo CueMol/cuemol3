@@ -1630,6 +1630,19 @@ void Scene::clearUndoDataScr()
   }
 }
 
+bool Scene::mergeUndoSteps(int start, int count)
+{
+  if (!m_undomgr.mergeSteps(start, count))
+    return false;
+
+  SceneEvent ev;
+  ev.setType(SceneEvent::SCE_SCENE_UNDOINFO);
+  ev.setSource(getUID());
+  ev.setTarget(getUID());
+  fireSceneEvent(ev);
+  return true;
+}
+
 ////////////////////////////////////////////////////////////////////
 // Serialization
 

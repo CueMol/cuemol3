@@ -225,6 +225,8 @@ export const setNodeProp = defineOp({
     ),
   },
   mutates: true,
+  coalesce: 'last',
+  coalesceKey: ['nodeType', 'nodeId', 'prop'],
   describe: (a, n) => `Set ${a.prop} = ${a.value} on ${a.nodeType === 'scene' || a.nodeType === 'view' ? `the ${a.nodeType}` : n('nodeId')}`,
   expose: { tool: 'core', console: true },
   group: 'properties',
