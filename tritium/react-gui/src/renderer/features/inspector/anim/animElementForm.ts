@@ -54,14 +54,6 @@ export function detailToForm(d: AnimElementDetail): FormState {
   };
 }
 
-/** Normalize an angle into [0, 360] by wrapping (UXP parity, not clamping). */
-export function wrapAngle(a: number): number {
-  let v = a;
-  while (v < 0) v += 360;
-  while (v > 360) v -= 360;
-  return v;
-}
-
 /** Which axis preset (if any) the current vector matches. */
 export function axisPreset(x: number, y: number, z: number): string {
   if (x === 1 && y === 0 && z === 0) return "x";

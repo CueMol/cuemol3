@@ -108,6 +108,22 @@
   flex: 0 0 auto;
 }
 
+/* "(x, y, z)": wraps below the select as one unit, never inside itself. */
+.anim-axis-vec {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* The axis cells give up width when even the group alone does not fit, so
+   the closing paren stays on the same line. */
+.anim-axis-vec .h3-form-number-cell {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
 .anim-axis-paren {
   flex: 0 0 auto;
   color: var(--text-muted);
