@@ -158,6 +158,18 @@ describe("anim.service setAnimElementProp", () => {
     expect(objs[0].hide).toBe(false);
   });
 
+  // Every route that changes a RockSpin's pattern (inspector, set_anim_prop,
+  // the generic tab, a replayed record) goes through this one write, so the
+  // aspect it brings must land with it, in the same undo step.
+  it("pattern re-seeds aspect for the new pattern in the same transaction", () => {
+    const objs = [makeObj({ uid: 5, name: "R", className: "RockSpin", props: { pattern: "wobble", aspect: 0.3 } })];
+    const { ctx, startUndoTxn, commitUndoTxn } = makeCtx({ objs });
+    services.setAnimElementProp(ctx, { sceneId: 1, uid: 5, prop: "pattern", value: "nutate" });
+    expect(objs[0]).toMatchObject({ pattern: "nutate", aspect: 1.0 });
+    expect(startUndoTxn).toHaveBeenCalledTimes(1);
+    expect(commitUndoTxn).toHaveBeenCalledTimes(1);
+  });
+
   it("tgtAlpha maps to the C++ snake key tgt_alpha", () => {
     const objs = [makeObj({ uid: 5, name: "A", className: "ShowHideAnim", props: { tgt_alpha: 1 } })];
     const { ctx } = makeCtx({ objs });

@@ -76,6 +76,7 @@ const HOLD_MAX_MS = 1000;
 /** Add-menu entries (UXP parity). Maps to AnimObj subclasses worker-side. */
 const ADD_TYPES: { id: AnimAddType; label: string }[] = [
   { id: "SimpleSpin", label: "Simple spin" },
+  { id: "RockSpin", label: "Rock" },
   { id: "CamMotion", label: "Camera motion" },
   { id: "ShowAnim", label: "Show" },
   { id: "HideAnim", label: "Hide" },

@@ -24,6 +24,7 @@
  */
 export type AnimElementType =
   | "SimpleSpin"
+  | "RockSpin"
   | "CamMotion"
   | "ShowHideAnim"
   | "SlideInOutAnim"
@@ -41,6 +42,7 @@ export type AnimElementType =
  */
 export type AnimAddType =
   | "SimpleSpin"
+  | "RockSpin"
   | "CamMotion"
   | "ShowAnim"
   | "HideAnim"

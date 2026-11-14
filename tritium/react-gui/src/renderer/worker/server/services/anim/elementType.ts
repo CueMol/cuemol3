@@ -1,6 +1,7 @@
 import type { AnimElementType } from "@renderer/types";
 const KNOWN: readonly string[] = [
   "SimpleSpin",
+  "RockSpin",
   "CamMotion",
   "ShowHideAnim",
   "SlideInOutAnim",
@@ -38,6 +39,7 @@ export function classNameToType(obj: unknown): AnimElementType {
 
   // Fallback: distinguishing-property probe (order matters -- most specific
   // first). Mirrors the per-type props seen in the UXP property dialog.
+  if (probe(w, "pattern") && probe(w, "cycles")) return "RockSpin";
   if (probe(w, "angle") && probe(w, "axis")) return "SimpleSpin";
   if (probe(w, "endcam")) return "CamMotion";
   if (probe(w, "fade")) return "ShowHideAnim";

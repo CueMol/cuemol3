@@ -33,6 +33,7 @@ import { boolean, enumOf, optional, real, string } from '../params'
 /** The element types `add_anim` takes, by the word typed. */
 const ADD_TYPES: Readonly<Record<string, AnimAddType>> = {
   spin: 'SimpleSpin',
+  rock: 'RockSpin',
   camera: 'CamMotion',
   show: 'ShowAnim',
   hide: 'HideAnim',
@@ -45,9 +46,14 @@ const ADD_TYPE_NAMES = Object.keys(ADD_TYPES) as [string, ...string[]]
 
 /** The properties `set_anim_prop` writes, by the kind of value each takes. */
 const BOOL_PROPS = ['disabled', 'ignorerotate', 'ignorecenter', 'ignorezoom', 'ignoreslab', 'hide', 'fade'] as const
-const NUMBER_PROPS = ['quadric', 'angle', 'tgtAlpha', 'direction', 'distance', 'startValue', 'endValue'] as const
+const NUMBER_PROPS = ['quadric', 'angle', 'tgtAlpha', 'direction', 'distance', 'startValue', 'endValue', 'cycles', 'phase', 'aspect'] as const
 const TEXT_PROPS = ['name', 'timeRefName', 'endcam', 'rend', 'mol'] as const
-const SET_PROPS = [...TEXT_PROPS, ...BOOL_PROPS, ...NUMBER_PROPS, 'axis'] as const
+/** Properties that take one word out of a fixed set (RockSpin). */
+const CHOICE_PROPS: Readonly<Record<string, readonly string[]>> = {
+  pattern: ['rock', 'nutate', 'wobble'],
+  envelope: ['none', 'grow', 'shrink'],
+}
+const SET_PROPS = [...TEXT_PROPS, ...BOOL_PROPS, ...NUMBER_PROPS, 'axis', 'pattern', 'envelope'] as const
 
 /** What a failed edit says when the service gives no reason. */
 const ANIM_FAILED = 'The animation could not be changed.'
@@ -104,7 +110,8 @@ export const animList = defineOp({
 export const animAdd = defineOp({
   name: 'add_anim',
   description:
-    'Add an element to the animation: spin (rotate the view), camera (move to a camera), show / ' +
+    'Add an element to the animation: spin (rotate the view), rock (swing the view: rock, nutate ' +
+    'or wobble, set by pattern), camera (move to a camera), show / ' +
     'hide (a renderer), slidein / slideout, mol (morphing), wait (does nothing for a time). It ' +
     'follows the element before it; set what it acts on with set_anim_prop.',
   params: {
@@ -212,6 +219,10 @@ function readPropValue(prop: (typeof SET_PROPS)[number], text: string): string |
   if ((NUMBER_PROPS as readonly string[]).includes(prop)) {
     return parseNumberText(t) ?? { error: `${prop} takes a number.` }
   }
+  const choices = CHOICE_PROPS[prop]
+  if (choices !== undefined) {
+    return choices.includes(t) ? t : { error: `${prop} takes one of: ${choices.join(', ')}.` }
+  }
   if (prop === 'axis') {
     const v = t.split(/\s+/).map(Number)
     if (v.length !== 3 || v.some((x) => !Number.isFinite(x))) return { error: 'axis takes three numbers separated by spaces: 0 1 0' }
@@ -224,7 +235,9 @@ export const animSet = defineOp({
   name: 'set_anim_prop',
   description:
     'Set one property of an element, as the inspector does: name, timeRefName (the element it ' +
-    'follows; empty for none), disabled, quadric (easing); spin: angle, axis ("0 1 0"); camera: ' +
+    'follows; empty for none), disabled, quadric (easing); spin: angle, axis ("0 1 0"); rock: ' +
+    'pattern (rock / nutate / wobble; resets aspect to the pattern\'s own), angle (the full swing), ' +
+    'axis, cycles, phase (degrees), aspect, envelope (none / grow / shrink); camera: ' +
     'endcam and ignorerotate / ignorecenter / ignorezoom / ignoreslab; show / hide / slide: rend ' +
     '(the renderer), hide, fade, tgtAlpha, direction, distance; mol: mol, startValue, endValue.',
   params: {

@@ -416,6 +416,14 @@ describe("anim.service editing", () => {
     expect(res).toMatchObject({ ok: true, uid: 4242 });
   });
 
+  it("animAddElement RockSpin starts even (quadric 0)", () => {
+    const { ctx, createObj, createdObj } = makeCtx({});
+    createdObj.quadric = 0.5; // whatever the class default is
+    expect(services.animAddElement(ctx, { sceneId: 1, type: "RockSpin" }).ok).toBe(true);
+    expect(createObj).toHaveBeenCalledWith("RockSpin");
+    expect(createdObj.quadric).toBe(0);
+  });
+
   it("animAddElement is born absolute when the preceding element's chain is broken", () => {
     const objs = [
       makeObj({ uid: 1, name: "Cam0", className: "CamMotion", timeRefName: "ghost", start: 0, end: 1000, absStart: 0, absEnd: 1000 }),
@@ -567,6 +575,19 @@ describe("anim.service editing", () => {
     services.animAddElement(ctx, { sceneId: 1, type: "SimpleSpin", viewId: 7 });
     expect(saveViewToCam).not.toHaveBeenCalled();
     expect(mgr.startcam).toBe("front");
+  });
+
+  // A stale __current (saved before a molecule was loaded) once moved the
+  // first motion far off the molecule: an empty timeline begins from the view.
+  it("animAddElement saves __current again only when the timeline is empty", () => {
+    const empty = makeCtx({ cameras: ["__current"], startcam: "__current" });
+    services.animAddElement(empty.ctx, { sceneId: 1, type: "SimpleSpin", viewId: 7 });
+    expect(empty.saveViewToCam).toHaveBeenCalledWith(7, "__current");
+
+    const objs = [makeObj({ uid: 1, name: "Spin0", className: "SimpleSpin", start: 0, end: 1000, absStart: 0, absEnd: 1000 })];
+    const authored = makeCtx({ objs, cameras: ["__current"], startcam: "__current" });
+    services.animAddElement(authored.ctx, { sceneId: 1, type: "SimpleSpin", viewId: 7 });
+    expect(authored.saveViewToCam).not.toHaveBeenCalled();
   });
 
   it("animAddElement leaves the start camera alone without an active view", () => {

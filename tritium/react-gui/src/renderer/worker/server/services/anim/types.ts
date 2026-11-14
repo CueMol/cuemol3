@@ -146,7 +146,12 @@ export interface AnimElementTypeProps {
   angle?: number;
   axisX?: number;
   axisY?: number;
-  axisZ?: number; // SimpleSpin
+  axisZ?: number; // SimpleSpin / RockSpin
+  pattern?: RockPattern;
+  cycles?: number;
+  phase?: number;
+  aspect?: number;
+  envelope?: RockEnvelope; // RockSpin
   endcam?: string;
   ignorerotate?: boolean;
   ignorecenter?: boolean;
@@ -189,6 +194,11 @@ export interface GetAnimElementDetailArgs {
 export type GetAnimElementDetailResult = Ok<{ detail: AnimElementDetail }> | AnimElementFail;
 
 /** Prop keys the inspector can write. `timing` and `axis` carry object values. */
+/** RockSpin motion pattern (C++ enum names). */
+export type RockPattern = "rock" | "nutate" | "wobble";
+/** RockSpin amplitude envelope (C++ enum names). */
+export type RockEnvelope = "none" | "grow" | "shrink";
+
 export type AnimElementPropKey =
   | "name"
   | "disabled"
@@ -197,6 +207,11 @@ export type AnimElementPropKey =
   | "timing"
   | "angle"
   | "axis"
+  | "pattern"
+  | "cycles"
+  | "phase"
+  | "aspect"
+  | "envelope"
   | "endcam"
   | "ignorerotate"
   | "ignorecenter"

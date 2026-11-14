@@ -9,6 +9,7 @@ import type { AppIconKey } from "@renderer/h3-kit/primitives";
 /** Leading icon per `AnimElementType` (color-blind-safe pairing with color). */
 const TYPE_ICON: Record<AnimElementType, AppIconKey> = {
   SimpleSpin: "track.camera",
+  RockSpin: "track.camera",
   CamMotion: "track.camera",
   ShowHideAnim: "ui.eyeOpen",
   SlideInOutAnim: "track.width",

@@ -301,6 +301,7 @@
 
 /* Per-type strip colors */
 .anim-strip--SimpleSpin { background: var(--anim-type-spin); }
+.anim-strip--RockSpin { background: var(--anim-type-rock); }
 .anim-strip--CamMotion { background: var(--anim-type-cam); }
 .anim-strip--ShowHideAnim { background: var(--anim-type-showhide); }
 .anim-strip--SlideInOutAnim { background: var(--anim-type-slide); }

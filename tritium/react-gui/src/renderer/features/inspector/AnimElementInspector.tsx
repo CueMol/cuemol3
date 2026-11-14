@@ -436,6 +436,29 @@ export const AnimElementInspector: React.FC<AnimElementInspectorProps> = ({
     commit("axis", v);
   };
 
+  // Axis preset + (x, y, z): shared by SimpleSpin and RockSpin.
+  const axisRow = (
+    <div className="anim-axis-row">
+      <SelectField fill={false} value={axisSel} onChange={onAxisPreset}>
+        <option value="x">X axis</option>
+        <option value="y">Y axis</option>
+        <option value="z">Z axis</option>
+        <option value="cart">Cartesian</option>
+      </SelectField>
+      {/* The "(x, y, z)" group stays on one line; a narrow inspector
+          wraps it below the preset select as a whole. */}
+      <span className="anim-axis-vec">
+        <span className="anim-axis-paren">(</span>
+        <NumberCell value={fmtAxis(axis.x)} onCommit={(s) => commitAxisComp("x", s)} disabled={!axisEditable} aria-label="Axis X" />
+        <span className="anim-axis-paren">,</span>
+        <NumberCell value={fmtAxis(axis.y)} onCommit={(s) => commitAxisComp("y", s)} disabled={!axisEditable} aria-label="Axis Y" />
+        <span className="anim-axis-paren">,</span>
+        <NumberCell value={fmtAxis(axis.z)} onCommit={(s) => commitAxisComp("z", s)} disabled={!axisEditable} aria-label="Axis Z" />
+        <span className="anim-axis-paren">)</span>
+      </span>
+    </div>
+  );
+
   // ShowHide/Slide can target several renderers; `rend` is a comma-joined list
   // of bare names (C++ RendPropAnim splits on ',').
   const rendSet = new Set(
@@ -541,26 +564,71 @@ export const AnimElementInspector: React.FC<AnimElementInspectorProps> = ({
               onRelease={(v) => commit("angle", v)}
             />
           </PropertyField>
-          <PropertyField label="Spin axis">
-            <div className="anim-axis-row">
-              <SelectField fill={false} value={axisSel} onChange={onAxisPreset}>
-                <option value="x">X axis</option>
-                <option value="y">Y axis</option>
-                <option value="z">Z axis</option>
-                <option value="cart">Cartesian</option>
-              </SelectField>
-              {/* The "(x, y, z)" group stays on one line; a narrow inspector
-                  wraps it below the preset select as a whole. */}
-              <span className="anim-axis-vec">
-                <span className="anim-axis-paren">(</span>
-                <NumberCell value={fmtAxis(axis.x)} onCommit={(s) => commitAxisComp("x", s)} disabled={!axisEditable} aria-label="Axis X" />
-                <span className="anim-axis-paren">,</span>
-                <NumberCell value={fmtAxis(axis.y)} onCommit={(s) => commitAxisComp("y", s)} disabled={!axisEditable} aria-label="Axis Y" />
-                <span className="anim-axis-paren">,</span>
-                <NumberCell value={fmtAxis(axis.z)} onCommit={(s) => commitAxisComp("z", s)} disabled={!axisEditable} aria-label="Axis Z" />
-                <span className="anim-axis-paren">)</span>
-              </span>
-            </div>
+          <PropertyField label="Spin axis">{axisRow}</PropertyField>
+        </FlatSection>
+      )}
+
+      {type === "RockSpin" && (
+        <FlatSection title="RockSpin">
+          <PropertyField label="Pattern">
+            {/* The worker re-seeds `aspect` for the new pattern. */}
+            <SelectField value={t.pattern ?? "rock"} onChange={(v) => commit("pattern", v)}>
+              <option value="rock">Rock</option>
+              <option value="nutate">Nutate</option>
+              <option value="wobble">Wobble</option>
+            </SelectField>
+          </PropertyField>
+          <PropertyField label="Axis">{axisRow}</PropertyField>
+          <PropertyField label="Swing angle">
+            {/* The full swing (+/- half of it); unbounded like Rotation angle. */}
+            <DragNumericField
+              value={form.angle}
+              step={1}
+              pxPerStep={1}
+              decimals={0}
+              unit="°"
+              onChange={(v) => setField({ angle: v })}
+              onRelease={(v) => commit("angle", v)}
+            />
+          </PropertyField>
+          <PropertyField label="Cycles">
+            <DragNumericField
+              value={form.cycles}
+              min={0}
+              step={0.5}
+              decimals={2}
+              onChange={(v) => setField({ cycles: v })}
+              onRelease={(v) => commit("cycles", v)}
+            />
+          </PropertyField>
+          <PropertyField label="Phase">
+            <DragNumericField
+              value={form.phase}
+              step={5}
+              decimals={0}
+              unit="°"
+              onChange={(v) => setField({ phase: v })}
+              onRelease={(v) => commit("phase", v)}
+            />
+          </PropertyField>
+          {t.pattern !== undefined && t.pattern !== "rock" && (
+            <PropertyField label="Aspect">
+              <DragNumericField
+                value={form.aspect}
+                min={0}
+                step={0.05}
+                decimals={2}
+                onChange={(v) => setField({ aspect: v })}
+                onRelease={(v) => commit("aspect", v)}
+              />
+            </PropertyField>
+          )}
+          <PropertyField label="Envelope">
+            <SelectField value={t.envelope ?? "none"} onChange={(v) => commit("envelope", v)}>
+              <option value="none">None</option>
+              <option value="grow">Grow</option>
+              <option value="shrink">Shrink</option>
+            </SelectField>
           </PropertyField>
         </FlatSection>
       )}
