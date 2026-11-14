@@ -20,11 +20,12 @@
  * 90 degrees), and `forever` is refused.
  */
 
-import type { CmdOutcome, CmdContext } from '@plugins/console/worker/dialect-api'
+import type { CmdOutcome, CmdContext, MotionElement } from '@plugins/console/worker/dialect-api'
+import { appendMotion, playFrom, startConsoleLoop, stopConsoleLoop, timelineLengthMs, timelinePlaying, timelineSize } from '@plugins/console/worker/dialect-api'
 import type { WorkerContext } from '@renderer/worker/server/types/WorkerContext'
 import { objectNodes, rendererNodesOf } from '@renderer/worker/server/catalog/refs'
 import { getGenericProps } from '@renderer/worker/server/services/props/read'
-import { AxisArg, BoolArg, ColorArg, EnumOf, FloatArg, SpecArg, StringArg } from '../cli/argTypes'
+import { AxisArg, BoolArg, ColorArg, EnumOf, FloatArg, IntArg, SpecArg, StringArg } from '../cli/argTypes'
 import { chxCommand } from '../cli/command'
 import type { ChxCommand } from '../cli/command'
 import { splitColorArg } from '../colors'
@@ -84,36 +85,201 @@ async function setView(ctx: WorkerContext, cc: CmdContext, change: Record<string
 
 // --- turn / move ---
 
+/** ChimeraX draws at 60 frames a second: a frame count becomes time at this rate. */
+const CHX_FPS = 60
+
+/**
+ * The motion keywords turn / roll / rock / wobble share (`turn.py`). The
+ * console moves the camera about the view centre, so the keywords that move
+ * models or set the centre are refused.
+ */
+const MOTION_ARGS = [
+  { name: 'center', type: StringArg, role: 'keyword' },
+  { name: 'coordinateSystem', type: StringArg, role: 'keyword' },
+  { name: 'models', type: StringArg, role: 'keyword' },
+  { name: 'atoms', type: StringArg, role: 'keyword' },
+] as const
+const MOTION_REFUSED = ['center', 'coordinateSystem', 'models', 'atoms'] as const
+const MOTION_WHY = 'the console turns the camera about the view centre and does not move models'
+
+/** A motion as `turn.py` reads its arguments. */
+interface MotionRequest {
+  cmd: string
+  axis: [number, number, number]
+  /** Degrees per frame (turn / roll), or the full swing (rock / wobble). */
+  angle: number
+  /** A frame count, `forever`, or '' (forever for roll / rock / wobble). */
+  frames: string
+  /** `rock N` / `wobble N`: frames per cycle ('' = neither). */
+  rock: string
+  wobble: string
+  wobbleAspect: string
+}
+
+/**
+ * Append a motion to the animation timeline as one element and run it: a
+ * motion with a frame count plays once from where it starts, one without an
+ * end (frames forever) plays one cycle of it in a loop until `stop`. Speeds and phases follow ChimeraX only roughly: the console is a
+ * helper, not an emulator.
+ */
+async function appendChxMotion(ctx: WorkerContext, cc: CmdContext, m: MotionRequest): Promise<CmdOutcome> {
+  if (m.rock !== '' && m.wobble !== '') return { ok: false, error: `Error: ${m.cmd}: give rock or wobble, not both` }
+  const cycleRaw = m.rock !== '' ? m.rock : m.wobble
+  const forever = m.frames === 'forever' || m.frames === ''
+  const frames = forever ? 0 : Number(m.frames)
+  if (!forever && !(Number.isInteger(frames) && frames > 0)) {
+    return { ok: false, error: `Error: ${m.cmd}: frames must be a whole number or forever` }
+  }
+  // The console's turn turns the camera the other way to the scene (see
+  // turnedRotation); the element does the same so both agree.
+  const sign = -1
+  const axis = m.axis.join(' ')
+  let el: MotionElement
+  if (cycleRaw !== '') {
+    const cycle = Number(cycleRaw)
+    if (!(Number.isInteger(cycle) && cycle > 0)) return { ok: false, error: `Error: ${m.cmd}: the cycle must be a whole number of frames` }
+    const props: Record<string, string> = {
+      pattern: m.wobble !== '' ? 'wobble' : 'rock',
+      axis,
+      angle: String(sign * m.angle),
+      cycles: String(forever ? 1 : frames / cycle),
+    }
+    if (m.wobble !== '' && m.wobbleAspect !== '') props.aspect = m.wobbleAspect
+    el = { type: 'rock', durationMs: ((forever ? cycle : frames) / CHX_FPS) * 1000, props }
+  } else {
+    if (m.angle === 0) return { ok: false, error: `Error: ${m.cmd}: the angle must not be 0` }
+    // Forever: one full turn in the angle's direction, at its speed.
+    const total = forever ? Math.sign(m.angle) * 360 : m.angle * frames
+    const n = forever ? 360 / Math.abs(m.angle) : frames
+    el = { type: 'spin', durationMs: (n / CHX_FPS) * 1000, props: { axis, angle: String(sign * total) } }
+  }
+  if (forever && timelineSize(ctx, cc.sceneId) > 0) {
+    cc.warn(`${m.cmd}: the loop repeats the whole animation timeline, not just this motion`)
+  }
+  // The new element goes at the end, so it starts where the timeline ends now.
+  const startMs = timelineLengthMs(ctx, cc.sceneId)
+  const added = await appendMotion(ctx, cc, 'chx', [el])
+  if (!added.ok) return added
+  if (!forever) {
+    const played = await playFrom(ctx, cc, 'chx', startMs)
+    return played.ok ? { ok: true } : played
+  }
+  const started = await startConsoleLoop(ctx, cc, 'chx')
+  return started.ok ? { ok: true } : started
+}
+
+/** Read the axis argument, or the error for it. */
+function motionAxis(cmd: string, raw: string): [number, number, number] | CmdOutcome {
+  return axisOf(raw || 'y') ?? { ok: false, error: `Error: ${cmd}: "${raw}" is not an axis (x, y, z or three numbers)` }
+}
+
 const turn = chxCommand({
   words: ['turn'],
   args: [
     { name: 'axis', type: AxisArg, role: 'optional' },
     { name: 'angle', type: FloatArg, role: 'optional' },
     { name: 'frames', type: StringArg, role: 'optional' },
-    { name: 'center', type: StringArg, role: 'keyword' },
-    { name: 'coordinateSystem', type: StringArg, role: 'keyword' },
     { name: 'rock', type: StringArg, role: 'keyword' },
     { name: 'wobble', type: StringArg, role: 'keyword' },
     { name: 'wobbleAspect', type: StringArg, role: 'keyword' },
-    { name: 'models', type: StringArg, role: 'keyword' },
-    { name: 'atoms', type: StringArg, role: 'keyword' },
+    ...MOTION_ARGS,
   ],
   mutates: false,
-  summary: 'Turn the scene about a screen axis (default y, 90 degrees).',
+  summary: 'Turn the scene about a screen axis (default y, 90 degrees); with frames, rock or wobble, add it to the animation.',
   async run(ctx, args, cc) {
-    const refused = refuseGiven('turn', args, ['center', 'coordinateSystem', 'rock', 'wobble', 'wobbleAspect', 'models', 'atoms'],
-      'the console turns the camera about the view centre and does not move models')
+    const refused = refuseGiven('turn', args, MOTION_REFUSED, MOTION_WHY)
     if (refused) return refused
-    const axis = axisOf(args.axis || 'y')
-    if (!axis) return { ok: false, error: `Error: turn: "${args.axis}" is not an axis (x, y, z or three numbers)` }
-    const frames = framesOf(args.frames)
-    if (args.frames === 'forever') return unsupported('Error: turn: frames forever is not supported (the console turns at once, not as an animation)')
-    if (frames === null) return { ok: false, error: 'Error: turn: frames must be a whole number' }
-    if (args.frames !== '') cc.warn('turn: frames: turned at once, not animated')
-    const angle = (args.angle === '' ? 90 : Number(args.angle)) * frames
+    const axis = motionAxis('turn', args.axis)
+    if (!Array.isArray(axis)) return axis
+    const angle = args.angle === '' ? 90 : Number(args.angle)
+    if (args.frames !== '' || args.rock !== '' || args.wobble !== '') {
+      return appendChxMotion(ctx, cc, { cmd: 'turn', axis, angle, frames: args.frames, rock: args.rock, wobble: args.wobble, wobbleAspect: args.wobbleAspect })
+    }
     const cam = cameraOf(ctx, cc)
     if ('ok' in cam) return cam
     return setView(ctx, cc, { rotation: turnedRotation(cam.rotation, axis, angle) })
+  },
+})
+
+const roll = chxCommand({
+  words: ['roll'],
+  args: [
+    { name: 'axis', type: AxisArg, role: 'optional' },
+    { name: 'angle', type: FloatArg, role: 'optional' },
+    { name: 'frames', type: StringArg, role: 'optional' },
+    { name: 'rock', type: StringArg, role: 'keyword' },
+    { name: 'wobble', type: StringArg, role: 'keyword' },
+    { name: 'wobbleAspect', type: StringArg, role: 'keyword' },
+    ...MOTION_ARGS,
+  ],
+  mutates: false,
+  summary: 'Keep turning the scene (default y, 1 degree a frame), as an animation that loops until stop.',
+  async run(ctx, args, cc) {
+    const refused = refuseGiven('roll', args, MOTION_REFUSED, MOTION_WHY)
+    if (refused) return refused
+    const axis = motionAxis('roll', args.axis)
+    if (!Array.isArray(axis)) return axis
+    const angle = args.angle === '' ? 1 : Number(args.angle)
+    return appendChxMotion(ctx, cc, { cmd: 'roll', axis, angle, frames: args.frames, rock: args.rock, wobble: args.wobble, wobbleAspect: args.wobbleAspect })
+  },
+})
+
+const rock = chxCommand({
+  words: ['rock'],
+  args: [
+    { name: 'axis', type: AxisArg, role: 'optional' },
+    { name: 'angle', type: FloatArg, role: 'optional' },
+    { name: 'frames', type: StringArg, role: 'optional' },
+    { name: 'cycle', type: IntArg, role: 'keyword' },
+    ...MOTION_ARGS,
+  ],
+  mutates: false,
+  summary: 'Rock the scene back and forth (default y, 30 degrees, 136 frames a cycle), as an animation.',
+  async run(ctx, args, cc) {
+    const refused = refuseGiven('rock', args, MOTION_REFUSED, MOTION_WHY)
+    if (refused) return refused
+    const axis = motionAxis('rock', args.axis)
+    if (!Array.isArray(axis)) return axis
+    const angle = args.angle === '' ? 30 : Number(args.angle)
+    return appendChxMotion(ctx, cc, { cmd: 'rock', axis, angle, frames: args.frames, rock: args.cycle || '136', wobble: '', wobbleAspect: '' })
+  },
+})
+
+const wobble = chxCommand({
+  words: ['wobble'],
+  args: [
+    { name: 'axis', type: AxisArg, role: 'optional' },
+    { name: 'angle', type: FloatArg, role: 'optional' },
+    { name: 'frames', type: StringArg, role: 'optional' },
+    { name: 'cycle', type: IntArg, role: 'keyword' },
+    { name: 'aspect', type: FloatArg, role: 'keyword' },
+    ...MOTION_ARGS,
+  ],
+  mutates: false,
+  summary: 'Wobble the scene in a figure 8 (default y, 30 degrees, 136 frames a cycle, aspect 0.3), as an animation.',
+  async run(ctx, args, cc) {
+    const refused = refuseGiven('wobble', args, MOTION_REFUSED, MOTION_WHY)
+    if (refused) return refused
+    const axis = motionAxis('wobble', args.axis)
+    if (!Array.isArray(axis)) return axis
+    const angle = args.angle === '' ? 30 : Number(args.angle)
+    return appendChxMotion(ctx, cc, { cmd: 'wobble', axis, angle, frames: args.frames, rock: '', wobble: args.cycle || '136', wobbleAspect: args.aspect })
+  },
+})
+
+const stop = chxCommand({
+  words: ['stop'],
+  args: [],
+  mutates: false,
+  summary: 'Stop the motion: pause the animation, and put back the loop setting a looping motion changed.',
+  async run(ctx, _args, cc) {
+    const ended = await stopConsoleLoop(ctx, cc, 'chx')
+    if (!ended.ok) return ended
+    if (!ended.ended && timelinePlaying(ctx, cc.sceneId)) {
+      const paused = await runOp(ctx, cc, 'animate', { action: 'pause', timeMs: null })
+      if (!paused.ok) return paused
+    }
+    return { ok: true }
   },
 })
 
@@ -549,6 +715,10 @@ const set = chxCommand({
 
 export const VIEW_COMMANDS: Record<string, ChxCommand> = {
   turn,
+  roll,
+  rock,
+  wobble,
+  stop,
   move,
   cofr,
   zoom,

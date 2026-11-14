@@ -3,8 +3,8 @@
  * @description The camera ops ChimeraX's `turn`, `move` and `view matrix` run.
  *
  * What a wrong sign or a dropped term does not show as an error: the scene
- * turning or moving the other way from ChimeraX, a `frames` count that is
- * not applied (`turn y 3 30` must end at 90 degrees, not 3), and a
+ * turning or moving the other way from ChimeraX, a `move` frames count that
+ * is not applied, and a
  * `view matrix` that places the camera but leaves CueMol's orthographic
  * projection, or puts the centre (and so the slab) away from the scene.
  * And silhouettes that widen with a zoom (their width is in pixels in
@@ -109,8 +109,8 @@ describe('camera commands', () => {
     expect(set!.args).toHaveProperty('rotation', null)
   })
 
-  it('turn multiplies a finite frames count, and turns the way ChimeraX does', async () => {
-    await VIEW_COMMANDS.turn.run(ctx, { axis: 'y', angle: '3', frames: '30' }, cc)
+  it('turn turns the way ChimeraX does', async () => {
+    await VIEW_COMMANDS.turn.run(ctx, { axis: 'y', angle: '90', frames: '', rock: '', wobble: '', wobbleAspect: '' }, cc)
     const q = ops[0].args.rotation as Quat
     // 90 degrees about y, the near side going right: the screen's x now shows the scene's +z.
     expect(round(columns(q)[0])).toEqual([0, 0, 1])

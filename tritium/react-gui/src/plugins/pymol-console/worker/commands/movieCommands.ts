@@ -20,6 +20,7 @@ import type { SceneObjectEntry } from '@renderer/worker/server/services/scene/li
 import type { WorkerContext } from '@renderer/worker/server/types/WorkerContext'
 import type { CmdContext, PymCommand } from './types'
 import { isAllSelection, resolveObjects, runOp, toNumber } from './helpers'
+import { stopConsoleLoop } from '@plugins/console/worker/dialect-api'
 
 /** An object's frame count: MorphMol and Trajectory both have one. */
 interface FramedObject {
@@ -146,6 +147,9 @@ const mstop: PymCommand = {
   mutates: false,
   summary: 'Stop the scene animation where it is.',
   async run(ctx, _args, cc) {
+    // A console rock ends too, putting back the loop setting it changed.
+    const ended = await stopConsoleLoop(ctx, cc, 'pym')
+    if (!ended.ok) return ended
     // PyMOL's mstop leaves the movie on the current frame; stop would
     // rewind it, pause does not.
     const res = await runOp(ctx, cc, 'animate', { action: 'pause', timeMs: null })
