@@ -134,6 +134,13 @@ describe('Format B: text envelope', () => {
     expect(got?.bytes).toEqual(bytes)
   })
 
+  it('carries an animation element as an envelope only: CueMol2 has no flavor for it', () => {
+    expect(legacyFormatFor('anim', 'single')).toBeNull()
+    const got = decodeEnvelope(encodeEnvelope({ kind: 'anim' }, bytes))
+    expect(got?.meta.kind).toBe('anim')
+    expect(got?.bytes).toEqual(bytes)
+  })
+
   it('defaults form to single and name to empty', () => {
     const got = decodeEnvelope(encodeEnvelope({ kind: 'camera' }, bytes))
     expect(got?.meta).toEqual({ kind: 'camera', form: 'single', name: '' })

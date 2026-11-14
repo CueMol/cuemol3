@@ -18,6 +18,7 @@ import { getSceneOrNull } from '@renderer/worker/server/services/helpers/sceneRe
 import { safeRead } from '@renderer/worker/server/services/helpers/safeRead';
 import type { PasteNodeArgs, PasteNodeResult } from './types';
 import { recordOp } from '@renderer/worker/server/actions/serviceOps';
+import { pasteElement } from '@renderer/worker/server/services/anim/edit';
 import {
     uniqueCameraNameViaScene,
     uniqueGroupName,
@@ -61,8 +62,33 @@ export function pasteNode(ctx: WorkerContext, args: PasteNodeArgs): PasteNodeRes
             xml: new TextDecoder().decode(args.bytes),
             target,
             targetType: target === null ? null : args.targetGroupId !== undefined ? 'rendGroup' : 'object',
+            before: null,
         }, ['target']);
     };
+
+    if (entry.kind === 'anim') {
+        const res = pasteElement(ctx, scene, {
+            xml: entry.xml,
+            insertIndex: args.insertIndex,
+            viewId: args.viewId,
+            record: (before) => {
+                recordOp(ctx, scene.uid, 'paste_node', {
+                    kind: entry.kind,
+                    form: entry.form,
+                    xml: new TextDecoder().decode(args.bytes),
+                    target: null,
+                    targetType: null,
+                    before,
+                });
+            },
+        });
+        if (!res.ok) return empty;
+        const name = safeRead(() => {
+            const mgr = scene.getAnimMgr() as unknown as { getAt: (i: number) => { name: string } };
+            return mgr.getAt(res.index).name;
+        }) ?? '';
+        return { ok: true, newId: res.uid, newName: name };
+    }
 
     if (entry.kind === 'camera') {
         // Paste a Camera under the destination scene (UXP `onCameraPaste`).

@@ -10,6 +10,8 @@ import { NO_NODE } from '../errors'
 import { defineOp } from '../op'
 import { boolean, enumOf, nodeId, optional, string } from '../params'
 import { pasteNode } from '@renderer/worker/server/services/clipboard/paste'
+import { listTimeline } from '@renderer/worker/server/services/anim/timeline'
+import { findElement } from './animOps'
 import { copyNode } from '@renderer/worker/server/services/clipboard/copy'
 import { MOVE_DEST_PARAMS, moveText } from '../moveDest'
 import { moveNodeTo } from '@renderer/worker/server/services/sceneTree/reorderSceneNode'
@@ -169,14 +171,16 @@ export const moveNode = defineOp({
 export const pasteNodeOp = defineOp({
   name: 'paste_node',
   description:
-    'Add an object, renderer, style set or camera from its CueMol XML (what Copy puts on the ' +
-    'clipboard), renamed when its name is taken. A renderer goes onto the target object or group.',
+    'Add an object, renderer, style set, camera or animation element from its CueMol XML (what ' +
+    'Copy puts on the clipboard), renamed when its name is taken. A renderer goes onto the target ' +
+    'object or group. An animation element keeps its length and follows the element before it.',
   params: {
-    kind: enumOf(['object', 'renderer', 'style', 'camera'], 'What the XML holds.'),
+    kind: enumOf(['object', 'renderer', 'style', 'camera', 'anim'], 'What the XML holds.'),
     form: enumOf(['single', 'rendArray'], 'single: one node; rendArray: a renderer group with its renderers.'),
     xml: string('The XML.'),
     target: optional(nodeId('For a renderer: the object or renderer group to add it to.', 'targetType')),
     targetType: optional(enumOf(['object', 'rendGroup'], 'What target refers to.')),
+    before: optional(string('For an animation element: insert before this element (its number in list_anims, #uid, or its name). Null appends.')),
   },
   mutates: true,
   describe: (a, n) => `Paste ${a.kind}${a.target === null ? '' : ` into ${n('target')}`}`,
@@ -185,9 +189,17 @@ export const pasteNodeOp = defineOp({
   format: () => [],
   run(ctx, args, oc) {
     if (args.kind === 'renderer' && args.target === null) return { ok: false, error: 'A renderer needs a target object or group.' }
+    let insertIndex: number | undefined
+    if (args.kind === 'anim' && args.before !== null) {
+      const at = findElement(listTimeline(ctx, { sceneId: oc.sceneId }).elements, args.before)
+      if (typeof at === 'string') return { ok: false, error: at }
+      insertIndex = at.index
+    }
     const onGroup = args.targetType === 'rendGroup'
     const res = pasteNode(ctx, {
       sceneId: oc.sceneId,
+      insertIndex,
+      viewId: oc.viewId,
       kind: args.kind,
       form: args.form,
       bytes: new TextEncoder().encode(args.xml),

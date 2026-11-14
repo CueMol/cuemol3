@@ -23,10 +23,11 @@ export async function peekClipboardKind(): Promise<
     // needs to know what kind is there. Asked on every menu open, so a copy
     // made in another app (or another CueMol instance) is seen immediately.
     // Paint rows share the clipboard but are not a scene node, so they read
-    // as "nothing to paste" here.
+    // as "nothing to paste" here, and so does an animation element (the
+    // Animation panel's own).
     try {
         const r = await window.electronAPI?.invoke(IPC.CLIPBOARD_CUEMOL_PEEK)
-        return r && r.kind !== 'paint' ? r.kind : null
+        return r && r.kind !== 'paint' && r.kind !== 'anim' ? r.kind : null
     } catch (err) {
         console.warn('clipboard peek failed:', err)
         return null

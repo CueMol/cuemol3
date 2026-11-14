@@ -121,6 +121,16 @@ scan** of `AnimMgr`'s current list (`findByUid`).
   `NumberCell`. The numslider->DragNumericField rule is recorded in the UI style
   guide (`docs/migration/ui-style-guide.md` §0).
 
+### SimpleSpin rotation angle is unbounded (departs from UXP)
+- UXP's numslider was `min=0 max=360`, and the first port both clamped the
+  field to that range and wrapped the committed value into [0, 360]. But C++
+  `SimpleSpin::angle` is the total turn over the element with no range: a
+  negative value spins the other way and 720 spins twice. The wrap made a
+  reverse spin impossible even by typing (-90 became 270).
+- The field is now an unbounded `DragNumericField` (1 deg per px, like the View
+  pane rotation fields, but the value stays after release because it is
+  absolute), and the typed value goes to C++ as is.
+
 ### Quadric 0 (= linear / no easing)
 - UXP and the initial port both guarded `new_val > 0` (UXP
   `animobj-common-proppage.js:188`), so the slider could never return to the
@@ -313,6 +323,16 @@ read-only (the manager derives it). Editing while playing ends in a pause, as
     a transport op had already latched a live snapshot.
   - No seeding happens when no view is active (`viewId` omitted).
 
+
+### Header row in a narrow panel
+- The header (`AnimTransport`) is one line of fixed height and never wraps.
+  When the panel is too narrow, optional groups move one by one into a
+  trailing "more" (`...`) popover, in `HIDE_ORDER`: element count / FPS, Loop,
+  Start cam, zoom (Fit / - / +), then the current / total time. The playback
+  buttons always stay, so every control is reachable at any width (priority+
+  overflow, `usePriorityOverflow`). Wrapping (the button groups broke into a
+  2x2 block and spilled out of the row) and a horizontal scrollbar were both
+  rejected.
 ### Relative time is an offset from the reference's END, and is never negative
 
 `AnimMgr::resolveTimeImpl` resolves `abs = base + rel`, where `base` is 0 for an

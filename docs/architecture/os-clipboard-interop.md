@@ -105,6 +105,10 @@ Electron は 1 回の書き込みで 1 形式しか置けない (`clipboard.writ
 読み取りに分岐が無いので、macOS ビルドでも A が現れれば読めるし、Windows ビルドでも
 どこで作られた envelope でも読める。
 
+例外は animation element (`kind: 'anim'`) で、CueMol2 に対応する A の形式が無いため、
+どの platform でも B だけを書く (`legacyFormatFor` が `null`)。
+[anim-element-copy-paste.md](anim-element-copy-paste.md) を参照。
+
 ### meta を最小にできた理由
 
 paste 側は既に meta に依存しない構造だった: camera paste は

@@ -48,8 +48,12 @@
  * @module shared/cuemolClipboard
  */
 
-/** What a clipboard payload represents. */
-export type ClipKind = 'object' | 'renderer' | 'camera' | 'style' | 'paint';
+/**
+ * What a clipboard payload represents. `anim` (an animation element) is
+ * tritium's own: CueMol2 has no such flavor, so it travels only as an
+ * envelope (Format B), on every platform.
+ */
+export type ClipKind = 'object' | 'renderer' | 'camera' | 'style' | 'paint' | 'anim';
 
 /**
  * Renderer payload shape. `rendArray` is UXP's "qscrendary": element 0 of
@@ -104,7 +108,8 @@ export const LEGACY_PROBE_ORDER: ReadonlyArray<{
 ];
 
 /** The legacy flavor string a (kind, form) pair is written as. */
-export function legacyFormatFor(kind: ClipKind, form: ClipForm): string {
+export function legacyFormatFor(kind: ClipKind, form: ClipForm): string | null {
+    if (kind === 'anim') return null;
     if (kind === 'renderer') {
         return form === 'rendArray' ? LEGACY_RENDERER_ARRAY : LEGACY_RENDERER;
     }
@@ -186,7 +191,7 @@ export function encodeEnvelope(meta: ClipMeta, bytes: Uint8Array): string {
 function isClipKind(v: unknown): v is ClipKind {
     return (
         v === 'object' || v === 'renderer' || v === 'camera' ||
-        v === 'style' || v === 'paint'
+        v === 'style' || v === 'paint' || v === 'anim'
     );
 }
 

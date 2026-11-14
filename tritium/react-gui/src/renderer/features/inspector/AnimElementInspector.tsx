@@ -75,7 +75,6 @@ import {
   detailToForm,
   fmtAxis,
   legacyStartNote,
-  wrapAngle,
   type FormState,
 } from "@renderer/features/inspector/anim/animElementForm";
 
@@ -529,15 +528,17 @@ export const AnimElementInspector: React.FC<AnimElementInspectorProps> = ({
       {type === "SimpleSpin" && (
         <FlatSection title="SimpleSpin">
           <PropertyField label="Rotation angle">
+            {/* Unbounded, like the View pane rotation fields: the angle is the
+                total turn over the element (negative = reverse, 720 = two
+                turns), so it is stored as typed. */}
             <DragNumericField
               value={form.angle}
-              min={0}
-              max={360}
-              step={5}
+              step={1}
+              pxPerStep={1}
               decimals={0}
               unit="°"
               onChange={(v) => setField({ angle: v })}
-              onRelease={(v) => commit("angle", wrapAngle(v))}
+              onRelease={(v) => commit("angle", v)}
             />
           </PropertyField>
           <PropertyField label="Spin axis">
@@ -548,13 +549,17 @@ export const AnimElementInspector: React.FC<AnimElementInspectorProps> = ({
                 <option value="z">Z axis</option>
                 <option value="cart">Cartesian</option>
               </SelectField>
-              <span className="anim-axis-paren">(</span>
-              <NumberCell value={fmtAxis(axis.x)} onCommit={(s) => commitAxisComp("x", s)} disabled={!axisEditable} aria-label="Axis X" />
-              <span className="anim-axis-paren">,</span>
-              <NumberCell value={fmtAxis(axis.y)} onCommit={(s) => commitAxisComp("y", s)} disabled={!axisEditable} aria-label="Axis Y" />
-              <span className="anim-axis-paren">,</span>
-              <NumberCell value={fmtAxis(axis.z)} onCommit={(s) => commitAxisComp("z", s)} disabled={!axisEditable} aria-label="Axis Z" />
-              <span className="anim-axis-paren">)</span>
+              {/* The "(x, y, z)" group stays on one line; a narrow inspector
+                  wraps it below the preset select as a whole. */}
+              <span className="anim-axis-vec">
+                <span className="anim-axis-paren">(</span>
+                <NumberCell value={fmtAxis(axis.x)} onCommit={(s) => commitAxisComp("x", s)} disabled={!axisEditable} aria-label="Axis X" />
+                <span className="anim-axis-paren">,</span>
+                <NumberCell value={fmtAxis(axis.y)} onCommit={(s) => commitAxisComp("y", s)} disabled={!axisEditable} aria-label="Axis Y" />
+                <span className="anim-axis-paren">,</span>
+                <NumberCell value={fmtAxis(axis.z)} onCommit={(s) => commitAxisComp("z", s)} disabled={!axisEditable} aria-label="Axis Z" />
+                <span className="anim-axis-paren">)</span>
+              </span>
             </div>
           </PropertyField>
         </FlatSection>

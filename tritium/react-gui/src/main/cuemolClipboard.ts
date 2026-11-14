@@ -120,13 +120,12 @@ export function writeCuemolClipboard(
     const form: ClipForm =
       req.kind === 'renderer' ? (req.form ?? 'single') : 'single'
 
-    if (process.platform === 'darwin') {
+    // A kind CueMol2 has no flavor for goes as an envelope everywhere.
+    const legacy = process.platform === 'darwin' ? null : legacyFormatFor(req.kind, form)
+    if (legacy === null) {
       clipboard.writeText(encodeEnvelope({ kind: req.kind, form }, bytes))
     } else {
-      clipboard.writeBuffer(
-        legacyFormatFor(req.kind, form),
-        encodeLegacyPayload(req.kind, bytes, process.platform),
-      )
+      clipboard.writeBuffer(legacy, encodeLegacyPayload(req.kind, bytes, process.platform))
     }
     return { ok: true }
   } catch (e) {

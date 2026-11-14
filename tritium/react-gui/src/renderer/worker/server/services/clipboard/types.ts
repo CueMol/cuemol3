@@ -3,7 +3,7 @@
  * @description Argument and result shapes for copy and paste.
  */
 
-export type ClipboardKind = 'object' | 'renderer' | 'style' | 'camera';
+export type ClipboardKind = 'object' | 'renderer' | 'style' | 'camera' | 'anim';
 
 /**
  * XML payload shape for kind 'renderer'. 'single' is one renderer
@@ -18,7 +18,8 @@ export type ClipboardForm = 'single' | 'rendArray';
 export interface CopyNodeArgs {
     sceneId: number;
     nodeId: number;
-    nodeType: 'object' | 'renderer' | 'rendGroup' | 'style' | 'camera';
+    /** 'anim': an animation element, `nodeId` being its uid. */
+    nodeType: 'object' | 'renderer' | 'rendGroup' | 'style' | 'camera' | 'anim';
     /**
      * Style scope id (0 for global, scene.uid for scene-local). Required
      * when `nodeType === 'style'`; the renderer reads it from the tree
@@ -66,6 +67,13 @@ export interface PasteNodeArgs {
      * under the group. Mutually exclusive with `targetObjId`.
      */
     targetGroupId?: number;
+    /**
+     * For an animation element: the strip index to insert before (absent or
+     * past the end appends).
+     */
+    insertIndex?: number;
+    /** For an animation element: the view that seeds the start camera when the scene has none. */
+    viewId?: number;
 }
 
 export interface PasteNodeResult {

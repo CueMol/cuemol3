@@ -247,6 +247,10 @@ architecture, it belongs here.
   UXP 版 CueMol2 との相互運用と、将来 tritium を複数起動したときのインスタンス間 copy&paste が
   目的。macOS では Gecko がカスタム flavor を pasteboard に出さないという発見と、
   そこから決まった 2 フォーマット構成 (legacy native / text envelope)。
+- [Animation element の copy / paste](anim-element-copy-paste.md) (日本語) --
+  Animation panel の element を Cut / Copy / Paste で複製する。C++ の toXML / fromXML が
+  AnimObj (`<motion>`) を扱い、貼った element は長さを保ったまま直前の element に chain して
+  後ろに並ぶ。clipboard は text envelope だけ (CueMol2 に対応する形式が無い)。
 - [Cmd+C / X / V をフォーカス文脈で振り分ける](focus-aware-edit-shortcuts.md) (日本語) --
   同じキーがテキスト欄・scene tree・paint deck で別の意味を持つようにする routing の設計。
   Electron の clipboard role では表現できない理由 (macOS はメニューの key equivalent が

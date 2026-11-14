@@ -14,6 +14,7 @@
 import { describe, it, expect, vi } from "vitest";
 import type { WorkerContext } from "@renderer/worker/server/types/WorkerContext";
 import { services } from "@renderer/worker/server/services/anim/anim.service";
+import { pasteElement } from "@renderer/worker/server/services/anim/edit";
 
 function tv(ms: number) {
   return { millisec: ms };
@@ -589,5 +590,55 @@ describe("anim.service editing", () => {
     const { ctx } = makeCtx({ noScene: true });
     expect(services.animRemoveElement(ctx, { sceneId: 9, uid: 1 })).toMatchObject({ ok: false, code: "not-found" });
     expect(services.animAddElement(ctx, { sceneId: 9, type: "NoopAnimObj" })).toMatchObject({ ok: false, code: "not-found" });
+  });
+});
+
+describe("anim pasteElement (Animation panel paste)", () => {
+  // The element fromXML hands back: a copy of "Spin0", 1.5 s long, chained
+  // to an element of the scene it was copied from.
+  function pasted() {
+    return { uid: 77, name: "Spin0", timeRefName: "elsewhere", start: tv(250), end: tv(1750) } as Record<string, unknown>;
+  }
+  function setup(objs: ReturnType<typeof makeObj>[]) {
+    const env = makeCtx({ objs });
+    const obj = pasted();
+    (env.ctx as unknown as { strMgr: unknown }).strMgr = { fromXML: vi.fn(() => obj) };
+    env.getByName.mockImplementation(((n: string) => objs.find((o) => o.name === n) ?? null) as never);
+    const scene = env.ctx.sceMgr.getScene(1) as never;
+    return { ...env, obj, scene };
+  }
+
+  it("keeps the length, chains to the element before the insertion point, renames a duplicate, in one undo txn", () => {
+    const objs = [
+      makeObj({ uid: 1, name: "Cam0", className: "CamMotion", start: 0, end: 1000, absStart: 0, absEnd: 1000 }),
+      makeObj({ uid: 2, name: "Spin0", className: "SimpleSpin", timeRefName: "Cam0", start: 0, end: 500, absStart: 1000, absEnd: 1500 }),
+    ];
+    const { ctx, obj, scene, insertBefore, startUndoTxn, commitUndoTxn, createdTimeValues } = setup(objs);
+    const record = vi.fn();
+    const res = pasteElement(ctx, scene, { xml: "<motion/>", insertIndex: 1, record });
+
+    expect(res).toMatchObject({ ok: true, uid: 77, index: 1 });
+    expect(obj.name).toBe("Spin1");
+    expect(obj.timeRefName).toBe("Cam0");
+    expect(createdTimeValues.map((t) => t.millisec)).toEqual([0, 1500]);
+    expect(insertBefore).toHaveBeenCalledWith(1, obj);
+    // Recorded with the element it went in front of, inside the transaction.
+    expect(record).toHaveBeenCalledWith("Spin0");
+    expect(startUndoTxn).toHaveBeenCalledWith("Paste animation element");
+    expect(commitUndoTxn).toHaveBeenCalledTimes(1);
+  });
+
+  it("starts at the previous element's end, absolute, when it cannot chain", () => {
+    const objs = [
+      makeObj({ uid: 1, name: "Cam0", className: "CamMotion", timeRefName: "ghost", start: 0, end: 1000, absStart: 0, absEnd: 1000 }),
+    ];
+    const { ctx, obj, scene, append, createdTimeValues } = setup(objs);
+    const record = vi.fn();
+    expect(pasteElement(ctx, scene, { xml: "<motion/>", record }).ok).toBe(true);
+
+    expect(obj.timeRefName).toBe("");
+    expect(createdTimeValues.map((t) => t.millisec)).toEqual([1000, 2500]);
+    expect(append).toHaveBeenCalledWith(obj);
+    expect(record).toHaveBeenCalledWith(null);
   });
 });

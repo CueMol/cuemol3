@@ -246,7 +246,8 @@ export function useSceneTreeNodeOps(
                 }
             }
             const clip = await readSceneClip()
-            if (!clip) return false
+            // An animation element is not a tree node; the Animation panel pastes it.
+            if (!clip || clip.kind === 'anim') return false
             const res = await cm.invokeService('pasteNode', { ...args, ...clip })
             return res?.ok === true
         },

@@ -14,6 +14,8 @@ import type { WorkerContext } from '@renderer/worker/server/types/WorkerContext'
 import { getSceneOrNull } from '@renderer/worker/server/services/helpers/sceneResolver';
 import { safeRead } from '@renderer/worker/server/services/helpers/safeRead';
 import { listGroupChildRenderers } from '@renderer/worker/server/services/helpers/groupChildren';
+import { getAnimMgrOrNull } from '@renderer/worker/server/services/anim/resolve';
+import { findByUid } from '@renderer/worker/server/services/anim/detail';
 import type {
     ClipboardKind,
     CopyNodeArgs,
@@ -54,6 +56,12 @@ export function copyNode(ctx: WorkerContext, args: CopyNodeArgs): CopyNodeResult
         if (!cam) return { ok: false, kind: null };
         target = cam;
         kind = 'camera';
+    } else if (args.nodeType === 'anim') {
+        const mgr = getAnimMgrOrNull(scene);
+        const found = mgr ? findByUid(mgr, args.nodeId) : null;
+        if (!found) return { ok: false, kind: null };
+        target = found.obj as unknown as LScrObject;
+        kind = 'anim';
     } else if (args.nodeType === 'style') {
         // UXP `onCopyStyle` rejects global (scope==0) styles before
         // toXML; the ctxmenu already disables Copy for those rows, but
