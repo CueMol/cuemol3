@@ -1,3 +1,3 @@
 /*  Master version info */
 
-#define QM_VERSION "3.0.1.555"
+#define QM_VERSION "3.0.2.560"
