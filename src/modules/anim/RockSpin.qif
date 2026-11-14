@@ -1,0 +1,63 @@
+// -*-Mode: C++;-*-
+//
+// Oscillating spin animation object scripting interface
+//
+
+#ifndef ROCK_SPIN_QIF_INCLUDED
+#define ROCK_SPIN_QIF_INCLUDED
+
+#include <qlib/Vector.qif>
+#include <qsys/anim/AnimObj.qif>
+
+runtime_class RockSpin extends AnimObj
+{
+  client_hdr "RockSpin.hpp";
+  client_name anim::RockSpin;
+
+  // interface attributes
+  scriptable;
+  cloneable;
+  smartptr;
+
+  // properties
+
+  /// Motion pattern: rock (one axis), nutate (circle), wobble (figure 8)
+  enumdef pattern {
+    rock = anim::RockSpin::PAT_ROCK;
+    nutate = anim::RockSpin::PAT_NUTATE;
+    wobble = anim::RockSpin::PAT_WOBBLE;
+  }
+  property enum pattern => redirect(getPattern, setPattern);
+  default pattern = "rock";
+
+  /// Full swing angle in degrees (the motion is +/- angle/2)
+  property real angle => redirect(getAngle, setAngle);
+  default angle = 30.0;
+
+  /// Primary axis (screen coordinates)
+  property object<Vector> axis => redirect(getScrAxis, setScrAxis);
+  default axis = qlib::LScrVector4D(0.0,1.0,0.0,0.0);
+
+  /// Number of periods within the element
+  property real cycles => redirect(getCycles, setCycles);
+  default cycles = 1.0;
+
+  /// Start phase in degrees
+  property real phase => redirect(getPhase, setPhase);
+  default phase = 0.0;
+
+  /// Secondary axis amplitude ratio (nutate / wobble)
+  property real aspect => redirect(getAspect, setAspect);
+  default aspect = 1.0;
+
+  /// Amplitude envelope over the element
+  enumdef envelope {
+    none = anim::RockSpin::ENV_NONE;
+    grow = anim::RockSpin::ENV_GROW;
+    shrink = anim::RockSpin::ENV_SHRINK;
+  }
+  property enum envelope => redirect(getEnvelope, setEnvelope);
+  default envelope = "none";
+};
+
+#endif

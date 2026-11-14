@@ -19,6 +19,7 @@ import { formatMs } from '@renderer/h3-kit/form';
 
 export const TYPE_LABEL: Record<string, string> = {
   SimpleSpin: "Simple spin",
+  RockSpin: "Rock spin",
   CamMotion: "Camera motion",
   ShowHideAnim: "Show / Hide",
   SlideInOutAnim: "Slide",
@@ -32,6 +33,9 @@ export interface FormState {
   name: string;
   quadricPct: number;
   angle: number;
+  cycles: number;
+  phase: number;
+  aspect: number;
   tgtAlpha: number;
   direction: number;
   distance: number;
@@ -46,6 +50,9 @@ export function detailToForm(d: AnimElementDetail): FormState {
     name: c.name,
     quadricPct: c.quadric * 100,
     angle: t.angle ?? 0,
+    cycles: t.cycles ?? 1,
+    phase: t.phase ?? 0,
+    aspect: t.aspect ?? 1,
     tgtAlpha: t.tgtAlpha ?? 1,
     direction: t.direction ?? 0,
     distance: t.distance ?? 1,

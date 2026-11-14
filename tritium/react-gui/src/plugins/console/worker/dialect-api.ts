@@ -51,6 +51,19 @@ export type { CompletionContext, CompletionOutcome, Group, Offer } from './compl
 export { resolvePath } from './runtime/paths'
 export { opContextOf, runOp } from './runtime/opContext'
 export type { OpRun } from './runtime/opContext'
+export {
+  appendMotion,
+  consoleMotionRecorded,
+  consoleMotionRunning,
+  playFrom,
+  resetConsoleMotion,
+  startConsoleLoop,
+  stopConsoleLoop,
+  timelineLengthMs,
+  timelinePlaying,
+  timelineSize,
+} from './runtime/motion'
+export type { MotionElement } from './runtime/motion'
 export { quitCommand } from './runtime/quitCommand'
 export { closeLog, currentLog, openLog, writeLog } from './runtime/commandLog'
 export { commandHelp, commandTable } from './help/helpMarkdown'

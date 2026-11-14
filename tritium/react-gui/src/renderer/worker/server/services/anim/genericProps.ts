@@ -15,7 +15,7 @@ import type { WorkerContext } from "@renderer/worker/server/types/WorkerContext"
 import { fail, failFrom, ok } from "@renderer/worker/shared/result";
 import { readAnimGraph, resolveMgr, resolveSceneMgr } from "./resolve";
 import { undoTxnResult } from "../withUndoTxn";
-import { animElementSpec, animValueText, findByUid, recordAnimPropWrite } from "./detail";
+import { animElementSpec, animValueText, findByUid, recordAnimPropWrite, setAnimElementProp } from "./detail";
 import { recordOp } from "@renderer/worker/server/actions/serviceOps";
 import type { AnimMgr } from "@cuemol/core/src/wrappers/AnimMgr";
 import { planNameWrite, planTimeRefWrite } from "./elementWrites";
@@ -122,6 +122,13 @@ export function setAnimElementGenericProp(
       });
       if (!r.ok) return r;
     }
+    return ok({ entries: readAnimGenericEntries(found.obj) });
+  }
+  if (key === "pattern" && args.op === "set" && mode === "commit") {
+    // Same write as the Properties tab: it also re-seeds `aspect`, and the
+    // recorded set_anim_prop replays to the same result.
+    const r = setAnimElementProp(ctx, { sceneId: args.sceneId, uid: args.uid, prop: "pattern", value: String(args.value) });
+    if (!r.ok) return r;
     return ok({ entries: readAnimGenericEntries(found.obj) });
   }
   if (TIMING_ROWS.has(key)) {

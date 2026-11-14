@@ -7,6 +7,7 @@
 #include "RealPropAnim.qif"
 #include "RendXformAnim.qif"
 #include "SimpleSpin.qif"
+#include "RockSpin.qif"
 #include "NoopAnimObj.qif"
 #include "MorphMol.qif"
 #include "MolAnim.qif"
@@ -22,6 +23,7 @@ module anim
   RealPropAnim;
   RendXformAnim;
   SimpleSpin;
+  RockSpin;
   NoopAnimObj;
   MorphMol;
   MolAnim;

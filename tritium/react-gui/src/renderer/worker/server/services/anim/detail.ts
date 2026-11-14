@@ -40,6 +40,8 @@ import type {
   AnimElementTypeProps,
   GetAnimElementDetailArgs,
   GetAnimElementDetailResult,
+  RockEnvelope,
+  RockPattern,
   SetAnimElementPropArgs,
   SetAnimElementPropResult,
 } from "./types";
@@ -80,7 +82,17 @@ const ANIM_OP_PROPS: ReadonlySet<string> = new Set<AnimElementPropKey>([
   "name", "timeRefName", "endcam", "rend", "mol",
   "disabled", "ignorerotate", "ignorecenter", "ignorezoom", "ignoreslab", "hide", "fade",
   "quadric", "angle", "tgtAlpha", "direction", "distance", "startValue", "endValue", "axis",
+  "pattern", "cycles", "phase", "aspect", "envelope",
 ]);
+
+/** RockSpin `aspect` each pattern starts from (rock has no secondary axis). */
+export const ROCK_PATTERN_ASPECT: Readonly<Record<RockPattern, number | null>> = {
+  rock: null,
+  nutate: 1.0,
+  wobble: 0.3,
+};
+const ROCK_PATTERNS: readonly string[] = ["rock", "nutate", "wobble"];
+const ROCK_ENVELOPES: readonly string[] = ["none", "grow", "shrink"];
 
 /** A property value as the text `set_anim_prop` reads back. */
 export function animValueText(value: unknown): string {
@@ -114,7 +126,8 @@ function readTypeProps(obj: AnimObj, type: AnimElementType): AnimElementTypeProp
   const w = obj as unknown as Record<string, unknown>;
   const tp: AnimElementTypeProps = {};
   switch (type) {
-    case "SimpleSpin": {
+    case "SimpleSpin":
+    case "RockSpin": {
       tp.angle = safeNum(() => w.angle as number);
       let ax: Record<string, unknown> | null = null;
       try {
@@ -125,6 +138,13 @@ function readTypeProps(obj: AnimObj, type: AnimElementType): AnimElementTypeProp
       tp.axisX = safeNum(() => ax?.x as number);
       tp.axisY = safeNum(() => ax?.y as number);
       tp.axisZ = safeNum(() => ax?.z as number);
+      if (type === "RockSpin") {
+        tp.pattern = safeStr(() => w.pattern as string) as RockPattern;
+        tp.cycles = safeNum(() => w.cycles as number);
+        tp.phase = safeNum(() => w.phase as number);
+        tp.aspect = safeNum(() => w.aspect as number);
+        tp.envelope = safeStr(() => w.envelope as string) as RockEnvelope;
+      }
       break;
     }
     case "CamMotion":
@@ -233,6 +253,25 @@ function applyProp(
       w.axis = vec; // C++ normalizes; near-zero keeps the old value
       break;
     }
+    case "pattern": {
+      // Each pattern brings its own secondary-axis ratio, in the same
+      // transaction, so every route (inspector, op, replay) moves alike.
+      const p = String(value);
+      if (!ROCK_PATTERNS.includes(p)) throw new Error(`unknown pattern: ${p}`);
+      w.pattern = p;
+      const aspect = ROCK_PATTERN_ASPECT[p as RockPattern];
+      if (aspect !== null) w.aspect = aspect;
+      break;
+    }
+    case "envelope": {
+      const e = String(value);
+      if (!ROCK_ENVELOPES.includes(e)) throw new Error(`unknown envelope: ${e}`);
+      w.envelope = e;
+      break;
+    }
+    case "cycles":
+    case "phase":
+    case "aspect":
     case "angle":
     case "direction":
     case "distance":

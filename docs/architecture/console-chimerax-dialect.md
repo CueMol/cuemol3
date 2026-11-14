@@ -371,7 +371,8 @@ renderer で表し、**その selection と paint が表示の状態そのもの
 | `view initial` | `[models]` | | 何もしないことを 1 行で言う (ChX は model を動かさないので、既に最初の位置) |
 | `view name` / `view list` / `view delete` | `name` / `name\|all` | `save_camera`、`list_cameras`、`delete_camera` | ChimeraX の予約語 (`clip` `cofr` `delete` `list` `matrix` ...) を前方一致で含む名前は断る。CueMol のカメラは視点だけで、ChimeraX のように model の位置は戻さない |
 | `view matrix` | `camera M` (12 数値)、`models` / `coordinateSystem` は断る | `set_view` ×2、`set_projection` | 下記 |
-| `turn` | `[axis] [angle] [frames]` (既定 y、90°) | `set_view` (`rotation`) | 下記。`center` `coordinateSystem` `rock` `wobble` `models` `atoms` は断る |
+| `turn` | `[axis] [angle] [frames]` (既定 y、90°)、`rock` `wobble` `wobbleAspect` | `set_view` (`rotation`)。frames / rock / wobble があれば `add_anim` ほか | 下記。`center` `coordinateSystem` `models` `atoms` は断る |
+| `roll` / `rock` / `wobble` / `stop` | `turn.py` と同じ引数 | `add_anim`、`set_anim_time`、`set_anim_prop`、`set_anim_options`、`animate` | animation element に置き換えて timeline に足す。[rock-spin-anim.md](rock-spin-anim.md) |
 | `move` | `axis [distance] [frames]` (Å、既定 1) | `set_view` (`center`) | 下記。`coordinateSystem` `models` `atoms` は断る |
 | `cofr` | 引数無し / `centerOfView` | (読み取り) | `Center of rotation: x y z  center of view` と出す。CueMol は view の中心で回すので、対象や点を指定する形は「視点が動いてしまう」として断り、`view <spec>` を案内する |
 | `zoom` | `[factor] [frames]`、`pixelSize` | `set_view` (`zoom`) | CueMol の zoom は view の高さ (Å) なので `zoom / factor`。1 pixel = zoom / 高さ (px) Å。引数無しは `Pixel size at center of rotation is ...`。`frames` は warn (ChimeraX は倍率を frames 全体で達成するので掛けない) |
@@ -430,8 +431,9 @@ renderer で表し、**その selection と paint が表示の状態そのもの
 - `turn`: 画面の軸 u (`x` `-y` や 3 数値) の周りに scene を回す。今の回転 q に `q · rot(u, -θ)` を掛けて `set_view` で書く
   (`turnedRotation`)。`rotate_view` は ChimeraX と逆向きに回るので使わない。
 - `move`: 画面の軸を world に直し、中心を `-d·軸` 動かす (scene が +d に動いて見える)。
-- `frames`: アニメーションはしない。有限の数は、ChimeraX が毎 frame 同じ角度・距離を繰り返すので掛けて一度に動かし
-  (`turn y 3 30` は 90°)、`forever` は断る。
+- `frames`: `move` はアニメーションしない。有限の数は、ChimeraX が毎 frame 同じ距離を繰り返すので掛けて一度に動かし、
+  `forever` は断る。`turn` の frames は animation element (SimpleSpin) にして 1 回再生する
+  ([rock-spin-anim.md](rock-spin-anim.md))。
 - `view matrix camera M`: 3×4 行列を行ごとに (列 0-2 が軸、列 3 が目の位置)。ChimeraX の camera は位置だけを持つが、CueMol は
   目の前 `distance` の中心の周りに回り、その前後 `slab` だけを描く。そこで、中心は視線が表示中の分子の中心を通る点に置き、
   distance はそこまでの距離にする。zoom は ChimeraX の水平の視野角 30° になる高さ (`2·d·tan15°/縦横比`)、投影は透視投影

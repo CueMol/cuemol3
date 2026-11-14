@@ -10,6 +10,7 @@ SET(ANIM_SRCS
 anim.cpp
 CamMotion.cpp
 SimpleSpin.cpp
+RockSpin.cpp
 RendPropAnim.cpp
 RealPropAnim.cpp
 RendXformAnim.cpp
@@ -26,6 +27,7 @@ SlideInOutAnim.cpp
 SET(ANIM_MCWG_QIFS
 CamMotion.qif
 SimpleSpin.qif
+RockSpin.qif
 RealPropAnim.qif
 RendXformAnim.qif
 NoopAnimObj.qif

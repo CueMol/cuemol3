@@ -56,13 +56,14 @@ function classForAddType(type: AnimAddType): string {
     case "SlideOutAnim":
       return "SlideInOutAnim";
     default:
-      return type; // SimpleSpin / CamMotion / MolAnim / NoopAnimObj
+      return type; // SimpleSpin / RockSpin / CamMotion / MolAnim / NoopAnimObj
   }
 }
 
 /** The `add_anim` type word of an Add-menu type id. */
 const ADD_TYPE_WORDS: Readonly<Record<AnimAddType, string>> = {
   SimpleSpin: "spin",
+  RockSpin: "rock",
   CamMotion: "camera",
   ShowAnim: "show",
   HideAnim: "hide",
@@ -93,6 +94,11 @@ function applyAddTypeDefaults(obj: AnimObj, type: AnimAddType): void {
   switch (type) {
     case "SimpleSpin":
       w.angle = 360.0;
+      break;
+    case "RockSpin":
+      // A swing reads as an even sway; C++ already defaults to rock, 30 deg,
+      // one cycle.
+      w.quadric = 0;
       break;
     case "ShowAnim":
       w.hide = false;
@@ -153,11 +159,19 @@ const CURRENT_CAM_NAME = "__current";
 /**
  * Seed the start camera from the live view when an element is added.
  *
- * UXP `anim-panel.js` onAddCmd, verbatim: the `__current` camera is saved from
- * the active view whenever the scene lacks it, and `startcam` adopts it only
- * when still empty (an explicit choice is never overwritten). Without this a
- * fresh animation starts from wherever the camera happens to be at Play time
+ * As UXP `anim-panel.js` onAddCmd: the `__current` camera is saved from the
+ * active view whenever the scene lacks it, and `startcam` adopts it only when
+ * still empty (an explicit choice is never overwritten). Without this a fresh
+ * animation starts from wherever the camera happens to be at Play time
  * instead of from the view the elements were authored against.
+ *
+ * Unlike UXP, `__current` is also saved again when the timeline is empty and
+ * the start camera is (or is about to be) `__current`: it stands for the view
+ * the animation was begun from, so a timeline emptied and begun again -- for
+ * instance after a molecule was loaded into a scene that once had one --
+ * starts from the view now, not from a stale one far from the molecule. With
+ * elements already there the camera is left alone: they were authored
+ * against it.
  *
  * Runs OUTSIDE the add's undo txn, as in UXP: neither `saveViewToCam` nor
  * `setStartCamName` belongs to the element edit, so undoing the add leaves both
@@ -166,10 +180,13 @@ const CURRENT_CAM_NAME = "__current";
 function ensureStartCam(scene: Scene, mgr: AnimMgr, viewId: number | undefined): void {
   if (viewId === undefined) return;
   try {
-    if (!scene.hasCamera(CURRENT_CAM_NAME)) scene.saveViewToCam(viewId, CURRENT_CAM_NAME);
+    const startcam = safeStr(() => mgr.startcam);
+    const empty = safeNum(() => mgr.size) === 0;
+    const beginning = empty && (startcam === "" || startcam === CURRENT_CAM_NAME);
+    if (beginning || !scene.hasCamera(CURRENT_CAM_NAME)) scene.saveViewToCam(viewId, CURRENT_CAM_NAME);
     // Never point startcam at a camera the save failed to create.
     if (!scene.hasCamera(CURRENT_CAM_NAME)) return;
-    if (safeStr(() => mgr.startcam) === "") mgr.startcam = CURRENT_CAM_NAME;
+    if (startcam === "") mgr.startcam = CURRENT_CAM_NAME;
   } catch {
     /* camera seeding is best-effort */
   }

@@ -324,6 +324,15 @@ read-only (the manager derives it). Editing while playing ends in a pause, as
   - No seeding happens when no view is active (`viewId` omitted).
 
 
+### `__current` is saved again for an empty timeline (departs from UXP)
+- UXP seeds `__current` from the view only when the scene lacks it. A scene
+  that once had an animation then kept a stale `__current`: after a molecule
+  was loaded and the timeline rebuilt, the first motion started from a view
+  far off the molecule. `ensureStartCam` now also saves `__current` again when
+  the timeline is empty and the start camera is empty or `__current`; with
+  elements present, or a named start camera, it is left alone. Details in
+  `docs/architecture/rock-spin-anim.md`.
+
 ### Header row in a narrow panel
 - The header (`AnimTransport`) is one line of fixed height and never wraps.
   When the panel is too narrow, optional groups move one by one into a
