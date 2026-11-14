@@ -247,6 +247,10 @@ architecture, it belongs here.
   UXP 版 CueMol2 との相互運用と、将来 tritium を複数起動したときのインスタンス間 copy&paste が
   目的。macOS では Gecko がカスタム flavor を pasteboard に出さないという発見と、
   そこから決まった 2 フォーマット構成 (legacy native / text envelope)。
+- [RockSpin: 振動する spin と、console からの camera の動き](rock-spin-anim.md) (日本語) --
+  rock / nutate / wobble を `pattern` で切り替える animation element (始まりで向きが跳ばない式)、
+  timeline が空のときの `__current` の保存し直し、ChimeraX (`turn ... frames` / `roll` / `rock` /
+  `wobble` / `stop`) と PyMOL (`movie.*` / `rock`) の console からの対応と一時的な loop の扱い。
 - [Animation element の copy / paste](anim-element-copy-paste.md) (日本語) --
   Animation panel の element を Cut / Copy / Paste で複製する。C++ の toXML / fromXML が
   AnimObj (`<motion>`) を扱い、貼った element は長さを保ったまま直前の element に chain して

@@ -289,6 +289,9 @@ camera の操作は undo しない ([ADR-0025](../migration/adr/ADR-0025-view-pa
 
 - `mplay` / `mstop` / `rewind`: scene の animation timeline (AnimMgr)。`mstop` は pause (位置を保つ)。
   MD trajectory の再生ループは Trajectory tab (renderer 側) にあるので `mplay` では動かせず、そう返す。
+- `movie.add_roll` / `add_rock` / `add_nutate`、`movie.roll` / `rock` / `nutate` / `tdroll`、`rock`
+  (`motionCommands.ts`): animation element (SimpleSpin / RockSpin) にして timeline の末尾に足す。`mstop` は
+  console が始めた `rock` の loop も元に戻す。[rock-spin-anim.md](rock-spin-anim.md)
 - `frame n` / `count_states`: MorphMol と trajectory の `frame` / `nframe` を直接読み書きする
   (mdtools plugin を import しない)。PyMOL の state は 1 から、CueMol の frame は 0 から。範囲外は丸めて warn。
 
