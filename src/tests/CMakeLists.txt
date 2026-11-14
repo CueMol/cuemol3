@@ -208,6 +208,7 @@ add_executable(test_anim
   modules/anim/test_main.cpp
   modules/anim/test_morphmol_crdarray.cpp
   modules/anim/test_animobj_xml.cpp
+  modules/anim/test_rockspin.cpp
 )
 target_include_directories(test_anim PRIVATE
   ${CMAKE_SOURCE_DIR}/src

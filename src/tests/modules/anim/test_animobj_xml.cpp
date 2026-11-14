@@ -2,6 +2,7 @@
 #include <common.h>
 
 #include "anim/SimpleSpin.hpp"
+#include "anim/RockSpin.hpp"
 
 #include <qsys/Scene.hpp>
 #include <qsys/SceneManager.hpp>
@@ -46,6 +47,31 @@ TEST(AnimObjXML, RoundTripKeepsClassAndProperties)
     EXPECT_DOUBLE_EQ(pCopy->getAngle(), 180.0);
     EXPECT_EQ(pCopy->getRelStart(), MS(250));
     EXPECT_EQ(pCopy->getRelEnd(), MS(1500));
+
+    pScene = qsys::ScenePtr();
+    qsys::SceneManager::getInstance()->destroyScene(sceneID);
+}
+
+// A RockSpin keeps its enum properties (written as their names) through the
+// same round trip, as in a qsc.
+TEST(AnimObjXML, RockSpinKeepsPatternAndEnvelope)
+{
+    qsys::ScenePtr pScene = qsys::SceneManager::getInstance()->createScene();
+    const qlib::uid_t sceneID = pScene->getUID();
+
+    qlib::LScrSp<anim::RockSpin> pRock(MB_NEW anim::RockSpin());
+    pRock->setPropStr("pattern", "wobble");
+    pRock->setPropStr("envelope", "grow");
+    pRock->setPropReal("aspect", 0.3);
+    pRock->setPropReal("cycles", 2.0);
+
+    qlib::LByteArrayPtr pXml = StreamManager::getInstance()->toXML(pRock);
+    qlib::LScrSp<anim::RockSpin> pCopy(StreamManager::getInstance()->fromXML(pXml, sceneID), qlib::no_throw_tag());
+    ASSERT_FALSE(pCopy.isnull());
+    EXPECT_EQ(pCopy->getPattern(), anim::RockSpin::PAT_WOBBLE);
+    EXPECT_EQ(pCopy->getEnvelope(), anim::RockSpin::ENV_GROW);
+    EXPECT_DOUBLE_EQ(pCopy->getAspect(), 0.3);
+    EXPECT_DOUBLE_EQ(pCopy->getCycles(), 2.0);
 
     pScene = qsys::ScenePtr();
     qsys::SceneManager::getInstance()->destroyScene(sceneID);
