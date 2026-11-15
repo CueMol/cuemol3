@@ -299,6 +299,52 @@
   opacity: 0.45;
 }
 
+/* Drag readout (AnimDragBadge): sits above the dragged strip's lane, or below
+   the top lane where the sticky ruler (z-index 4) would cover it. Under the
+   ruler and playhead; never takes the pointer from the drag. */
+.anim-drag-badge {
+  position: absolute;
+  top: calc(var(--anim-ruler-h) + var(--anim-lane-h) * var(--anim-badge-lane));
+  transform: translateY(-100%);
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-overlay);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.anim-drag-badge.is-below {
+  transform: none;
+}
+
+.anim-drag-badge-primary {
+  font-weight: var(--fw-semibold);
+}
+
+.anim-drag-badge-secondary {
+  color: var(--text-muted);
+}
+
+/* Cursor pinned for a whole strip drag (set on <html> by the panel). The
+   universal selector and !important are needed because the lane, strip and
+   grips each declare their own cursor (same approach as data-busy). */
+:root[data-anim-drag="resize"],
+:root[data-anim-drag="resize"] * {
+  cursor: ew-resize !important;
+}
+
+:root[data-anim-drag="move"],
+:root[data-anim-drag="move"] * {
+  cursor: grabbing !important;
+}
+
 /* Per-type strip colors */
 .anim-strip--SimpleSpin { background: var(--anim-type-spin); }
 .anim-strip--RockSpin { background: var(--anim-type-rock); }

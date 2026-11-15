@@ -255,6 +255,9 @@ architecture, it belongs here.
   Animation panel の element を Cut / Copy / Paste で複製する。C++ の toXML / fromXML が
   AnimObj (`<motion>`) を扱い、貼った element は長さを保ったまま直前の element に chain して
   後ろに並ぶ。clipboard は text envelope だけ (CueMol2 に対応する形式が無い)。
+- [Animation strip の drag 表示と snap](anim-strip-drag-readout.md) (日本語) --
+  strip の移動・伸縮中に長さや時刻を浮動 badge で表示し、ruler の目盛りの 1/10 に snap する
+  (Alt で解除)。badge の配置と clamp、drag 中の canvas の伸長、cursor の固定。
 - [Cmd+C / X / V をフォーカス文脈で振り分ける](focus-aware-edit-shortcuts.md) (日本語) --
   同じキーがテキスト欄・scene tree・paint deck で別の意味を持つようにする routing の設計。
   Electron の clipboard role では表現できない理由 (macOS はメニューの key equivalent が
