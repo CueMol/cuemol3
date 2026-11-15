@@ -130,7 +130,7 @@ const LATTICE: HatchLayerKind[] = ["line", "dot"];
 
 /** Mark-layer fields, in the order the spec text lists them. */
 export const LAYER_FIELDS: readonly HatchFieldDef[] = [
-  { key: "angle", type: "num", def: 45, label: "Angle", place: "primary", min: -180, max: 180, step: 1, unit: "deg" },
+  { key: "angle", type: "num", def: 45, label: "Angle", place: "primary", min: -180, max: 180, step: 1, unit: "°" },
   { key: "spacing", type: "num", def: 10, label: "Spacing", place: "primary", min: 0.25, max: 64, step: 0.25, unit: "px" },
   { key: "subdiv", type: "int", def: 2, label: "Nesting levels", place: "advanced", min: 0, max: 5, step: 1, kinds: LATTICE },
   { key: "width", type: "num", def: 1.1, label: "Width", place: "primary", min: 0.1, max: 8, step: 0.05, unit: "px", kinds: LINE },
@@ -149,11 +149,11 @@ export const LAYER_FIELDS: readonly HatchFieldDef[] = [
   { key: "slen", type: "num", def: 0, label: "Stroke length", place: "advanced", min: 0, max: 200, step: 1, unit: "px", kinds: LINE },
   { key: "sgap", type: "num", def: 0, label: "Stroke gap", place: "advanced", min: 0, max: 50, step: 0.5, unit: "px", kinds: LINE },
   { key: "taper", type: "num", def: 0.3, label: "Stroke taper", place: "advanced", min: 0, max: 0.9, step: 0.05, kinds: LINE },
-  { key: "anglejitter", type: "num", def: 0, label: "Angle jitter", place: "advanced", min: 0, max: 15, step: 0.5, unit: "deg", kinds: LINE },
+  { key: "anglejitter", type: "num", def: 0, label: "Angle jitter", place: "advanced", min: 0, max: 15, step: 0.5, unit: "°", kinds: LINE },
   { key: "lenjitter", type: "num", def: 0, label: "Length jitter", place: "advanced", min: 0, max: 0.9, step: 0.05, kinds: LINE },
   { key: "shape", type: "num", def: 2, label: "Shape exponent", place: "advanced", min: 1, max: 16, step: 0.5, kinds: DOTS },
   { key: "aspect", type: "num", def: 1, label: "Aspect", place: "advanced", min: 0.5, max: 2, step: 0.05, kinds: DOTS },
-  { key: "dotangle", type: "num", def: 0, label: "Dot angle", place: "advanced", min: -90, max: 90, step: 1, unit: "deg", kinds: DOTS },
+  { key: "dotangle", type: "num", def: 0, label: "Dot angle", place: "advanced", min: -90, max: 90, step: 1, unit: "°", kinds: DOTS },
   { key: "invert", type: "bool", def: true, label: "Merge to solid", place: "advanced", kinds: DOT },
   { key: "tooth", type: "num", def: 0, label: "Paper tooth", place: "advanced", min: 0, max: 1, step: 0.05 },
   { key: "toothscale", type: "num", def: 3, label: "Tooth scale", place: "advanced", min: 0.5, max: 20, step: 0.5, unit: "px" },

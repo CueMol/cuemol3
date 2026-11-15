@@ -38,6 +38,23 @@
   gap: var(--space-3);
 }
 
+/* Filling inline variant (`Field fill`): the control takes the width after the
+   label, with the same label floor and gap as a SliderField row, so a drag box
+   in a column of slider rows spans the slider and its number box. */
+.h3-form-field-row.h3-form-inline.h3-form-fill {
+  justify-content: flex-start;
+  gap: var(--space-4);
+}
+
+.h3-form-field-row.h3-form-inline.h3-form-fill .h3-form-field-label {
+  flex-shrink: 0;
+  min-width: 56px;
+}
+
+.h3-form-field-row.h3-form-inline.h3-form-fill .h3-form-field-control {
+  flex: 1 1 0;
+}
+
 /* ── Field grid (aligned label column + filling control) ──
  * A grid whose rows share one label-column width so every control's left edge
  * lines up (Blender-style property rows). Rows use display:contents so their
@@ -1056,16 +1073,18 @@
   cursor: default;
 }
 
-/* Negative side-margins tighten the gaps around the unit suffix from the row's
-   8px gap default down to 1px on each side. */
+/* A negative left margin tightens the gap before the unit suffix from the
+   row's 8px gap default down to 1px. Nothing follows the unit, so it takes no
+   right margin (a negative one pushed it past the row's end). The minimum
+   width keeps one-letter units in a column; a longer one widens the suffix
+   and the slider gives way. */
 .h3-form-sliderfield-unit {
   font-size: var(--type-caption-fs);
   color: var(--text-secondary);
   flex-shrink: 0;
-  width: 14px;
+  min-width: 14px;
   text-align: left;
   margin-left: -7px;
-  margin-right: -7px;
 }
 
 /* ── Reject numeric input (bare, reject-and-revert validation) ── */

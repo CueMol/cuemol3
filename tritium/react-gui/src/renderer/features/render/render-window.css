@@ -80,6 +80,10 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* Vertical scrolling only: overflow-y:auto alone promotes overflow-x to
+     auto, and the tabs lay out to the pane width, so a horizontal scrollbar
+     is never wanted. */
+  overflow-x: hidden;
 }
 
 /* Image tab: stacked sections. One padding and one section gap for the whole

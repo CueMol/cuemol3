@@ -60,19 +60,25 @@ Rendering window は別 BrowserWindow で worker を持たないため、`RENDER
 
 ```
 RenderSettingsPane: [Image] [Render] [Detail]   (Detail は hatch prop があるときだけ)
-└ Detail タブ = HatchLookEditor    .hatch-look
-   ├ caption "Style template: <name>" / status caption (loading / error)
-   ├ ButtonRow: FormButton "Reset to style" (dirty のときだけ有効) + "Edited"
-   ├ HatchLayersSection = FieldSection "Layers" (titleActions: +Line / +Dot)
+└ Detail タブ = .insp-properties-tab > HatchLookEditor (.hatch-look)
+   ├ FlatSection "Style"
+   │   ├ caption "Template: <name>" / status caption (loading / error)
+   │   └ ButtonRow: FormButton "Reset to style" (dirty のときだけ有効) + "Edited"
+   ├ HatchLayersSection = FlatSection "Layers" (actions: +Line / +Dot)
    │   └ HatchLayerRow x N (React.memo, key = layer.id)
    │       ├ .h3-list-row ヘッダ (Layer n -- kind, duplicate, trash)
    │       ├ Field "Kind" > SelectField (line / dot / stipple)
-   │       ├ SliderField: angle / spacing / width | dot scale / tone high / tone low / fade / opacity / ink darkness
+   │       ├ HatchNumField: angle / spacing / width | dot scale / tone high / tone low / fade / opacity / ink darkness
    │       └ AccordionSection "Randomness / Advanced": jitter / wobble / ... / shape / aspect / invert (kind でフィルタ)
-   └ HatchShadingSection = FieldSection "Shading"
-       ├ SliderField Strength / Curve
+   └ HatchShadingSection = FlatSection "Shading"
+       ├ HatchNumField Strength / Curve
        └ AccordionSection "Advanced": ambient / wrap / rim ... / ink shade / min contrast / tone fog / fill posterize
 ```
+
+Detail タブは Render タブと同じく `FlatSection` を積む作りで、余白と区切り線は section が持つ
+(タブ側では余白を付けない)。数値はすべて `HatchNumField` = `Field inline fill` + `DragNumericField`
+で、範囲の広さに関係なく揃える (spec テーブルの min / max で範囲を縛り、step が drag の刻みと
+矢印の増減幅、表示桁は step の桁数)。値は操作の終わり (`onRelease`) に 1 回だけ書く。
 
 `hooks/useRenderSettings.ts` が `HatchEditState { style, template, spec }` と操作
 (`applyHatchTemplate` / `updateHatchLayer` / `addHatchLayer` / `removeHatchLayer` /

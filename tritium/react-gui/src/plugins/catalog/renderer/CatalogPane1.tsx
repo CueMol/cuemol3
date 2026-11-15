@@ -151,6 +151,9 @@ export const CatalogPane1: PaneComponent = ({
                   unit="Å"
                 />
               </Field>
+              <Field label="Drag (inline fill)" inline fill>
+                <DragNumericField value={drag} onChange={setDrag} min={0} max={10} step={0.1} unit="Å" />
+              </Field>
               <Field label="TimeField (segments / drag / Ctrl+wheel / Enter to type)">
                 <TimeField value={timeMs} onChange={setTimeMs} />
               </Field>

@@ -8,8 +8,9 @@
 
 import React from "react";
 
-import { AccordionSection } from "./AccordionSection";
-import { Field, FieldSection, SliderField, SwitchField } from "@renderer/h3-kit/form";
+import { AccordionSection, FlatSection } from "./AccordionSection";
+import { Field, SwitchField } from "@renderer/h3-kit/form";
+import { HatchNumField } from "./HatchNumField";
 import {
   INK_FIELDS,
   TONE_FIELDS,
@@ -49,15 +50,10 @@ const renderField = (
     );
   }
   return (
-    <SliderField
+    <HatchNumField
       key={f.key}
-      label={f.label}
+      field={f}
       value={Number(value)}
-      min={f.min ?? 0}
-      max={f.max ?? 1}
-      step={f.step}
-      unit={f.unit}
-      slider={f.type !== "int"}
       disabled={!enabled}
       onCommit={(v) => commit({ [f.key]: v })}
     />
@@ -76,7 +72,7 @@ export const HatchShadingSection: React.FC<HatchShadingSectionProps> = ({
   const commitTone = (p: Record<string, unknown>) => onToneChange(p as Partial<HatchTone>);
   const commitInk = (p: Record<string, unknown>) => onInkChange(p as Partial<HatchInk>);
   return (
-    <FieldSection title="Shading">
+    <FlatSection title="Shading">
       {TONE_FIELDS.filter((f) => f.place === "primary").map((f) =>
         renderField(f, toneRec[f.key], toneFieldEnabled(f.key, tone, env), commitTone),
       )}
@@ -88,6 +84,6 @@ export const HatchShadingSection: React.FC<HatchShadingSectionProps> = ({
           renderField(f, inkRec[f.key], inkFieldEnabled(f.key, ink, env), commitInk),
         )}
       </AccordionSection>
-    </FieldSection>
+    </FlatSection>
   );
 };

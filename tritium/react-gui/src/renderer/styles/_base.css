@@ -54,6 +54,10 @@ body {
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+/* Where a vertical and a horizontal scrollbar meet; the default is white. */
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
 ::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
   border-radius: var(--radius-lg);
