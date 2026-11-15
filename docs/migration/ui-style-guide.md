@@ -192,6 +192,10 @@ listbox はフォームと違い**描画基盤が3種**あり単一コンポー�
   (`@phosphor-icons/react`)が共存し、各意味キー(例 `tool.lasso`)を Phosphor か Blueprint のどちらで描くかを
   レジストリ `APP_ICONS` が集中管理する。新しいアイコンは **まずキーをレジストリに足してから** `<AppIcon>` で使う。
   分子ツール等の domain 固有アイコンは Phosphor を優先、既存で十分なものは Blueprint エントリのまま。
+- **Phosphor に無い意味だけ外部 outline icon (`lib: "ext"`)**: `h3-kit/primitives/extIcons.tsx` に SVG path を
+  直接取り込む (npm 依存は足さない)。Phosphor と線が揃う 24px stroke 系 (Tabler 等) に限り、stroke 幅は Phosphor の
+  weight に連動 (regular 1.5px)。ライセンス表記はファイル先頭コメントに置く。アイコンの重ね合わせ (合成) はしない。
+  例: toolbar の Open File / Save File As = Tabler `file-import` / `file-export` (scene の Open/Save は Phosphor のまま)。
 - **サイズはトークン**: `sm=12 / md=14 / lg=18`(`AppIcon` の `SIZE_PX`、CSS の `--icon-sm/md/lg` と一致)。
   consumer は `size="sm|md|lg"` を渡す(px 直書き禁止、必要時のみ明示 px)。
 - **色は currentColor 継承**(dark/light 自動)。アイコンに固定色を当てない。Phosphor の既定 weight は

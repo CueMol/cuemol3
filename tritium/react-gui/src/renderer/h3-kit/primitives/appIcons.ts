@@ -125,10 +125,15 @@ import {
   TextAa,
 } from "@phosphor-icons/react";
 import type { IconName } from "@blueprintjs/icons";
+import { TablerFileExport, TablerFileImport, type ExtIcon } from "./extIcons";
 
-/** A registry entry: either a Phosphor component or a Blueprint icon name. */
+/**
+ * A registry entry: a Phosphor component, an outline icon from another set
+ * drawn to match Phosphor (`extIcons.tsx`), or a Blueprint icon name.
+ */
 export type AppIconSpec =
   | { lib: "phosphor"; Comp: PhosphorIcon; weight?: IconWeight }
+  | { lib: "ext"; Comp: ExtIcon; weight?: IconWeight }
   | { lib: "bp"; name: IconName };
 
 /**
@@ -159,8 +164,11 @@ export const APP_ICONS = {
 
   // Top toolbar.
   "toolbar.newTab": { lib: "phosphor", Comp: Plus },
-  "toolbar.openFile": { lib: "phosphor", Comp: File },
-  "toolbar.saveAs": { lib: "phosphor", Comp: FloppyDiskBack },
+  // Open File loads into the current scene and Save File As writes one
+  // object out, so they are import / export; the scene keeps the plain
+  // folder / floppy as the app's own document.
+  "toolbar.openFile": { lib: "ext", Comp: TablerFileImport },
+  "toolbar.saveAs": { lib: "ext", Comp: TablerFileExport },
   "toolbar.openScene": { lib: "phosphor", Comp: FolderOpen },
   "toolbar.reloadScene": { lib: "phosphor", Comp: ArrowClockwise },
   "toolbar.saveScene": { lib: "phosphor", Comp: FloppyDisk },
