@@ -10,7 +10,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Allotment } from 'allotment'
+import { Allotment, LayoutPriority } from 'allotment'
 import 'allotment/dist/style.css'
 
 import { usePluginContributions } from '@renderer/plugin-host'
@@ -100,7 +100,11 @@ export const MainLayout: React.FC = () => {
 
         <div className="main-content-area">
           {loaded && (
+            // Not proportional: a window resize goes to the center (the
+            // High-priority pane), so the sidebar and the inspector keep
+            // their widths.
             <Allotment
+              proportionalLayout={false}
               onChange={handleMainSizesChange}
               defaultSizes={
                 savedSizes.mainSizes.length > 0 ? savedSizes.mainSizes : undefined
@@ -117,8 +121,9 @@ export const MainLayout: React.FC = () => {
               </Allotment.Pane>
 
               {/* Right section: center + inspector */}
-              <Allotment.Pane>
+              <Allotment.Pane priority={LayoutPriority.High}>
                 <Allotment
+                  proportionalLayout={false}
                   onChange={handleRightPanelSizesChange}
                   defaultSizes={
                     savedSizes.rightPanelSizes.length > 0
@@ -127,7 +132,7 @@ export const MainLayout: React.FC = () => {
                   }
                 >
                   {/* Center: ContentArea + BottomPanel (vertical split) */}
-                  <Allotment.Pane>
+                  <Allotment.Pane priority={LayoutPriority.High}>
                     <Allotment
                       vertical
                       onChange={setCenterSizes}
