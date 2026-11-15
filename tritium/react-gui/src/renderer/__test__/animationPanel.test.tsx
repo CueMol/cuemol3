@@ -660,11 +660,11 @@ describe("AnimationPanel chain state and failures", () => {
     act(() => {
       root.render(<AnimationPanel cm={cm} activeSceneId={1} activeMolViewId={2} />);
     });
-  const dragStrip = (container: HTMLElement, uid: number, fromX: number, toX: number) => {
+  const dragStrip = (container: HTMLElement, uid: number, fromX: number, toX: number, altKey = false) => {
     const strip = container.querySelector(`.anim-strip[data-uid="${uid}"]`) as HTMLElement;
     act(() => strip.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0, clientX: fromX })));
-    act(() => document.dispatchEvent(new MouseEvent("mousemove", { clientX: toX })));
-    act(() => document.dispatchEvent(new MouseEvent("mouseup", { clientX: toX })));
+    act(() => document.dispatchEvent(new MouseEvent("mousemove", { clientX: toX, altKey })));
+    act(() => document.dispatchEvent(new MouseEvent("mouseup", { clientX: toX, altKey })));
   };
 
   it("holds the dropped span across an unrelated refetch and hands over when the edit shows", () => {
@@ -706,15 +706,18 @@ describe("AnimationPanel chain state and failures", () => {
     unmount();
   });
 
-  it("commits whole milliseconds", () => {
+  it("snaps to a tenth of the ruler tick; Alt drags freely in whole milliseconds", () => {
     const { container, unmount } = mount();
-    // Zoom in once: 0.1 * 1.4 px/ms, so 100 px is 714.28... ms.
+    // Zoom in once: 0.1 * 1.4 px/ms, so 100 px is 714.28... ms, and the
+    // ruler tick is 1000 ms -> a 100 ms snap grid.
     const zoomIn = Array.from(container.querySelectorAll(".anim-zoom button")).find((b) =>
       b.getAttribute("title")?.startsWith("Zoom in"),
     ) as HTMLButtonElement;
     act(() => zoomIn.click());
     dragStrip(container, 1, 100, 200);
-    expect(mockEdit.setElementTime).toHaveBeenCalledWith(1, 714, 1714);
+    expect(mockEdit.setElementTime).toHaveBeenLastCalledWith(1, 700, 1700);
+    dragStrip(container, 1, 100, 200, true);
+    expect(mockEdit.setElementTime).toHaveBeenLastCalledWith(1, 714, 1714);
     unmount();
   });
 

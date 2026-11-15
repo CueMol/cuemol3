@@ -80,3 +80,23 @@ export function fitPxPerMs(lengthMs: number, availPx: number): number {
   if (lengthMs <= 0 || availPx <= 0) return DEFAULT_PX_PER_MS;
   return clampPxPerMs((availPx - 40) / lengthMs);
 }
+
+/**
+ * Snap grid (ms) for strip drags: a tenth of the ruler's major tick step, so
+ * the grid gets finer as the timeline is zoomed in.
+ *
+ * @param pxPerMs - Current horizontal scale.
+ */
+export function snapStepMs(pxPerMs: number): number {
+  return niceTickStepMs(pxPerMs) / 10;
+}
+
+/** Round a time (ms) to the nearest multiple of `stepMs`. */
+export function snapMs(ms: number, stepMs: number): number {
+  return Math.round(ms / stepMs) * stepMs;
+}
+
+/** Format a duration (ms) as seconds with millisecond precision (`2.400s`). */
+export function formatSpanSec(ms: number): string {
+  return `${(Math.round(ms) / 1000).toFixed(3)}s`;
+}

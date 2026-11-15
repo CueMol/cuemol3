@@ -45,6 +45,7 @@ import { useShowErrorAlert } from "@renderer/dialogs/ErrorAlertDialogProvider";
 import { AnimTransport } from "@renderer/features/animation/anim/AnimTransport";
 import { AnimTimeRuler } from "@renderer/features/animation/anim/AnimTimeRuler";
 import { AnimStrip, type AnimStripEditMode } from "@renderer/features/animation/anim/AnimStrip";
+import { AnimDragBadge } from "@renderer/features/animation/anim/AnimDragBadge";
 import { typeIcon } from "@renderer/features/animation/anim/animElementMeta";
 import {
   DEFAULT_PX_PER_MS,
@@ -52,6 +53,8 @@ import {
   msToPx,
   timelineWidthPx,
   fitPxPerMs,
+  snapMs,
+  snapStepMs,
 } from "@renderer/features/animation/anim/timelineGeometry";
 
 interface AnimationPanelProps {
@@ -98,6 +101,8 @@ interface DragPreview {
   uid: number;
   absStartMs: number;
   absEndMs: number;
+  /** The drag kind, for the live readout badge. */
+  mode: AnimStripEditMode;
   /** The edit is in flight; drop this once fresh data carries it. */
   committed?: boolean;
   /** The RELATIVE span that was written; the refetch that shows it ends the hold. */
@@ -169,15 +174,33 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
   const lengthMs = tmgr.lengthMs;
 
   // Time-axis extent: the manager length, but never less than the furthest
-  // element end (length auto-grows on the C++ side; guard regardless).
+  // element end (length auto-grows on the C++ side; guard regardless). A strip
+  // dragged past the end grows it live, as the commit will.
+  const previewEndMs = dragPreview?.absEndMs ?? 0;
   const contentMs = useMemo(() => {
     const maxAbsEnd = elements.reduce((m, e) => Math.max(m, e.absEndMs), 0);
-    return Math.max(lengthMs, maxAbsEnd, 1000);
-  }, [elements, lengthMs]);
+    return Math.max(lengthMs, maxAbsEnd, previewEndMs, 1000);
+  }, [elements, lengthMs, previewEndMs]);
 
   const widthPx = timelineWidthPx(contentMs, pxPerMs);
   const playheadMs = scrubMs ?? tmgr.elapsedMs;
   const playheadLeft = msToPx(playheadMs, pxPerMs);
+
+  // Live readout of the span being dragged; gone once the drop is in flight.
+  const dragLane =
+    dragPreview && !dragPreview.committed
+      ? elements.findIndex((e) => e.uid === dragPreview.uid)
+      : -1;
+  const dragBadge =
+    dragPreview && dragLane >= 0 ? (
+      <AnimDragBadge
+        mode={dragPreview.mode}
+        absStartMs={dragPreview.absStartMs}
+        absEndMs={dragPreview.absEndMs}
+        laneIndex={dragLane}
+        pxPerMs={pxPerMs}
+      />
+    ) : null;
 
   const { seek, canControl } = transport;
   // While the time-reference chain does not resolve, playback would be
@@ -259,6 +282,10 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
    * click (no movement) is left to the strip's onClick to select. The relative
    * delta equals the absolute delta because the chain reference is fixed during
    * the drag; chained-after elements re-resolve only on commit (via refetch).
+   *
+   * The dragged edge snaps to a grid a tenth of the ruler tick (finer when
+   * zoomed in): the absolute start for a move / left resize, the length for a
+   * right resize. Holding Alt (Option) drags freely.
    */
   const handleStripEditDown = useCallback(
     (el: AnimElement, mode: AnimStripEditMode, e: React.MouseEvent) => {
@@ -266,6 +293,9 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
       e.preventDefault();
       e.stopPropagation();
       const startX = e.clientX;
+      // Pin the cursor for the whole gesture: snapping leaves the pointer off
+      // the narrow grip, where the lane's own cursor would show through.
+      document.documentElement.dataset.animDrag = mode === "move" ? "move" : "resize";
       const { startMs: relStart, endMs: relEnd, absStartMs: absStart, absEndMs: absEnd } = el;
       let moved = false;
 
@@ -277,8 +307,15 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
       // the binding one whenever the reference does not itself start at 0.
       const minDelta = -Math.min(absStart, el.timeRefName ? relStart : Infinity);
 
-      const deltaFor = (clientX: number): number => {
-        const raw = (clientX - startX) / pxPerMs;
+      const step = snapStepMs(pxPerMs);
+      const spanMs = absEnd - absStart;
+      const deltaFor = (clientX: number, free: boolean): number => {
+        let raw = (clientX - startX) / pxPerMs;
+        if (!free)
+          raw =
+            mode === "resize-right"
+              ? snapMs(spanMs + raw, step) - spanMs
+              : snapMs(absStart + raw, step) - absStart;
         if (mode === "move") return Math.max(raw, minDelta);
         if (mode === "resize-left")
           return Math.max(Math.min(raw, absEnd - absStart), minDelta); // start in [0, end]
@@ -288,22 +325,23 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
       const onMove = (ev: MouseEvent) => {
         if (!moved && Math.abs(ev.clientX - startX) > DRAG_THRESHOLD_PX) moved = true;
         if (!moved) return;
-        const d = deltaFor(ev.clientX);
+        const d = deltaFor(ev.clientX, ev.altKey);
         if (mode === "move")
-          setDragPreview({ uid: el.uid, absStartMs: absStart + d, absEndMs: absEnd + d });
+          setDragPreview({ uid: el.uid, mode, absStartMs: absStart + d, absEndMs: absEnd + d });
         else if (mode === "resize-left")
-          setDragPreview({ uid: el.uid, absStartMs: absStart + d, absEndMs: absEnd });
-        else setDragPreview({ uid: el.uid, absStartMs: absStart, absEndMs: absEnd + d });
+          setDragPreview({ uid: el.uid, mode, absStartMs: absStart + d, absEndMs: absEnd });
+        else setDragPreview({ uid: el.uid, mode, absStartMs: absStart, absEndMs: absEnd + d });
       };
 
       const onUp = (ev: MouseEvent) => {
         document.removeEventListener("mousemove", onMove);
         document.removeEventListener("mouseup", onUp);
+        delete document.documentElement.dataset.animDrag;
         if (!moved) {
           setDragPreview(null);
           return; // click selects via onClick
         }
-        const d = deltaFor(ev.clientX);
+        const d = deltaFor(ev.clientX, ev.altKey);
         let newStart = relStart;
         let newEnd = relEnd;
         if (mode === "move") {
@@ -596,6 +634,7 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
                 No animation elements -- use + to add one
               </div>
             )}
+            {dragBadge}
             <div className="anim-playhead" style={{ left: playheadLeft }} aria-hidden />
           </div>
         </div>
