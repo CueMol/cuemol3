@@ -11,6 +11,7 @@ import React from "react";
 
 import { HatchLayersSection } from "./HatchLayersSection";
 import { HatchShadingSection } from "./HatchShadingSection";
+import { FlatSection } from "./AccordionSection";
 import { AppIcon } from "@renderer/h3-kit/primitives";
 import { ButtonRow, FormButton } from "@renderer/h3-kit/form";
 import type {
@@ -74,25 +75,25 @@ export const HatchLookEditor: React.FC<HatchLookEditorProps> = ({
   onReset,
 }) => (
   <div className="hatch-look">
-    <span className="type-caption hatch-look-status">
-      Style template: {styleName || "(none)"}
-    </span>
-    {(density !== 1 || widthScale !== 1) && (
+    <FlatSection title="Style">
       <span className="type-caption hatch-look-status">
-        Render tab multipliers: Mark density x{fmtMul(density)}, Mark width x{fmtMul(widthScale)}
-        {" "}(applied on top of the values below)
+        Template: {styleName || "(none)"}
       </span>
-    )}
-    {status === "loading" && (
-      <span className="type-caption hatch-look-status">Loading the style template...</span>
-    )}
-    {status === "error" && (
-      <span className="type-caption hatch-look-status is-error">
-        {error ?? "The style template could not be loaded."}
-      </span>
-    )}
-    {spec && (
-      <>
+      {(density !== 1 || widthScale !== 1) && (
+        <span className="type-caption hatch-look-status">
+          Render tab multipliers: Mark density x{fmtMul(density)}, Mark width x{fmtMul(widthScale)}
+          {" "}(applied on top of the values below)
+        </span>
+      )}
+      {status === "loading" && (
+        <span className="type-caption hatch-look-status">Loading the style template...</span>
+      )}
+      {status === "error" && (
+        <span className="type-caption hatch-look-status is-error">
+          {error ?? "The style template could not be loaded."}
+        </span>
+      )}
+      {spec && (
         <ButtonRow className="hatch-look-actions">
           <FormButton
             icon={<AppIcon name="ui.resetDefaults" aria-hidden />}
@@ -102,6 +103,10 @@ export const HatchLookEditor: React.FC<HatchLookEditorProps> = ({
           />
           {dirty && <span className="type-caption hatch-look-edited">Edited</span>}
         </ButtonRow>
+      )}
+    </FlatSection>
+    {spec && (
+      <>
         <HatchLayersSection
           layers={spec.layers}
           density={density}

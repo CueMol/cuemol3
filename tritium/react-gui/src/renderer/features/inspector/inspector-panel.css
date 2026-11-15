@@ -246,6 +246,18 @@
   white-space: nowrap;
 }
 
+/* Header controls (FlatSection `actions`): pushed to the right end, and not
+   in the eyebrow's uppercase / tracking. */
+.insp-accordion-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: auto;
+  flex-shrink: 0;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
 .insp-accordion-body {
   padding: var(--space-3) var(--space-4) var(--space-4);
   display: flex;
@@ -433,10 +445,10 @@
    NPR hatch layer editor (render settings > Hatching)
    ═══════════════════════════════════════════════════════════ */
 
+/* Stacked FlatSections; each carries its own padding and divider. */
 .hatch-look {
   display: flex;
   flex-direction: column;
-  gap: var(--form-section-gap);
 }
 
 .hatch-look-actions {

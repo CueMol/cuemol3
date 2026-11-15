@@ -20,7 +20,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useHoldReveal, useRevealWindow } from "@renderer/shell/reveal/useRevealWindow";
-import { Allotment } from "allotment";
+import { Allotment, LayoutPriority } from "allotment";
 import { Alert } from "@blueprintjs/core";
 import "allotment/dist/style.css";
 
@@ -318,9 +318,11 @@ export const RenderWindowApp: React.FC = () => {
         </span>
       </div>
       <div className="render-window-body">
-      <Allotment>
+      {/* Not proportional: a window resize goes to the image side (the
+          High-priority pane), so the Render Settings pane keeps its width. */}
+      <Allotment proportionalLayout={false}>
         {/* Left: image area over the render panel */}
-        <Allotment.Pane minSize={320}>
+        <Allotment.Pane minSize={320} priority={LayoutPriority.High}>
           <Allotment vertical>
             <Allotment.Pane minSize={160}>
               <div className="render-window-image">

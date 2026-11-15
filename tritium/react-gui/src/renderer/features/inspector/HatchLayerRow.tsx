@@ -11,7 +11,8 @@ import React, { useCallback } from "react";
 
 import { AccordionSection } from "./AccordionSection";
 import { AppIcon } from "@renderer/h3-kit/primitives";
-import { Field, FormButton, SelectField, SliderField, SwitchField } from "@renderer/h3-kit/form";
+import { Field, FormButton, SelectField, SwitchField } from "@renderer/h3-kit/form";
+import { HatchNumField } from "./HatchNumField";
 import {
   LAYER_FIELDS,
   fieldAppliesTo,
@@ -112,14 +113,9 @@ const HatchLayerRowImpl: React.FC<HatchLayerRowProps> = ({
     }
     return (
       <React.Fragment key={f.key}>
-        <SliderField
-          label={f.label}
+        <HatchNumField
+          field={f}
           value={Number(value)}
-          min={f.min ?? 0}
-          max={f.max ?? 1}
-          step={f.step}
-          unit={f.unit}
-          slider={f.type !== "int"}
           disabled={!enabled}
           onCommit={(v) => patch({ [f.key]: v })}
         />

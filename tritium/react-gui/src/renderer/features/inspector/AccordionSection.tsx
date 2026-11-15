@@ -96,6 +96,8 @@ export const AccordionSection: React.FC<AccordionSectionProps> = ({
 interface FlatSectionProps {
   /** Section title displayed in the header. */
   title: string;
+  /** Controls at the right end of the header (e.g. add buttons). */
+  actions?: React.ReactNode;
   /** Child elements rendered inside the always-visible body. */
   children: React.ReactNode;
 }
@@ -107,10 +109,11 @@ interface FlatSectionProps {
  * panel, and keeps `.insp-accordion-title` so the title is addressable the
  * same way in both forms.
  */
-export const FlatSection: React.FC<FlatSectionProps> = ({ title, children }) => (
+export const FlatSection: React.FC<FlatSectionProps> = ({ title, actions, children }) => (
   <div className="insp-accordion insp-accordion-flat expanded">
     <div className="insp-accordion-header insp-accordion-header-static">
       <span className="insp-accordion-title">{title}</span>
+      {actions != null && <span className="insp-accordion-actions">{actions}</span>}
     </div>
     <div className="insp-accordion-body">{children}</div>
   </div>

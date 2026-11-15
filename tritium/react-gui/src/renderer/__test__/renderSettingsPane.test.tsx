@@ -330,7 +330,7 @@ describe('RenderSettingsPane Detail tab', () => {
     expect(container.textContent ?? '').toContain('Style');
     selectTab(container, 'Detail');
     const text = container.textContent ?? '';
-    expect(text).toContain('Style template: richardson');
+    expect(text).toContain('Template: richardson');
     expect(text).toContain('Layers');
     expect(text).toContain('Shading');
     expect(container.querySelectorAll('.hatch-layer').length).toBe(3);

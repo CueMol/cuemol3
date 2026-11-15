@@ -29,6 +29,13 @@ export interface FieldProps {
      */
     controlFirst?: boolean;
     /**
+     * Inline rows only: the control takes all the width after the label, like
+     * a SliderField's slider, instead of hugging its content at the far end.
+     * For a control that reads better wide (a drag number box in a column of
+     * slider rows).
+     */
+    fill?: boolean;
+    /**
      * Layout-only class for positioning the row within its parent (e.g. a
      * flex child). Must NOT be used to set sizes -- sizing lives in the kit.
      */
@@ -40,6 +47,7 @@ export const Field: React.FC<FieldProps> = ({
     label,
     inline,
     controlFirst,
+    fill,
     className,
     children,
 }) => {
@@ -49,6 +57,7 @@ export const Field: React.FC<FieldProps> = ({
         'h3-form-field-row'
         + (inline ? ' h3-form-inline' : '')
         + (inline && controlFirst ? ' h3-form-control-first' : '')
+        + (inline && fill ? ' h3-form-fill' : '')
         + (className ? ` ${className}` : '');
     return (
         <div className={rowClass}>

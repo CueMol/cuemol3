@@ -9,7 +9,8 @@ import React from "react";
 
 import { HatchLayerRow } from "./HatchLayerRow";
 import { AppIcon } from "@renderer/h3-kit/primitives";
-import { FieldSection, FormButton } from "@renderer/h3-kit/form";
+import { FormButton } from "@renderer/h3-kit/form";
+import { FlatSection } from "./AccordionSection";
 import type { HatchLayer, HatchLayerKind } from "@renderer/data/hatchSpec";
 
 export interface HatchLayersSectionProps {
@@ -34,9 +35,9 @@ export const HatchLayersSection: React.FC<HatchLayersSectionProps> = ({
   onLayerRemove,
   onLayerDuplicate,
 }) => (
-  <FieldSection
+  <FlatSection
     title="Layers"
-    titleActions={
+    actions={
       <>
         <FormButton
           minimal
@@ -71,5 +72,5 @@ export const HatchLayersSection: React.FC<HatchLayersSectionProps> = ({
     {layers.length === 0 && (
       <span className="type-caption hatch-look-status">No layers: add one above.</span>
     )}
-  </FieldSection>
+  </FlatSection>
 );
