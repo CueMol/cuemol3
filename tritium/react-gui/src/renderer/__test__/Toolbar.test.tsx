@@ -95,7 +95,7 @@ describe('Toolbar', () => {
     const cases: [string, CmdId][] = [
       ['New Tab', CmdId.TabNew],
       ['Open File', CmdId.UiOpenObjDialog],
-      ['Save As', CmdId.ObjectSaveAs],
+      ['Save File As', CmdId.ObjectSaveAs],
       ['Open Scene', CmdId.UiOpenSceneDialog],
       ['Reload Scene', CmdId.SceneReload],
       ['Save Scene', CmdId.FileSave],
@@ -166,7 +166,7 @@ describe('Toolbar', () => {
       b.textContent?.trim(),
     )
     expect(labels).not.toContain('Save')
-    expect(labels).toContain('Save As')
+    expect(labels).toContain('Save File As')
     expect(labels).toContain('Save Scene')
     t.unmount()
   })
@@ -180,7 +180,7 @@ describe('Toolbar', () => {
 
   it('disables scene-only buttons when no molview tab is active', () => {
     const t = mountToolbar(makeUndoRedo(), false)
-    for (const text of ['Save As', 'Reload Scene', 'Save Scene', 'Render']) {
+    for (const text of ['Save File As', 'Reload Scene', 'Save Scene', 'Render']) {
       expect(findButton(t.container, text)?.disabled).toBe(true)
     }
     // Scene-independent buttons stay enabled.
@@ -192,7 +192,7 @@ describe('Toolbar', () => {
 
   it('enables scene-only buttons when a molview tab is active', () => {
     const t = mountToolbar(makeUndoRedo(), true)
-    for (const text of ['Save As', 'Reload Scene', 'Save Scene', 'Render']) {
+    for (const text of ['Save File As', 'Reload Scene', 'Save Scene', 'Render']) {
       expect(findButton(t.container, text)?.disabled).toBe(false)
     }
     t.unmount()
