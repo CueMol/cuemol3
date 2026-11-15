@@ -11,10 +11,12 @@
  *
  * Rows are addressed by name (a registered camera has no uid -- ADR-0005) and
  * can be dragged to reorder; the order is stored on the cameras themselves and
- * saved with the scene. `__current` -- the viewpoint the scene was saved with --
- * is listed as UXP listed it, but pinned to the top and left out of the
- * ordering: it is where the scene opens, not one of the viewpoints the user
- * arranges. Double-click applies with show/hide, as in UXP.
+ * saved with the scene. `__current` -- the live view point, which every scene
+ * has from its creation -- is listed as UXP listed it, but pinned to the top
+ * and left out of the ordering. It is refreshed from the view whenever
+ * something reads it, so the row only offers Save As: overwriting, applying,
+ * renaming, copying or deleting it is off (the worker services refuse the
+ * name too). Double-click applies with show/hide, as in UXP.
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -51,6 +53,8 @@ export const CameraPane: React.FC<CameraPaneProps> = ({ collapsed, onToggleColla
     const names = useMemo(() => cameras.map((c) => c.name), [cameras])
     // A camera can go away under the selection (deleted, scene reloaded).
     const active = selected !== null && names.includes(selected) ? selected : null
+    // The selected camera can be overwritten / applied / deleted / renamed.
+    const editableActive = active !== null && active !== CURRENT_CAMERA_NAME ? active : null
     const hasView = activeMolViewId !== undefined
 
     /** Run a command, keeping a rejection out of the render path. */
@@ -139,33 +143,34 @@ export const CameraPane: React.FC<CameraPaneProps> = ({ collapsed, onToggleColla
         (e: React.KeyboardEvent) => {
             if (editing !== null) return
             if (navKeyDown(e)) return
-            if ((e.key === 'Delete' || e.key === 'Backspace') && active) {
+            if ((e.key === 'Delete' || e.key === 'Backspace') && editableActive) {
                 e.preventDefault()
-                run('delete camera', dispatch(CmdId.CameraDelete, { name: active }))
+                run('delete camera', dispatch(CmdId.CameraDelete, { name: editableActive }))
                 return
             }
-            if (e.key === 'F2' && active) {
+            if (e.key === 'F2' && editableActive) {
                 e.preventDefault()
-                beginRename(active)
+                beginRename(editableActive)
             }
         },
-        [editing, navKeyDown, active, dispatch, run, beginRename],
+        [editing, navKeyDown, editableActive, dispatch, run, beginRename],
     )
 
     // Edit > Cut / Copy / Paste while the pane is where the user is working.
     useClipboardScope('camera-list', {
         copy: () => {
-            if (active) run('copy camera', dispatch(CmdId.CameraCopy, { name: active }))
+            if (editableActive) run('copy camera', dispatch(CmdId.CameraCopy, { name: editableActive }))
         },
         paste: () => run('paste camera', dispatch(CmdId.CameraPaste)),
         cut: () => {
-            if (!active) return
+            if (!editableActive) return
+            const name = editableActive
             // Delete only once the copy is actually on the clipboard, so a
             // failed write cannot lose the camera (same rule as the tree).
             run(
                 'cut camera',
-                dispatch(CmdId.CameraCopy, { name: active }).then((ok) =>
-                    ok ? dispatch(CmdId.CameraDelete, { name: active }) : undefined,
+                dispatch(CmdId.CameraCopy, { name }).then((ok) =>
+                    ok ? dispatch(CmdId.CameraDelete, { name }) : undefined,
                 ),
             )
         },
@@ -180,7 +185,7 @@ export const CameraPane: React.FC<CameraPaneProps> = ({ collapsed, onToggleColla
         )
     }, [dispatch, run])
 
-    const canEdit = hasView && active !== null
+    const canEdit = hasView && editableActive !== null
 
     return (
         <div className="sp-pane camera-pane">
@@ -208,7 +213,7 @@ export const CameraPane: React.FC<CameraPaneProps> = ({ collapsed, onToggleColla
                                 icon={<AppIcon name="ui.cameraSave" aria-hidden />}
                                 className="section-action-btn"
                                 disabled={!canEdit}
-                                onClick={() => active && saveFromView(active, false)}
+                                onClick={() => editableActive && saveFromView(editableActive, false)}
                             />
                         </Tooltip>
                         <Tooltip content="Save from view with show/hide" placement="bottom">
@@ -218,7 +223,7 @@ export const CameraPane: React.FC<CameraPaneProps> = ({ collapsed, onToggleColla
                                 icon={<AppIcon name="ui.cameraSaveVis" aria-hidden />}
                                 className="section-action-btn"
                                 disabled={!canEdit}
-                                onClick={() => active && saveFromView(active, true)}
+                                onClick={() => editableActive && saveFromView(editableActive, true)}
                             />
                         </Tooltip>
                         <Tooltip content="Apply to view" placement="bottom">
@@ -228,7 +233,7 @@ export const CameraPane: React.FC<CameraPaneProps> = ({ collapsed, onToggleColla
                                 icon={<AppIcon name="ui.cameraApply" aria-hidden />}
                                 className="section-action-btn"
                                 disabled={!canEdit}
-                                onClick={() => active && applyToView(active, false)}
+                                onClick={() => editableActive && applyToView(editableActive, false)}
                             />
                         </Tooltip>
                         <Tooltip content="Apply to view with show/hide" placement="bottom">
@@ -238,7 +243,7 @@ export const CameraPane: React.FC<CameraPaneProps> = ({ collapsed, onToggleColla
                                 icon={<AppIcon name="ui.cameraApplyVis" aria-hidden />}
                                 className="section-action-btn"
                                 disabled={!canEdit}
-                                onClick={() => active && applyToView(active, true)}
+                                onClick={() => editableActive && applyToView(editableActive, true)}
                             />
                         </Tooltip>
                         <Tooltip content="Delete" placement="bottom">
@@ -247,10 +252,10 @@ export const CameraPane: React.FC<CameraPaneProps> = ({ collapsed, onToggleColla
                                 small
                                 icon={<AppIcon name="ui.trash" aria-hidden />}
                                 className="section-action-btn"
-                                disabled={active === null}
+                                disabled={editableActive === null}
                                 onClick={() =>
-                                    active &&
-                                    run('delete camera', dispatch(CmdId.CameraDelete, { name: active }))
+                                    editableActive &&
+                                    run('delete camera', dispatch(CmdId.CameraDelete, { name: editableActive }))
                                 }
                             />
                         </Tooltip>
@@ -292,7 +297,9 @@ export const CameraPane: React.FC<CameraPaneProps> = ({ collapsed, onToggleColla
                                         editing === null && cam.name !== CURRENT_CAMERA_NAME
                                     }
                                     onClick={() => setSelected(cam.name)}
-                                    onDoubleClick={() => applyToView(cam.name, true)}
+                                    onDoubleClick={() => {
+                                        if (cam.name !== CURRENT_CAMERA_NAME) applyToView(cam.name, true)
+                                    }}
                                     onContextMenu={(e) => {
                                         e.preventDefault()
                                         setSelected(cam.name)

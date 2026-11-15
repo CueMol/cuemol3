@@ -16,7 +16,9 @@ import type { AnimMgr } from "@cuemol/core/src/wrappers/AnimMgr";
 import type { TimeValue } from "@cuemol/core/src/wrappers/TimeValue";
 import type { WorkerContext } from "@renderer/worker/server/types/WorkerContext";
 import type { AnimMgrState } from "@renderer/types";
-import { getViewOrNull } from "@renderer/worker/server/services/helpers/sceneResolver";
+import { getSceneOrNull, getViewOrNull } from "@renderer/worker/server/services/helpers/sceneResolver";
+import { syncCurrentCam } from "@renderer/worker/server/services/camera/currentCam";
+import { CURRENT_CAMERA_NAME } from "@renderer/worker/shared/cameraTypes";
 import { fail, failFrom, ok } from "@renderer/worker/shared/result";
 import { readAnimGraph, resolveMgr } from "./resolve";
 import { ANIM_PROGRESS_CHANNEL, type AnimProgressUpdate } from "@renderer/worker/shared/animTypes";
@@ -178,6 +180,27 @@ function unresolvedChain(mgr: AnimMgr, verb: string): string | null {
   return reason === null ? null : `Cannot ${verb}: ${reason}`;
 }
 
+/**
+ * Refresh `__current` from the view when an animation is about to start from
+ * it: from the stopped state only, so playback begins at the view the user is
+ * looking at. Resuming or seeking a paused animation leaves it as it is.
+ *
+ * `__current`-start animations are for quick, temporary use (spin what is on
+ * screen now); one that must start from a fixed view names its own camera.
+ */
+function syncStartCam(ctx: WorkerContext, sceneId: number, mgr: AnimMgr, viewId: number): void {
+  if (readPlayState(mgr) !== "stop") return;
+  let startcam: string;
+  try {
+    startcam = mgr.startcam;
+  } catch {
+    return;
+  }
+  if (startcam !== CURRENT_CAMERA_NAME) return;
+  const scene = getSceneOrNull(ctx, sceneId);
+  if (scene) syncCurrentCam(scene, viewId);
+}
+
 /** Start (or resume) playback on the target view. */
 export function play(ctx: WorkerContext, args: AnimPlayArgs): AnimTransportResult {
   const mgr = resolveMgr(ctx, args.sceneId);
@@ -186,6 +209,7 @@ export function play(ctx: WorkerContext, args: AnimPlayArgs): AnimTransportResul
   if (!view) return fail("view not found", "not-found");
   const blocked = unresolvedChain(mgr, "play");
   if (blocked !== null) return fail(blocked, "invalid-args");
+  syncStartCam(ctx, args.sceneId, mgr, args.viewId);
   try {
     mgr.start(view);
   } catch (e) {
@@ -233,6 +257,7 @@ export function goTime(ctx: WorkerContext, args: AnimGoTimeArgs): AnimTransportR
   const tv = ctx.svc.createObj("TimeValue") as TimeValue | null;
   if (!tv) return fail("TimeValue create failed", "native");
   tv.millisec = Math.max(0, args.ms);
+  syncStartCam(ctx, args.sceneId, mgr, args.viewId);
   try {
     mgr.goTime(tv, view);
   } catch (e) {

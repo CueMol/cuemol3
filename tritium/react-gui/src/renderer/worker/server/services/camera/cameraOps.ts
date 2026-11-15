@@ -27,6 +27,7 @@ import type { WorkerContext } from '@renderer/worker/server/types/WorkerContext'
 import { withUndoTxn } from '../withUndoTxn';
 import { getSceneOrNull } from '@renderer/worker/server/services/helpers/sceneResolver';
 import { recordOp } from '@renderer/worker/server/actions/serviceOps';
+import { isReservedCameraName, RESERVED_CAMERA_ERROR } from './currentCam';
 
 // --- helpers ---
 
@@ -53,6 +54,8 @@ export interface CreateCameraArgs {
 
 export interface CreateCameraResult {
     ok: boolean;
+    /** Why it failed, when there is more to say than `ok: false`. */
+    error?: string;
     /** True when a camera of that name already existed and was replaced. */
     overwritten: boolean;
 }
@@ -60,6 +63,7 @@ export interface CreateCameraResult {
 export function createCamera(ctx: WorkerContext, args: CreateCameraArgs): CreateCameraResult {
     const trimmed = args.name.trim();
     if (trimmed.length === 0) return { ok: false, overwritten: false };
+    if (isReservedCameraName(trimmed)) return { ok: false, overwritten: false, error: RESERVED_CAMERA_ERROR };
     const scene = getSceneOrNull(ctx, args.sceneId);
     if (!scene) return { ok: false, overwritten: false };
 
@@ -81,9 +85,12 @@ export interface DestroyCameraArgs {
 
 export interface DestroyCameraResult {
     ok: boolean;
+    /** Why it failed, when there is more to say than `ok: false`. */
+    error?: string;
 }
 
 export function destroyCamera(ctx: WorkerContext, args: DestroyCameraArgs): DestroyCameraResult {
+    if (isReservedCameraName(args.name)) return { ok: false, error: RESERVED_CAMERA_ERROR };
     const scene = getSceneOrNull(ctx, args.sceneId);
     if (!scene) return { ok: false };
     if (!scene.hasCamera(args.name)) return { ok: false };
@@ -111,12 +118,17 @@ export interface RenameCameraArgs {
 
 export interface RenameCameraResult {
     ok: boolean;
+    /** Why it failed, when there is more to say than `ok: false`. */
+    error?: string;
 }
 
 export function renameCamera(ctx: WorkerContext, args: RenameCameraArgs): RenameCameraResult {
     const trimmed = args.newName.trim();
     if (trimmed.length === 0) return { ok: false };
     if (trimmed === args.oldName) return { ok: false };
+    if (isReservedCameraName(trimmed) || isReservedCameraName(args.oldName)) {
+        return { ok: false, error: RESERVED_CAMERA_ERROR };
+    }
 
     const scene = getSceneOrNull(ctx, args.sceneId);
     if (!scene) return { ok: false };
@@ -146,6 +158,8 @@ export interface SaveViewToCameraArgs {
 
 export interface SaveViewToCameraResult {
     ok: boolean;
+    /** Why it failed, when there is more to say than `ok: false`. */
+    error?: string;
 }
 
 export function saveViewToCamera(
@@ -158,6 +172,7 @@ export function saveViewToCamera(
     // Trimmed, as save_camera takes it, so the two save the same camera.
     const name = args.name.trim();
     if (name.length === 0) return { ok: false };
+    if (isReservedCameraName(name)) return { ok: false, error: RESERVED_CAMERA_ERROR };
 
     let ok = false;
     withUndoTxn(scene, `Change camera ${name}`, () => {
@@ -190,12 +205,17 @@ export interface ApplyCameraToViewArgs {
 
 export interface ApplyCameraToViewResult {
     ok: boolean;
+    /** Why it failed, when there is more to say than `ok: false`. */
+    error?: string;
 }
 
 export function applyCameraToView(
     ctx: WorkerContext,
     args: ApplyCameraToViewArgs,
 ): ApplyCameraToViewResult {
+    // `__current` is always the live view, so applying it would only move
+    // the view back to whenever it was last refreshed.
+    if (isReservedCameraName(args.name)) return { ok: false, error: RESERVED_CAMERA_ERROR };
     const scene = getSceneOrNull(ctx, args.sceneId);
     if (!scene) return { ok: false };
     if (!scene.hasCamera(args.name)) return { ok: false };
@@ -228,12 +248,15 @@ export interface ClearCameraVisFlagsArgs {
 
 export interface ClearCameraVisFlagsResult {
     ok: boolean;
+    /** Why it failed, when there is more to say than `ok: false`. */
+    error?: string;
 }
 
 export function clearCameraVisFlags(
     ctx: WorkerContext,
     args: ClearCameraVisFlagsArgs,
 ): ClearCameraVisFlagsResult {
+    if (isReservedCameraName(args.name)) return { ok: false, error: RESERVED_CAMERA_ERROR };
     const scene = getSceneOrNull(ctx, args.sceneId);
     if (!scene) return { ok: false };
     const cam = getCameraRef(scene, args.name);

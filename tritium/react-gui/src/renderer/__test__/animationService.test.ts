@@ -579,15 +579,22 @@ describe("anim.service editing", () => {
 
   // A stale __current (saved before a molecule was loaded) once moved the
   // first motion far off the molecule: an empty timeline begins from the view.
-  it("animAddElement saves __current again only when the timeline is empty", () => {
-    const empty = makeCtx({ cameras: ["__current"], startcam: "__current" });
-    services.animAddElement(empty.ctx, { sceneId: 1, type: "SimpleSpin", viewId: 7 });
-    expect(empty.saveViewToCam).toHaveBeenCalledWith(7, "__current");
+  it("play / seek from the stopped state refresh __current right before starting; a paused one does not", () => {
+    // A __current-start animation begins at the view the user is looking at.
+    const stopped = makeCtx({ cameras: ["__current"], startcam: "__current" });
+    const order: string[] = [];
+    stopped.saveViewToCam.mockImplementation((_v: number, name: string) => { order.push(`save ${name}`); return true; });
+    stopped.mgr.start.mockImplementation(() => order.push("start"));
+    services.animPlay(stopped.ctx, { sceneId: 1, viewId: 7 });
+    expect(order).toEqual(["save __current", "start"]);
+    services.animGoTime(stopped.ctx, { sceneId: 1, viewId: 7, ms: 500 });
+    expect(stopped.saveViewToCam).toHaveBeenLastCalledWith(7, "__current");
 
-    const objs = [makeObj({ uid: 1, name: "Spin0", className: "SimpleSpin", start: 0, end: 1000, absStart: 0, absEnd: 1000 })];
-    const authored = makeCtx({ objs, cameras: ["__current"], startcam: "__current" });
-    services.animAddElement(authored.ctx, { sceneId: 1, type: "SimpleSpin", viewId: 7 });
-    expect(authored.saveViewToCam).not.toHaveBeenCalled();
+    // Resuming or scrubbing a paused animation keeps its start point.
+    const paused = makeCtx({ cameras: ["__current"], startcam: "__current", playState: "pause" });
+    services.animPlay(paused.ctx, { sceneId: 1, viewId: 7 });
+    services.animGoTime(paused.ctx, { sceneId: 1, viewId: 7, ms: 500 });
+    expect(paused.saveViewToCam).not.toHaveBeenCalled();
   });
 
   it("animAddElement leaves the start camera alone without an active view", () => {

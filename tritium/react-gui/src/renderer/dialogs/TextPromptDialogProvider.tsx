@@ -10,6 +10,8 @@ export interface TextPromptDialogArgs {
     label: string
     defaultValue?: string
     confirmLabel?: string
+    /** Why the trimmed input cannot be used, or null when it can. */
+    validate?: (trimmed: string) => string | null
 }
 
 export const {
@@ -24,6 +26,7 @@ export const {
             label={args?.label ?? ''}
             defaultValue={args?.defaultValue ?? ''}
             confirmLabel={args?.confirmLabel}
+            validate={args?.validate}
             onResult={(value) => resolve(value)}
         />
     ),

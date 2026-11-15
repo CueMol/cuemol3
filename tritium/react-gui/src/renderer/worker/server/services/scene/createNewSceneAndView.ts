@@ -4,6 +4,7 @@ import type { WorkerContext } from '@renderer/worker/server/types/WorkerContext'
 import type { NewSceneInitialProps } from '@renderer/worker/shared/newSceneTypes';
 import { createInitialView } from '@renderer/worker/server/services/helpers/createSceneView';
 import { makeColor } from '@renderer/worker/server/services/helpers/makeColor';
+import { syncCurrentCam } from '@renderer/worker/server/services/camera/currentCam';
 import { DEFAULT_ICC_PROFILE } from './sceneBgColor';
 
 const log = console;
@@ -141,6 +142,9 @@ export function createNewSceneAndView(
     }
     const scene_uid = scene.getUID();
     const { view_uid, view_name } = createInitialView(ctx, scene, args.dpr, args.bindView !== false);
+    // The scene has its live view point from the start (outside any undo txn,
+    // and C++ never records "__current" anyway).
+    syncCurrentCam(scene, view_uid);
     return {
         scene_uid,
         view_uid,

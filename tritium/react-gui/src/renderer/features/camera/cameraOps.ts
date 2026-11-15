@@ -109,9 +109,11 @@ export async function saveCameraToFile(
     sceneId: number | undefined,
     name: string,
     path: string,
+    /** The view `__current` is refreshed from; needed for that name only. */
+    viewId?: number,
 ): Promise<boolean> {
     if (!cm || sceneId === undefined) return false
-    const res = await cm.invokeService('saveCameraToFile', { sceneId, name, path })
+    const res = await cm.invokeService('saveCameraToFile', { sceneId, name, path, viewId })
     return res?.ok === true
 }
 

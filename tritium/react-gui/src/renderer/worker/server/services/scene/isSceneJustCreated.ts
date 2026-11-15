@@ -12,7 +12,8 @@ export interface IsSceneJustCreatedResult {
 
 /**
  * Report whether a scene is "just created" -- unmodified with no objects and
- * no saved cameras (C++ `Scene::isJustCreated()`).
+ * no saved cameras besides `__current`, which every scene has from its
+ * creation (C++ `Scene::isJustCreated()`).
  *
  * Mirrors the `scene.isJustCreated()` gate in UXP `openSceneImpl`: opening a
  * .qsc into a just-created current scene loads into it in place, while a

@@ -317,6 +317,10 @@ namespace {
 
 void Camera::visAppend(qlib::uid_t tgtid, bool bVis, bool bObj)
 {
+  // The live view-point camera holds no visibility flags.
+  if (getName().equals(CURRENT_CAMERA_NAME))
+    return;
+
   VisSetting::iterator i = m_visset.find(tgtid);
   if (i!=m_visset.end()) {
     LOG_DPRINTLN("Camera.visAppend> ERROR, tgt id=%d already exists", tgtid);

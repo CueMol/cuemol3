@@ -89,9 +89,10 @@ describe('useFileCommands', () => {
 
   // --- SaveCurrentView ---
 
-  it('SaveCurrentView: view -> __current camera -> dialog -> saveCameraToFile', async () => {
+  it('SaveCurrentView: dialog -> saveCameraToFile(__current) with the view, never saveViewToCamera', async () => {
+    // The service refreshes __current outside the undo history; the old
+    // saveViewToCamera path recorded it as an undoable edit.
     const cm = makeCm({
-      saveViewToCamera: () => ({ ok: true }),
       saveCameraToFile: () => ({ ok: true }),
     })
     ;(window.electronAPI.invoke as ReturnType<typeof vi.fn>).mockResolvedValue({
@@ -102,21 +103,18 @@ describe('useFileCommands', () => {
 
     await h.result.dispatch(CmdId.SaveCurrentView)
 
-    expect(cm.invokeService).toHaveBeenCalledWith('saveViewToCamera', {
-      sceneId: 1, viewId: 2, name: '__current', withVisFlags: false,
-    })
     expect(window.electronAPI.invoke).toHaveBeenCalledWith(
       IPC.DIALOG_CAMERA_SAVE, { defaultName: 'view' },
     )
     expect(cm.invokeService).toHaveBeenCalledWith('saveCameraToFile', {
-      sceneId: 1, name: '__current', path: '/tmp/view.cam',
+      sceneId: 1, viewId: 2, name: '__current', path: '/tmp/view.cam',
     })
+    expect(cm.invokeService).not.toHaveBeenCalledWith('saveViewToCamera', expect.anything())
     h.unmount()
   })
 
   it('SaveCurrentView: cancelled save dialog does not write a file', async () => {
     const cm = makeCm({
-      saveViewToCamera: () => ({ ok: true }),
       saveCameraToFile: () => ({ ok: true }),
     })
     ;(window.electronAPI.invoke as ReturnType<typeof vi.fn>).mockResolvedValue({

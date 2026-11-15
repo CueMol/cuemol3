@@ -30,6 +30,7 @@ import { emit, jobs, stopAnim, stopTimer } from "./jobRegistry";
 import { progressUpdate } from "./progress";
 import { PREVIEW_MIN_INTERVAL_MS, TASK_QUEUED, TASK_RUNNING } from "./types";
 import type { RenderJobEntry } from "./types";
+import { CURRENT_CAMERA_NAME } from "@renderer/worker/shared/cameraTypes";
 /** Create a C++ TimeValue holding `ms` milliseconds. */
 export function makeTimeValue(ctx: WorkerContext, ms: number): TimeValue {
   const tv = ctx.svc.createObj("TimeValue") as TimeValue | null;
@@ -38,11 +39,7 @@ export function makeTimeValue(ctx: WorkerContext, ms: number): TimeValue {
   return tv;
 }
 
-/**
- * Name of the implicit "camera the user is looking through" (UXP convention;
- * see ensureStartCam in animation.service.ts, which seeds `startcam` from it).
- */
-const CURRENT_CAM_NAME = "__current";
+const CURRENT_CAM_NAME = CURRENT_CAMERA_NAME;
 
 /** Whether the scene has a camera by this name; null when it cannot be told. */
 function sceneHasCamera(scene: Scene, name: string): boolean | null {

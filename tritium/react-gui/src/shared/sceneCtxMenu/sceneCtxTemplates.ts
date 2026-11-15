@@ -173,14 +173,18 @@ function buildCameraNodeMenu(
     const info = payload.cameraInfo
     const hasSrc = (info?.src ?? '').length > 0
     const hasVis = (info?.visSize ?? 0) > 0
+    // `__current` (the live view): only what reads it fresh stays usable --
+    // Save As writes the view as it is now; the rest would overwrite, delete,
+    // or hand out a stale copy of it.
+    const editable = info?.reserved !== true
 
     return [
         ...header,
         { label: 'New Camera…', action: { kind: 'newCamera' } },
         { type: 'separator' },
-        { label: 'Copy', action: { kind: 'copy' } },
+        { label: 'Copy', enabled: editable, action: { kind: 'copy' } },
         ...pasteItem(payload, 'camera'),
-        { label: 'Delete', action: { kind: 'delete' } },
+        { label: 'Delete', enabled: editable, action: { kind: 'delete' } },
         { type: 'separator' },
         {
             label: 'Camera file',
@@ -188,42 +192,47 @@ function buildCameraNodeMenu(
                 { label: 'Load…', action: { kind: 'cameraLoad' } },
                 {
                     label: 'Reload',
-                    enabled: hasSrc,
+                    enabled: editable && hasSrc,
                     action: { kind: 'cameraReload' },
                 },
-                { label: 'Save', action: { kind: 'cameraSave' } },
+                { label: 'Save', enabled: editable, action: { kind: 'cameraSave' } },
                 { label: 'Save As…', action: { kind: 'cameraSaveAs' } },
             ],
         },
         { type: 'separator' },
         {
             label: 'Save from view',
+            enabled: editable,
             action: { kind: 'cameraSaveFromView', withVisFlags: false },
         },
         {
             label: 'Apply to view',
+            enabled: editable,
             action: { kind: 'cameraApplyToView', withVisFlags: false },
         },
         { type: 'separator' },
         {
             label: 'Save from scene (with vis flags)',
+            enabled: editable,
             action: { kind: 'cameraSaveFromView', withVisFlags: true },
         },
         {
             label: 'Apply to scene (with vis flags)',
+            enabled: editable,
             action: { kind: 'cameraApplyToView', withVisFlags: true },
         },
         {
             label: 'Edit vis flags…',
+            enabled: editable,
             action: { kind: 'cameraEditVisFlags' },
         },
         {
             label: 'Clear vis flags',
-            enabled: hasVis,
+            enabled: editable && hasVis,
             action: { kind: 'cameraClearVisFlags' },
         },
         { type: 'separator' },
-        renameItem(),
+        { label: 'Rename…', enabled: editable, action: { kind: 'rename' } },
     ]
 }
 

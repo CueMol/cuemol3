@@ -15,6 +15,7 @@
  */
 
 import { IPC } from '@shared/ipcChannels'
+import { CURRENT_CAMERA_NAME } from '@renderer/worker/shared/cameraTypes'
 import type { AsyncCueMol } from '@renderer/worker/client/AsyncCueMol'
 import type { ActiveSceneCommandDeps } from './commandTypes'
 import { useShowErrorAlert } from '@renderer/dialogs/ErrorAlertDialogProvider'
@@ -92,31 +93,29 @@ export function useFileCommands({
         }
     })
 
-    // SaveCurrentView -- UXP `onSaveCurView`: store the live view in the
-    // transient '__current' camera, then write that camera to a file.
+    // SaveCurrentView -- UXP `onSaveCurView`: write the live view to a camera
+    // file. The service refreshes the '__current' camera from the view right
+    // before writing it, outside the undo history.
     useRegisterCommand(CmdId.SaveCurrentView, async () => {
         if (!cm) return
         const info = getActiveSceneInfo()
         if (!info) return
-        const saved = await cm.invokeService('saveViewToCamera', {
-            sceneId: info.scene_uid,
-            viewId: info.view_id,
-            name: '__current',
-            withVisFlags: false,
-        })
-        if (!saved?.ok) {
-            console.warn('Save current view: saveViewToCamera failed')
-            return
-        }
         const dlg = await window.electronAPI.invoke(IPC.DIALOG_CAMERA_SAVE, {
             defaultName: 'view',
         })
         if (dlg.canceled || !dlg.filePath) return
-        await cm.invokeService('saveCameraToFile', {
+        const res = await cm.invokeService('saveCameraToFile', {
             sceneId: info.scene_uid,
-            name: '__current',
+            viewId: info.view_id,
+            name: CURRENT_CAMERA_NAME,
             path: dlg.filePath,
         })
+        if (!res?.ok) {
+            await showErrorAlert({
+                title: 'Save Current View',
+                message: `Failed to save the view: ${dlg.filePath}`,
+            })
+        }
     })
 
     // Export scene -- one command per file type (UXP `exportScene`). Each

@@ -159,6 +159,40 @@ TEST_F(SceneTest, DestroyCameraReducesCount)
     EXPECT_FALSE(m_pScene->hasCamera("cam1"));
 }
 
+// "__current" (the live view point) is outside the undo history: changing it
+// in a transaction neither adds an undo step nor drops the redo side, it
+// holds no visibility flags, and it cannot be destroyed.
+TEST_F(SceneTest, CurrentCameraIsOutsideUndoAndCannotBeDestroyed)
+{
+    // A scene holding only "__current" still counts as just created.
+    m_pScene->setCamera(qsys::CURRENT_CAMERA_NAME, CameraPtr(new qsys::Camera()));
+    EXPECT_TRUE(m_pScene->isJustCreated());
+
+    ObjectPtr pObj(new ConcreteObject());
+    m_pScene->addObject(pObj);
+
+    m_pScene->startUndoTxn("named");
+    m_pScene->setCamera("cam1", CameraPtr(new qsys::Camera()));
+    m_pScene->commitUndoTxn();
+    ASSERT_TRUE(m_pScene->undo(0));
+    ASSERT_EQ(m_pScene->getRedoSize(), 1);
+
+    CameraPtr pCam(new qsys::Camera());
+    pCam->visAppend(pObj->getUID(), true, true);
+    m_pScene->startUndoTxn("current");
+    m_pScene->setCamera(qsys::CURRENT_CAMERA_NAME, pCam);
+    m_pScene->setCamera(qsys::CURRENT_CAMERA_NAME, CameraPtr(new qsys::Camera()));
+    m_pScene->getCameraRef(qsys::CURRENT_CAMERA_NAME)->saveVisSettings(m_pScene);
+    m_pScene->commitUndoTxn();
+
+    EXPECT_EQ(m_pScene->getUndoSize(), 0);
+    EXPECT_EQ(m_pScene->getRedoSize(), 1);
+    EXPECT_EQ(m_pScene->getCameraRef(qsys::CURRENT_CAMERA_NAME)->getVisSize(), 0);
+
+    EXPECT_ANY_THROW(m_pScene->destroyCamera(qsys::CURRENT_CAMERA_NAME));
+    EXPECT_TRUE(m_pScene->hasCamera(qsys::CURRENT_CAMERA_NAME));
+}
+
 // --- Object management logic ---
 
 TEST_F(SceneTest, DestroyObjectWithInvalidUIDReturnsFalse)
