@@ -42,3 +42,15 @@ export function withPaneEnv<T>(
   paneEnv.activeMolViewId = activeMolViewId
   return element
 }
+
+/**
+ * The `vi.mock` factory for `state/inspector`, for a pane test that does not
+ * exercise the inspector: nothing is inspected and the actions do nothing.
+ */
+export function mockInspectorModule() {
+  const noop = () => undefined
+  return {
+    useInspector: () => ({ target: null }),
+    useInspectorActions: () => ({ showCamera: noop }),
+  }
+}

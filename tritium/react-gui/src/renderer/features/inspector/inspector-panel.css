@@ -495,3 +495,43 @@
 .action-step-note {
   color: var(--text-muted);
 }
+
+/* Camera inspector (CameraInspector.tsx). Tokens only; the controls inside
+   are form-kit pieces and keep their own sizes. */
+.camera-insp-vis-actions {
+  align-items: center;
+  margin-bottom: var(--space-2);
+}
+
+.camera-insp-vis-count {
+  flex: 1;
+  color: var(--text-secondary);
+}
+
+.camera-insp-vis-list {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+/* One object / renderer; the indent per nesting level is set inline. */
+.camera-insp-vis-row {
+  display: flex;
+  align-items: center;
+  gap: var(--list-row-gap);
+  height: var(--row-h);
+  padding-right: var(--space-1);
+}
+
+.camera-insp-vis-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Not captured by the camera: the eye shows the current state, dimmed. */
+.camera-insp-vis-row.is-excluded .camera-insp-vis-name,
+.camera-insp-vis-row.is-excluded .visibility-toggle {
+  color: var(--text-disabled);
+}

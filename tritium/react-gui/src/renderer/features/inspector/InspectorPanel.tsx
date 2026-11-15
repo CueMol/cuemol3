@@ -19,7 +19,8 @@
  * The inspector targets one of several context kinds. `node` targets (a
  * scene-tree node or the View) use the migrated UXP `generic-propdlg`
  * editor; `animElement` targets use `AnimElementInspector`; `actionStep`
- * targets (an undo step) use the read-only `ActionStepInspector`.
+ * targets (an undo step) use the read-only `ActionStepInspector`; `camera`
+ * targets (a named camera) use `CameraInspector`.
  *
  * @module InspectorPanel
  */
@@ -33,6 +34,7 @@ import { PropertiesTab } from "./PropertiesTab";
 import { GenericTab } from "./GenericTab";
 import { AnimElementInspector } from "./AnimElementInspector";
 import { ActionStepInspector } from "./ActionStepInspector";
+import { CameraInspector } from "./CameraInspector";
 import { InspectorResetAllButton } from "./InspectorResetAllButton";
 import { modifiedKeys } from "./propModel";
 import { ColorPickerProvider } from "@renderer/h3-kit/colorpicker";
@@ -47,7 +49,7 @@ import { useActiveScene } from "@renderer/state/workspace";
 type InspectorMode = "properties" | "generic";
 
 /** Kind of context the inspector is currently editing. */
-export type InspectorTargetKind = "node" | "animElement" | "actionStep";
+export type InspectorTargetKind = "node" | "animElement" | "actionStep" | "camera";
 
 
 // ------------------------------------------------------------
@@ -75,6 +77,8 @@ const InspectorPanelComponent: React.FC = () => {
     clearAnimElement: onAnimElementGone,
     setAnimHeader: onAnimHeaderChange,
     setStepHeader: onStepHeaderChange,
+    clearCamera,
+    setCameraHeader: onCameraHeaderChange,
   } = useInspectorActions();
   const { cm } = useCueMol();
   const { activeSceneId: sceneId } = useActiveScene();
@@ -88,6 +92,11 @@ const InspectorPanelComponent: React.FC = () => {
     target?.kind === "actionStep"
       ? { sceneId: target.sceneId, stepId: target.stepId, entryIndex: target.entryIndex }
       : null;
+  const camera = target?.kind === "camera" ? target : null;
+  const cameraSceneId = camera?.sceneId;
+  const onCameraGone = useCallback(() => {
+    if (cameraSceneId !== undefined) clearCamera(cameraSceneId);
+  }, [clearCamera, cameraSceneId]);
 
   /**
    * Writer for the structured page. It presents a renderer group's `visible`
@@ -126,7 +135,9 @@ const InspectorPanelComponent: React.FC = () => {
         ? `node:${target.sceneId}:${target.nodeType}:${target.nodeId}`
         : target.kind === "animElement"
           ? `anim:${target.sceneId}:${target.uid}`
-          : `step:${target.sceneId}:${target.stepId}:${target.entryIndex ?? ""}`;
+          : target.kind === "camera"
+            ? `camera:${target.sceneId}:${target.name}`
+            : `step:${target.sceneId}:${target.stepId}:${target.entryIndex ?? ""}`;
   useEffect(() => {
     if (targetKey !== null) setMode(defaultMode);
   }, [targetKey, defaultMode]);
@@ -176,6 +187,21 @@ const InspectorPanelComponent: React.FC = () => {
           entryIndex={actionStep.entryIndex}
           onHeaderChange={onStepHeaderChange}
         />
+      ) : camera ? (
+        /* -- Named camera target (self-contained page) -- */
+        cm ? (
+          <CameraInspector
+            key={`${camera.sceneId}:${camera.name}`}
+            cm={cm}
+            sceneId={camera.sceneId}
+            name={camera.name}
+            focusRequest={camera.focus ? camera : null}
+            onGone={onCameraGone}
+            onHeaderChange={onCameraHeaderChange}
+          />
+        ) : (
+          <div className="inspector-empty">No camera.</div>
+        )
       ) : isAnimElement ? (
         /* -- Animation element target (self-contained editor) -- */
         animElement && cm ? (

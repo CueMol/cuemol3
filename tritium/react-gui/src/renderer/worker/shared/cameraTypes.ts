@@ -32,3 +32,28 @@ export interface CameraEntry {
      */
     uiOrder: number;
 }
+
+/**
+ * What the camera inspector shows of one camera (`getCameraDetail`).
+ *
+ * The view values are read-only in the inspector: a camera's viewpoint is
+ * changed by moving the 3D view and saving it (Save from view).
+ */
+export interface CameraDetail {
+    name: string;
+    /** Path of the linked camera file; '' for an embedded camera. */
+    src: string;
+    /** The reserved live view point (`__current`): its values are not shown. */
+    isCurrent: boolean;
+    /** Number of stored visibility-flag entries. */
+    visSize: number;
+    center: [number, number, number];
+    /** Rotation quaternion as (x, y, z, a). */
+    rotation: [number, number, number, number];
+    zoom: number;
+    distance: number;
+    slab: number;
+    perspective: boolean;
+    /** Enum id from C++ (`none` / `crosshair` / `axis`). */
+    centerMark: string;
+}

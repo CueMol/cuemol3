@@ -12,20 +12,21 @@
 import { IPC } from '@shared/ipcChannels'
 import type { AsyncCueMol } from '@renderer/worker/client/AsyncCueMol'
 import type { ActiveSceneCommandDeps } from '@renderer/commands/commandTypes'
-import { useShowEditCameraVisFlagsDialog } from '@renderer/dialogs/EditCameraVisFlagsDialogProvider'
 import { useShowTextPromptDialog } from '@renderer/dialogs/TextPromptDialogProvider'
 import { useRegisterCommand } from '@renderer/commands/CommandRegistry'
 import { CmdId } from '@renderer/commands/ids'
+import type { InspectorActions } from '@renderer/state/inspector'
 import * as ops from './cameraOps'
 import { CURRENT_CAMERA_NAME } from '@renderer/worker/shared/cameraTypes'
 
 export interface CameraCommandsOptions {
   cm: AsyncCueMol | null
   getActiveSceneInfo: ActiveSceneCommandDeps
+  /** The inspector's camera hooks (`useInspectorActions`). */
+  inspector: Pick<InspectorActions, 'showCamera' | 'renameCameraTarget'>
 }
 
-export function useCameraCommands({ cm, getActiveSceneInfo }: CameraCommandsOptions): void {
-  const showEditCameraVisFlags = useShowEditCameraVisFlagsDialog()
+export function useCameraCommands({ cm, getActiveSceneInfo, inspector }: CameraCommandsOptions): void {
   const showTextPrompt = useShowTextPromptDialog()
 
   // Mirrors UXP `ws.createCamera`: suggest the first free `camera_N`, prompt,
@@ -66,7 +67,11 @@ export function useCameraCommands({ cm, getActiveSceneInfo }: CameraCommandsOpti
   useRegisterCommand(CmdId.CameraRename, async ({ oldName, newName }) => {
     const info = getActiveSceneInfo()
     if (!info) return false
-    return ops.renameCamera(cm, info.scene_uid, oldName, newName)
+    const ok = await ops.renameCamera(cm, info.scene_uid, oldName, newName)
+    // The inspector follows the camera it shows; the Camera pane follows the
+    // inspector (and selects the new name itself after an inline rename).
+    if (ok) inspector.renameCameraTarget(info.scene_uid, oldName, newName.trim())
+    return ok
   })
 
   useRegisterCommand(CmdId.CameraCopy, async ({ name }) => {
@@ -138,26 +143,17 @@ export function useCameraCommands({ cm, getActiveSceneInfo }: CameraCommandsOpti
     await ops.clearCameraVisFlags(cm, info.scene_uid, name)
   })
 
-  useRegisterCommand(CmdId.CameraEditVisFlags, async ({ name }) => {
+  // The visibility flags are edited in the inspector's Visibility section
+  // (the old modal dialog is gone): open the camera there, scrolled to it.
+  useRegisterCommand(CmdId.CameraEditVisFlags, ({ name }) => {
     const info = getActiveSceneInfo()
-    if (!cm || !info) return
-    const sceneId = info.scene_uid
-    let flags
-    try {
-      flags = await cm.invokeService('getCameraVisFlags', { sceneId, cameraName: name })
-    } catch (err) {
-      console.warn('getCameraVisFlags failed:', err)
-      return
-    }
-    if (!flags?.ok) return
-    const result = await showEditCameraVisFlags({ cameraName: name, entries: flags.entries })
-    if (!result) return
-    try {
-      await cm.invokeService('setCameraVisFlags', {
-        sceneId, cameraName: name, entries: result.entries,
-      })
-    } catch (err) {
-      console.warn('setCameraVisFlags failed:', err)
-    }
+    if (!info) return
+    inspector.showCamera(info.scene_uid, name, 'visibility')
+  })
+
+  useRegisterCommand(CmdId.CameraShowProperties, ({ name }) => {
+    const info = getActiveSceneInfo()
+    if (!info) return
+    inspector.showCamera(info.scene_uid, name)
   })
 }

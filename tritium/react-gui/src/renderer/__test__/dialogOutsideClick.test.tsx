@@ -47,7 +47,6 @@ import { ConfirmReloadSceneDialog } from '@renderer/dialogs/ConfirmReloadSceneDi
 import { ErrorAlertDialog } from '@renderer/dialogs/ErrorAlertDialog'
 import { ObjectPickerDialog } from '@renderer/dialogs/ObjectPickerDialog'
 import { TextPromptDialog } from '@renderer/dialogs/TextPromptDialog'
-import { EditCameraVisFlagsDialog } from '@renderer/dialogs/EditCameraVisFlagsDialog'
 import { GetPdbDialog } from '@plugins/getpdb/renderer/GetPdbDialog'
 import { NewTabDialog } from '@renderer/dialogs/NewTabDialog'
 import { FACTORY_NEW_SCENE_DEFAULTS } from '@renderer/data/newSceneDefaults'
@@ -218,13 +217,6 @@ describe('DialogShell frame contract', () => {
       title: 'Scene options',
       render: () => React.createElement(QscWriterOptionDialog, {
         visible: true, onConfirm: () => {}, onCancel: () => {},
-      }),
-    },
-    {
-      name: 'EditCameraVisFlagsDialog',
-      title: 'Edit visibility flags: cam1',
-      render: () => React.createElement(EditCameraVisFlagsDialog, {
-        visible: true, cameraName: 'cam1', entries: [], onConfirm: () => {}, onCancel: () => {},
       }),
     },
     {

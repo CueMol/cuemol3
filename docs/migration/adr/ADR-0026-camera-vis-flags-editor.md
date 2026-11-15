@@ -1,6 +1,6 @@
 # ADR-0026: Camera visibility-flags editor — scene-tree enumerate + clear-rebuild apply
 
-- Status: accepted (host E2E verified; PR pending)
+- Status: accepted; the dialog UI is superseded by the camera inspector's Visibility section ([architecture/camera-inspector](../../architecture/camera-inspector.md), 2026-11-15). The service decisions (scene-tree enumerate, clear-rebuild apply) still hold
 - Date: 2026-06-12
 - Mapping rows: [`dialog.tool.visflagset-edit`](../mapping/tool_dlgs.md#dialogtoolvisflagset-edit), [`panel.workspace.ctxmenu.camera`](../mapping/panels.md#panelworkspacectxmenucamera)
 

@@ -99,8 +99,9 @@ camera は object の階層の一部ではなく視点のリストなので、tr
   tree id を含まないので、`buildCameraNodeMenu` / `buildCameraRootMenu` と
   `IPC.SCENE_CTX_SHOW` (macOS native / 他は MenuPanel) をそのまま再利用できた。
   空白部分の右クリックは root menu (New / Paste / Camera file > Load)。
-  camera の **Properties 項目は削除**した (UXP の camera menu にも無く、camera は uid を
-  持たないので inspector が解決できない死んだ項目だった)。
+  camera の Properties 項目は、scene tree から移した時点では inspector が camera を解決できず
+  削除したが、[Camera inspector](camera-inspector.md) で inspector の target に camera を足して
+  復活させた (ツールバーの Property ボタンも同じ command)。
 - **リフレッシュ**: `SEM_CAMERA` の任意イベント + `SEM_SCENE` の `SEM_CHANGED` を購読する。
   debounce は必須で、`destroyCamera` は map から消す**前**に `cameraRemoving` を出し、
   reorder は camera 数ぶん `cameraChanged` を連続で出す。undo/redo の replay も同じ
@@ -120,7 +121,7 @@ controller の Add / double-click / inline-rename の camera 分岐、
 
 **残した共有物**: menu template (`buildCamera*Menu`) と `SceneCtxAction` /
 `SceneCtxNodeType` (pane が使う)、`IPC.SCENE_CTX_SHOW` と main 側、
-`EditCameraVisFlagsDialog`、worker の camera services、clipboard の `'camera'` kind。
+worker の camera services、clipboard の `'camera'` kind。
 `sceneCtxActionToCommand` の camera ケースは `return null` にまとめて switch の網羅性を保つ。
 
 ## テスト
@@ -137,5 +138,6 @@ controller の Add / double-click / inline-rename の camera 分岐、
 ## 関連
 
 - [ADR-0005](../migration/adr/ADR-0005-camera-name-keyed.md) — worker 境界が名前キーである理由 (不変)
-- [ADR-0026](../migration/adr/ADR-0026-camera-vis-flags-editor.md) — vis flags エディタ
+- [Camera inspector](camera-inspector.md) — camera の inspector と visibility flags の編集
+- [ADR-0026](../migration/adr/ADR-0026-camera-vis-flags-editor.md) — vis flags の service (UI は inspector に置き換え)
 - [ADR-0025](../migration/adr/ADR-0025-view-panel.md) — View pane 本体 (Explorer の最後の pane)

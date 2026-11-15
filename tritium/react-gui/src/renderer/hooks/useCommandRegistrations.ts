@@ -37,7 +37,9 @@ export function useCommandRegistrations(): void {
     useWorkspaceDispatch();
   const { onProjectionChanged, onCenterMarkChanged, onBgColorChanged, onColorProofingChanged } =
     useActiveViewDispatch();
-  const { showView: showViewProperty, showScene: showSceneProperty } = useInspectorActions();
+  const {
+    showView: showViewProperty, showScene: showSceneProperty, showCamera, renameCameraTarget,
+  } = useInspectorActions();
   // The dispatch slice only: toggling the palette must not re-render this.
   const { setToolPaletteCollapsed, getLayoutSnapshot } = useLayoutDispatch();
   // Shared "create scene + view + register tab" action (UXP onNewScene
@@ -54,7 +56,7 @@ export function useCommandRegistrations(): void {
   useTabCommands({ closeTab, openSettingsTab, getActiveTabId });
   useNewTabCommand({ cm, getActiveSceneInfo, newScene });
   useEditCommands({ cm, getActiveSceneInfo });
-  useCameraCommands({ cm, getActiveSceneInfo });
+  useCameraCommands({ cm, getActiveSceneInfo, inspector: { showCamera, renameCameraTarget } });
   useStyleCommands({ cm, getActiveSceneInfo });
   useActionCommands({ cm, getActiveSceneInfo });
   useLibraryCommands({ cm, getActiveSceneInfo });

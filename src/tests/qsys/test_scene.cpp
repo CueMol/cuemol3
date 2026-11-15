@@ -6,6 +6,9 @@
 #include "qsys/Object.hpp"
 #include "qsys/TTYView.hpp"
 #include "qsys/View.hpp"
+#include "qsys/ScrEventManager.hpp"
+#include <qlib/LScrCallBack.hpp>
+#include <qlib/LVarArgs.hpp>
 
 using qlib::LString;
 using qsys::SceneManager;
@@ -18,6 +21,14 @@ namespace {
 
 class ConcreteObject : public qsys::Object {
 public:
+    qlib::LCloneableObject *clone() const override { return nullptr; }
+};
+
+// Counts the script events the event manager delivers.
+class EventCounter : public qlib::LScrCallBack {
+public:
+    int count = 0;
+    bool invoke(qlib::LVarArgs &) override { ++count; return true; }
     qlib::LCloneableObject *clone() const override { return nullptr; }
 };
 
@@ -191,6 +202,33 @@ TEST_F(SceneTest, CurrentCameraIsOutsideUndoAndCannotBeDestroyed)
 
     EXPECT_ANY_THROW(m_pScene->destroyCamera(qsys::CURRENT_CAMERA_NAME));
     EXPECT_TRUE(m_pScene->hasCamera(qsys::CURRENT_CAMERA_NAME));
+}
+
+// Changing a camera's visibility flags -- directly or by undo / redo -- tells
+// the scene's listeners, so a GUI showing them (the Camera pane badge, the
+// camera inspector) can follow.
+TEST_F(SceneTest, CameraVisFlagChangesFireCameraEvents)
+{
+    ObjectPtr pObj(new ConcreteObject());
+    m_pScene->addObject(pObj);
+    m_pScene->setCamera("cam1", CameraPtr(new qsys::Camera()));
+    CameraPtr pCam = m_pScene->getCameraRef("cam1");
+
+    qsys::ScrEventManager *pSEM = qsys::ScrEventManager::getInstance();
+    EventCounter *pCounter = new EventCounter();
+    pSEM->addListener(qlib::LSCBPtr(pCounter));
+    const int slot = pSEM->append("", qsys::ScrEventManager::SEM_CAMERA,
+                                  qsys::ScrEventManager::SEM_CHANGED, m_pScene->getUID());
+
+    m_pScene->startUndoTxn("vis");
+    pCam->visAppend(pObj->getUID(), false, true);
+    m_pScene->commitUndoTxn();
+    EXPECT_EQ(pCounter->count, 1);
+    ASSERT_TRUE(m_pScene->undo(0));
+    EXPECT_EQ(pCounter->count, 2);
+
+    pSEM->remove(slot);
+    pSEM->removeListener(0);
 }
 
 // --- Object management logic ---
