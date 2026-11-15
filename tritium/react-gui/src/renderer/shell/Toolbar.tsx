@@ -42,7 +42,7 @@ const TOOLBAR_ITEMS: ToolbarItem[] = [
   { kind: "cmd", id: "new-tab", icon: "toolbar.newTab", text: "New Tab", cmd: CmdId.TabNew },
   { kind: "divider", id: "d1" },
   { kind: "cmd", id: "open-file", icon: "toolbar.openFile", text: "Open File", cmd: CmdId.UiOpenObjDialog },
-  { kind: "cmd", id: "save-as", icon: "toolbar.saveAs", text: "Save As", cmd: CmdId.ObjectSaveAs, requiresScene: true },
+  { kind: "cmd", id: "save-as", icon: "toolbar.saveAs", text: "Save File As", cmd: CmdId.ObjectSaveAs, requiresScene: true },
   { kind: "divider", id: "d2" },
   { kind: "cmd", id: "open-scene", icon: "toolbar.openScene", text: "Open Scene", cmd: CmdId.UiOpenSceneDialog },
   { kind: "cmd", id: "reload-scene", icon: "toolbar.reloadScene", text: "Reload Scene", cmd: CmdId.SceneReload, requiresScene: true },

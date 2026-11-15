@@ -1,7 +1,8 @@
 /**
  * @file h3-kit/primitives/AppIcon.tsx
  * @description Single entry point for rendering icons. Resolves a semantic key
- * from {@link APP_ICONS} to either a Phosphor or a Blueprint icon, applying a
+ * from {@link APP_ICONS} to a Phosphor icon, an outline icon drawn to match
+ * Phosphor (`extIcons.tsx`), or a Blueprint icon, applying a
  * consistent token-based size and inheriting color via `currentColor` (so
  * dark/light themes work without per-consumer color handling).
  *
@@ -54,7 +55,7 @@ export const AppIcon: React.FC<AppIconProps> = ({ name, size = "md", weight, ...
   // currently holds only Phosphor entries, so without this CFA would narrow
   // the Blueprint branch to `never`. AppIcon must still support `bp` specs.
   const spec = APP_ICONS[name] as AppIconSpec;
-  if (spec.lib === "phosphor") {
+  if (spec.lib === "phosphor" || spec.lib === "ext") {
     const Comp = spec.Comp;
     return <Comp size={px} weight={weight ?? spec.weight ?? DEFAULT_WEIGHT} {...rest} />;
   }
