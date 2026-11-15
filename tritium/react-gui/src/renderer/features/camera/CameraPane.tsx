@@ -17,6 +17,11 @@
  * something reads it, so the row only offers Save As: overwriting, applying,
  * renaming, copying or deleting it is off (the worker services refuse the
  * name too). Double-click applies with show/hide, as in UXP.
+ *
+ * The inspector opens a camera explicitly (the Property button or the
+ * context menu's Properties...), as the Scene pane does. While it shows one of
+ * this scene's cameras, picking another row moves it along, and the row it
+ * shows (also after a rename made there) becomes the selected one.
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -27,6 +32,7 @@ import { PaneSectionHeader } from '@renderer/shell/PaneSectionHeader'
 import { InlineRenameInput } from '@renderer/features/scene/InlineRenameInput'
 import { useCueMol } from '@renderer/hooks/cuemol/useCueMol'
 import { useActiveScene } from '@renderer/state/workspace'
+import { useInspector, useInspectorActions } from '@renderer/state/inspector'
 import { useCommands } from '@renderer/commands/CommandRegistry'
 import { useClipboardScope } from '@renderer/hooks/useClipboardScope'
 import { CmdId } from '@renderer/commands/ids'
@@ -49,6 +55,28 @@ export const CameraPane: React.FC<CameraPaneProps> = ({ collapsed, onToggleColla
     const [editing, setEditing] = useState<string | null>(null)
     const bodyRef = useRef<HTMLDivElement | null>(null)
     const renameRef = useRef<HTMLInputElement | null>(null)
+
+    // The camera the inspector shows, when it is one of this scene's.
+    const { target: inspectorTarget } = useInspector()
+    const { showCamera } = useInspectorActions()
+    const inspectedCamera =
+        inspectorTarget?.kind === 'camera' && inspectorTarget.sceneId === activeSceneId
+            ? inspectorTarget.name
+            : null
+    // inspector -> pane: the inspected camera is the selected row.
+    useEffect(() => {
+        if (inspectedCamera !== null) setSelected(inspectedCamera)
+    }, [inspectedCamera])
+    /** Select a row; while the inspector shows a camera, it follows. */
+    const select = useCallback(
+        (name: string) => {
+            setSelected(name)
+            if (inspectedCamera !== null && name !== inspectedCamera && activeSceneId !== undefined) {
+                showCamera(activeSceneId, name)
+            }
+        },
+        [inspectedCamera, activeSceneId, showCamera],
+    )
 
     const names = useMemo(() => cameras.map((c) => c.name), [cameras])
     // A camera can go away under the selection (deleted, scene reloaded).
@@ -133,7 +161,7 @@ export const CameraPane: React.FC<CameraPaneProps> = ({ collapsed, onToggleColla
     const navKeyDown = useListKeyNav({
         items: names,
         activeId: active,
-        onSelect: setSelected,
+        onSelect: select,
         onScrollTo: (id) =>
             scrollRowIntoView(bodyRef.current, `[data-camera-name="${CSS.escape(id)}"]`),
         enabled: editing === null,
@@ -259,6 +287,19 @@ export const CameraPane: React.FC<CameraPaneProps> = ({ collapsed, onToggleColla
                                 }
                             />
                         </Tooltip>
+                        <Tooltip content="Property" placement="bottom">
+                            <Button
+                                minimal
+                                small
+                                icon={<AppIcon name="ui.properties" aria-hidden />}
+                                className="section-action-btn"
+                                disabled={active === null}
+                                onClick={() =>
+                                    active &&
+                                    run('show camera', dispatch(CmdId.CameraShowProperties, { name: active }))
+                                }
+                            />
+                        </Tooltip>
                     </ButtonGroup>
                 }
             />
@@ -296,13 +337,13 @@ export const CameraPane: React.FC<CameraPaneProps> = ({ collapsed, onToggleColla
                                     draggable={
                                         editing === null && cam.name !== CURRENT_CAMERA_NAME
                                     }
-                                    onClick={() => setSelected(cam.name)}
+                                    onClick={() => select(cam.name)}
                                     onDoubleClick={() => {
                                         if (cam.name !== CURRENT_CAMERA_NAME) applyToView(cam.name, true)
                                     }}
                                     onContextMenu={(e) => {
                                         e.preventDefault()
-                                        setSelected(cam.name)
+                                        select(cam.name)
                                         void openMenu(cam, e.clientX, e.clientY)
                                     }}
                                     onDragStart={(e) => dnd.onDragStart(e, cam.name)}

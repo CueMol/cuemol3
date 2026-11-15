@@ -7,6 +7,7 @@
  * between a scene and a file.
  */
 
+import { getCameraDetail } from './cameraDetail';
 import { loadCameraFromFile, reloadCameraFromSrc, saveCameraToCurrentSrc, saveCameraToFile } from './cameraFile';
 import { applyCameraToView, clearCameraVisFlags, createCamera, destroyCamera, renameCamera, saveViewToCamera } from './cameraOps';
 import { listCameras, reorderCameras } from './cameraOrder';
@@ -14,6 +15,7 @@ import { getCameraVisFlags, setCameraVisFlags } from './cameraVisFlags';
 
 export const services = {
     listCameras,
+    getCameraDetail,
     reorderCameras,
     loadCameraFromFile,
     saveCameraToFile,
@@ -29,6 +31,7 @@ export const services = {
     setCameraVisFlags,
 };
 
+export type * from './cameraDetail';
 export type * from './cameraFile';
 export type * from './cameraOrder';
 export type * from './cameraOps';

@@ -43,6 +43,11 @@ architecture, it belongs here.
   qsc には `<camera>` 要素の並び順として保存する (object / renderer と同じ仕組み)。
   save / apply の with show/hide 版を含むツールバー、drag での並べ替え、既存名の上書き挙動。
 
+- [Camera inspector](camera-inspector.md) (日本語) --
+  Camera pane の Property / 右クリックで camera を inspector に出す (Name、Source、読み取り専用の
+  View、visibility flags)。visibility flags の dialog を inspector の Visibility section に置き換え、
+  1 操作 = 1 undo step で即時反映。`Camera::visAppend` / `visRemove` が camera event を出すようにした。
+
 - [Styles view (Style Sets / Colors / Selections pane)](styles-panel.md) (日本語) --
   style set を scene tree の枝から外し、activity bar の Styles view に set の一覧と、選んだ set の
   色・selection を編集する pane を置いた記録。一覧は名前を探す順番 (scene の set、次に global)、

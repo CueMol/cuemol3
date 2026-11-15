@@ -51,6 +51,8 @@ export function cameraCtxActionToCommand(
                 : null
         case 'cameraEditVisFlags':
             return name ? { id: CmdId.CameraEditVisFlags, args: { name } } : null
+        case 'property':
+            return name ? { id: CmdId.CameraShowProperties, args: { name } } : null
         case 'cameraClearVisFlags':
             return name ? { id: CmdId.CameraClearVisFlags, args: { name } } : null
         default:

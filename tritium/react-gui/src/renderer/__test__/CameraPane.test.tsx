@@ -27,6 +27,8 @@ vi.mock('@renderer/hooks/cuemol/useCueMol', async () =>
     (await import('@renderer/__test__/helpers/paneEnv')).mockCueMolModule())
 vi.mock('@renderer/state/workspace', async () =>
     (await import('@renderer/__test__/helpers/paneEnv')).mockWorkspaceModule())
+vi.mock('@renderer/state/inspector', async () =>
+    (await import('@renderer/__test__/helpers/paneEnv')).mockInspectorModule())
 vi.mock('@renderer/commands/CommandRegistry', () => ({ useCommands: () => ({ dispatch }) }))
 vi.mock('@renderer/hooks/useClipboardScope', () => ({ useClipboardScope: () => undefined }))
 vi.mock('@renderer/features/camera/useCameraCtxMenu', () => ({

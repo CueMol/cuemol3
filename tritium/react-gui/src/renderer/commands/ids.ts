@@ -150,6 +150,7 @@ export const CmdId = {
   CameraApplyToView:     'scene.camera.applyToView',     // args: { name; withVisFlags }
   CameraEditVisFlags:    'scene.camera.editVisFlags',    // args: { name }
   CameraClearVisFlags:   'scene.camera.clearVisFlags',   // args: { name }
+  CameraShowProperties:  'scene.camera.showProperties',  // args: { name }
 
   // Action history (the active scene's undo steps, by action-log step id).
   ActionsShowStep:       'actions.showStep',             // args: { stepId; entryIndex? }

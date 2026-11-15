@@ -160,6 +160,8 @@ export interface CommandMap {
   [CmdId.CameraSaveFromView]:   { args: { name: string; withVisFlags: boolean }; result: void }
   [CmdId.CameraApplyToView]:    { args: { name: string; withVisFlags: boolean }; result: void }
   [CmdId.CameraEditVisFlags]:   { args: { name: string };        result: void }
+  // Opens the camera in the inspector (Property button / Properties...).
+  [CmdId.CameraShowProperties]: { args: { name: string };        result: void }
   [CmdId.CameraClearVisFlags]:  { args: { name: string };        result: void }
 
   // Action history. Showing a step is read-only; only GoToStep moves the

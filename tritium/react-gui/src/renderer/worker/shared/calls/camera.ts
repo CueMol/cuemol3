@@ -8,6 +8,10 @@
  */
 
 import type {
+  GetCameraDetailArgs,
+  GetCameraDetailResult,
+} from '@renderer/worker/server/services/camera/cameraDetail'
+import type {
   LoadCameraFromFileArgs,
   LoadCameraFromFileResult,
   ReloadCameraFromSrcArgs,
@@ -46,6 +50,7 @@ import type {
 
 export interface CameraCalls {
   listCameras:                { args: ListCamerasArgs; result: ListCamerasResult }
+  getCameraDetail:            { args: GetCameraDetailArgs; result: GetCameraDetailResult }
   reorderCameras:             { args: ReorderCamerasArgs; result: ReorderCamerasResult }
   createCamera:               { args: CreateCameraArgs; result: CreateCameraResult }
   destroyCamera:              { args: DestroyCameraArgs; result: DestroyCameraResult }
@@ -63,6 +68,7 @@ export interface CameraCalls {
 
 export const CAMERA_KEYS = [
   'listCameras',
+  'getCameraDetail',
   'reorderCameras',
   'createCamera',
   'destroyCamera',
