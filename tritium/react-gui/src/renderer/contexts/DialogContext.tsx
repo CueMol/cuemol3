@@ -38,7 +38,6 @@ import { ReassignProt2ndryDialogProvider } from '@renderer/dialogs/ReassignProt2
 import { MolSuperposeDialogProvider } from '@renderer/dialogs/MolSuperposeDialogProvider'
 import { MorphAnimDialogProvider } from '@renderer/dialogs/MorphAnimDialogProvider'
 import { ErrorAlertDialogProvider } from '@renderer/dialogs/ErrorAlertDialogProvider'
-import { EditCameraVisFlagsDialogProvider } from '@renderer/dialogs/EditCameraVisFlagsDialogProvider'
 import { EditInteractionListDialogProvider } from '@renderer/dialogs/EditInteractionListDialogProvider'
 import { StyleEditorDialogProvider } from '@renderer/dialogs/StyleEditorDialogProvider'
 import { composeProviders } from './composeProviders'
@@ -81,7 +80,6 @@ export const DialogProvider = composeProviders([
   MolSuperposeDialogProvider,
   MorphAnimDialogProvider,
   ErrorAlertDialogProvider,
-  EditCameraVisFlagsDialogProvider,
   EditInteractionListDialogProvider,
   StyleEditorDialogProvider,
 ])

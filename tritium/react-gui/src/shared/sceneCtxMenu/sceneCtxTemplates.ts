@@ -222,7 +222,7 @@ function buildCameraNodeMenu(
             action: { kind: 'cameraApplyToView', withVisFlags: true },
         },
         {
-            label: 'Edit vis flags…',
+            label: 'Edit vis flags',
             enabled: editable,
             action: { kind: 'cameraEditVisFlags' },
         },
@@ -233,6 +233,9 @@ function buildCameraNodeMenu(
         },
         { type: 'separator' },
         { label: 'Rename…', enabled: editable, action: { kind: 'rename' } },
+        { type: 'separator' },
+        // Also for `__current`: its inspector explains what it is.
+        propertyItem(),
     ]
 }
 

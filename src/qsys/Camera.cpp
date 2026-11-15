@@ -315,6 +315,27 @@ namespace {
 
 //////////
 
+namespace {
+  /// Tell the scene's listeners that the visibility flags of pCam changed.
+  /// Only for a camera registered in the scene under its own name: a copy or
+  /// a camera still being read has no listeners to tell.
+  void fireVisFlagsChanged(const ScenePtr &pScene, const Camera *pCam)
+  {
+    if (pScene.isnull() || pCam->getName().isEmpty())
+      return;
+    CameraPtr pReg = pScene->getCameraRef(pCam->getName());
+    if (pReg.isnull() || pReg.get() != pCam)
+      return;
+
+    CameraEvent ev;
+    ev.setSource(pScene->getUID());
+    ev.m_name = pCam->getName();
+    ev.setDescr("cameraChanged");
+    ev.setType(ScrEventManager::SEM_CHANGED);
+    ScrEventManager::getInstance()->fireEvent(ev);
+  }
+}
+
 void Camera::visAppend(qlib::uid_t tgtid, bool bVis, bool bObj)
 {
   // The live view-point camera holds no visibility flags.
@@ -354,6 +375,7 @@ void Camera::visAppend(qlib::uid_t tgtid, bool bVis, bool bObj)
     uu.add(pInfo);
   }
 
+  fireVisFlagsChanged(pScene, this);
 }
 
 bool Camera::visRemove(qlib::uid_t tgtid)
@@ -393,6 +415,7 @@ bool Camera::visRemove(qlib::uid_t tgtid)
     uu.add(pInfo);
   }
 
+  fireVisFlagsChanged(pScene, this);
   return true;
 }
 

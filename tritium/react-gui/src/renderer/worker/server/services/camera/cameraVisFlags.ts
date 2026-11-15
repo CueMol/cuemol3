@@ -29,6 +29,14 @@ export interface VisFlagEntry {
     included: boolean;
     /** Captured (or current, when not included) visibility state. */
     visible: boolean;
+    /**
+     * The element's visibility in the scene now. Capture takes it for every
+     * row (`visible` keeps the stored value of an included row). Optional on
+     * input: `setCameraVisFlags` reads only `included` / `visible`.
+     */
+    currentVisible?: boolean;
+    /** Nesting under its object (0 for an object), for indenting the row. */
+    depth?: number;
 }
 
 export interface GetCameraVisFlagsArgs {
@@ -71,19 +79,24 @@ interface VisTarget {
     name: string;
     isObj: boolean;
     visible: boolean;
+    depth: number;
 }
 
 /** Collect every object / renderer / renderer-group node (the vis targets). */
-function collectVisTargets(node: SceneTreeNode, out: VisTarget[]): void {
-    if (node.type === 'object' || node.type === 'renderer' || node.type === 'rendGroup') {
+function collectVisTargets(node: SceneTreeNode, out: VisTarget[], depth = 0): void {
+    const isTarget = node.type === 'object' || node.type === 'renderer' || node.type === 'rendGroup';
+    if (isTarget) {
         out.push({
             id: node.id,
-            name: node.name,
+            // An unnamed renderer (e.g. the selection one) shows its type.
+            name: node.name !== '' ? node.name : `(${node.className})`,
             isObj: node.type === 'object',
             visible: node.visible,
+            depth,
         });
     }
-    for (const child of node.children ?? []) collectVisTargets(child, out);
+    const childDepth = isTarget ? depth + 1 : depth;
+    for (const child of node.children ?? []) collectVisTargets(child, out, childDepth);
 }
 
 export function getCameraVisFlags(
@@ -118,6 +131,8 @@ export function getCameraVisFlags(
             included,
             // Captured visibility when included; the live flag otherwise.
             visible: included && typeof rec.visible === 'boolean' ? rec.visible : t.visible,
+            currentVisible: t.visible,
+            depth: t.depth,
         };
     });
     return { ok: true, entries };

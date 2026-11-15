@@ -1,5 +1,6 @@
 # Migration Mapping — Index
 
+- Updated: 2026-11-15 (**visibility flags の dialog を camera inspector に統合** (status 遷移なし、`dialog.tool.visflagset-edit` を split -> merged。merged 60->61 / split 38->37)。Camera pane の Property / 右クリック Properties で camera を inspector に出し (Name、Source、読み取り専用の View、Visibility)、`EditCameraVisFlagsDialog` は削除して Visibility section に置き換えた。設計は [architecture/camera-inspector](../../architecture/camera-inspector.md))
 - Updated: 2026-11-12 (**Styles view を新設** (counts 不変・status 遷移なし)。style set を scene tree から外して Style Sets pane にし、選んだ set の色・selection を編集する Colors / Selections pane を同じ view に置いた。Style Editor ダイアログは style entry だけに。編集可否は read only フラグで決め、同梱の global set は起動時に read only。`panel.workspace.tree` / `panel.workspace.ctxmenu.style` / `dialog.style-editor` の Notes 更新 — [styles-panel](../../architecture/styles-panel.md))
 - Updated: 2026-11-12 (**Camera / View pane を Explorer に集約** (counts 不変・status 遷移なし)。Explorer を Scene / Camera / Color / View の 4 pane にし、pane が無くなった View activity view は activity bar から外した。`panel.fakedial` / `panel.workspace.tree` / `widget.wheelbtn` の Notes 更新 — [camera-pane](../../architecture/camera-pane.md))
 - Updated: 2026-11-11 (**ダイアログ option の記憶** (counts 不変・status 遷移なし)。file open / New Renderer の Center view と map center、tool dialog (merge / resindex / chain id / interaction / makesurf / APBS / prot2ndry / superpose) の option と選択式、Export PNG の option を、最後に確定した値で再起動後も復元する。数値を記憶する 4 ダイアログに計算パラメータだけを戻す Defaults ボタン。New Renderer で map center policy が効いていなかったのも修正。詳細は [architecture/dialog-option-persistence](../../architecture/dialog-option-persistence.md))
@@ -186,8 +187,8 @@
 | Mapping | Count |
 |---------|------:|
 | 1:1 (`direct`) | 29 |
-| merged | 60 |
-| split | 38 |
+| merged | 61 |
+| split | 37 |
 | redesign | 0 |
 | deferred | 1 |
 | deprecated (`dropped`) | 12 |

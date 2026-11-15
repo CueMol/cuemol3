@@ -72,8 +72,10 @@ describe('cameraVisFlags.getCameraVisFlags', () => {
         const res = getCameraVisFlags(makeCtx(cam), { sceneId: 1, cameraName: 'cam1' })
         expect(res.ok).toBe(true)
         expect(res.entries).toEqual([
-            { tgtId: 11, tgtName: '1CRN', isObj: true, included: true, visible: false },
-            { tgtId: 21, tgtName: 'rend1', isObj: false, included: false, visible: true },
+            // `visible` is the stored state of an included row; `currentVisible`
+            // is the scene's own (what Capture records).
+            { tgtId: 11, tgtName: '1CRN', isObj: true, included: true, visible: false, currentVisible: true, depth: 0 },
+            { tgtId: 21, tgtName: 'rend1', isObj: false, included: false, visible: true, currentVisible: true, depth: 1 },
         ])
     })
 

@@ -55,11 +55,20 @@ function recordSelWrite(valueType: string, value: unknown): void {
  * - `actionStep` -- one undo step from the Action history pane, or one op
  *   of it (`entryIndex`), shown read-only by `ActionStepInspector`; keyed by
  *   the action log's step id.
+ * - `camera` -- a named camera opened from the Camera pane; cameras have no
+ *   uid, so it is keyed by name, and `CameraInspector` fetches and edits it.
  */
 export type InspectorTarget =
   | { kind: 'node'; sceneId: number; nodeId: number; nodeType: PropTargetType }
   | { kind: 'animElement'; sceneId: number; uid: number }
   | { kind: 'actionStep'; sceneId: number; stepId: number; entryIndex?: number }
+  | {
+      kind: 'camera'
+      sceneId: number
+      name: string
+      /** Scroll to this section once shown (Edit vis flags). */
+      focus?: 'visibility'
+    }
 
 /** A property-bridge target (a scene-tree node or the View). */
 export type NodeTarget = Extract<InspectorTarget, { kind: 'node' }>
@@ -116,6 +125,20 @@ export interface InspectorActions {
   showActionStep: (sceneId: number, stepId: number, entryIndex?: number) => void
   /** ActionStepInspector reports the header it fetched. */
   setStepHeader: (name: string, type: string) => void
+  /** Open a named camera (Camera pane Property button / context menu). */
+  showCamera: (sceneId: number, name: string, focus?: 'visibility') => void
+  /**
+   * A camera was renamed: if the inspector (or a scene's remembered target)
+   * shows `oldName` of that scene, follow it to `newName`.
+   */
+  renameCameraTarget: (sceneId: number, oldName: string, newName: string) => void
+  /**
+   * Drop a camera target for one scene (the camera went away). Scene-scoped
+   * and kind-guarded like `clearAnimElement`.
+   */
+  clearCamera: (sceneId: number) => void
+  /** CameraInspector reports the header it fetched. */
+  setCameraHeader: (name: string, type: string) => void
   /** Close the panel, forget the target and the per-scene memory. */
   close: () => void
   /** Set the open flag alone (a snap-collapse of the pane); the target is kept. */
@@ -329,6 +352,26 @@ export function InspectorProvider({ children }: { children: React.ReactNode }): 
         )
       },
       setStepHeader: (name, type) => setAnimHeader({ name, type }),
+      showCamera: (sceneId, name, focus) => {
+        setAnimHeader(null)
+        applyTarget(focus ? { kind: 'camera', sceneId, name, focus } : { kind: 'camera', sceneId, name })
+      },
+      renameCameraTarget: (sceneId, oldName, newName) => {
+        const follow = (t: InspectorTarget | null | undefined): InspectorTarget | null =>
+          t?.kind === 'camera' && t.sceneId === sceneId && t.name === oldName
+            ? { kind: 'camera', sceneId, name: newName }
+            : null
+        const mem = follow(targetsBySceneRef.current.get(sceneId))
+        if (mem) targetsBySceneRef.current.set(sceneId, mem)
+        setTarget((t) => follow(t) ?? t)
+      },
+      clearCamera: (sceneId) => {
+        setTarget((t) => (t?.kind === 'camera' && t.sceneId === sceneId ? null : t))
+        const mem = targetsBySceneRef.current.get(sceneId)
+        if (mem?.kind === 'camera') targetsBySceneRef.current.delete(sceneId)
+        setAnimHeader(null)
+      },
+      setCameraHeader: (name, type) => setAnimHeader({ name, type }),
       close: () => {
         setOpen(false)
         setTarget(null)
@@ -423,7 +466,8 @@ export function InspectorProvider({ children }: { children: React.ReactNode }): 
   )
 
   const state = useMemo<InspectorState>(() => {
-    const selfFetched = target?.kind === 'animElement' || target?.kind === 'actionStep'
+    const selfFetched =
+      target?.kind === 'animElement' || target?.kind === 'actionStep' || target?.kind === 'camera'
     return {
       open,
       target,
@@ -433,6 +477,8 @@ export function InspectorProvider({ children }: { children: React.ReactNode }): 
           ? 'Animation'
           : target.kind === 'actionStep'
             ? 'Action'
+            : target.kind === 'camera'
+              ? 'Camera'
             : (NODE_CATEGORY_LABELS[target.nodeType] ?? 'Node'),
       header: selfFetched ? (animHeader ?? EMPTY_HEADER) : nodeHeader,
       entries,
