@@ -95,6 +95,27 @@ describe('cameraOps.destroyCamera', () => {
     })
 })
 
+describe('cameraOps: the reserved "__current"', () => {
+    // It is the live view point: only syncCurrentCam writes it, and no
+    // ordinary camera op may overwrite, delete, rename or apply it (the
+    // console reaches these same services).
+    it('is refused by the camera ops, which then touch neither the scene nor the undo stack', () => {
+        const b = buildCtx({ existingNames: ['__current'] })
+        const results = [
+            services.destroyCamera(b.ctx, { sceneId: 1, name: '__current' }),
+            services.saveViewToCamera(b.ctx, { sceneId: 1, viewId: 7, name: ' __current ' }),
+            services.renameCamera(b.ctx, { sceneId: 1, oldName: '__current', newName: 'mine' }),
+            services.applyCameraToView(b.ctx, { sceneId: 1, viewId: 7, name: '__current' }),
+        ]
+        for (const res of results) expect(res).toEqual(expect.objectContaining({ ok: false, error: '"__current" is reserved' }))
+        expect(b.destroyCamera).not.toHaveBeenCalled()
+        expect(b.saveViewToCam).not.toHaveBeenCalled()
+        expect(b.setCamera).not.toHaveBeenCalled()
+        expect(b.loadViewFromCam).not.toHaveBeenCalled()
+        expect(b.startUndoTxn).not.toHaveBeenCalled()
+    })
+})
+
 describe('cameraOps.renameCamera', () => {
     it('rejects when newName equals oldName or is empty', () => {
         const { ctx, destroyCamera, setCamera } = buildCtx({ existingNames: ['cam0'] })

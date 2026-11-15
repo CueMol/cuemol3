@@ -17,6 +17,7 @@ import { useShowTextPromptDialog } from '@renderer/dialogs/TextPromptDialogProvi
 import { useRegisterCommand } from '@renderer/commands/CommandRegistry'
 import { CmdId } from '@renderer/commands/ids'
 import * as ops from './cameraOps'
+import { CURRENT_CAMERA_NAME } from '@renderer/worker/shared/cameraTypes'
 
 export interface CameraCommandsOptions {
   cm: AsyncCueMol | null
@@ -49,6 +50,7 @@ export function useCameraCommands({ cm, getActiveSceneInfo }: CameraCommandsOpti
       label: 'Name for new camera:',
       defaultValue: suggestion,
       confirmLabel: 'Create',
+      validate: (name) => (name === CURRENT_CAMERA_NAME ? `"${CURRENT_CAMERA_NAME}" is reserved for the current view.` : null),
     })
     if (entered == null) return null
     const okd = await ops.createCamera(cm, info.scene_uid, info.view_id, entered)
@@ -107,7 +109,7 @@ export function useCameraCommands({ cm, getActiveSceneInfo }: CameraCommandsOpti
     if (!r.ok || r.saved) return
     const save = await window.electronAPI.invoke(IPC.DIALOG_CAMERA_SAVE, { defaultName: name })
     if (save.canceled || !save.filePath) return
-    await ops.saveCameraToFile(cm, info.scene_uid, name, save.filePath)
+    await ops.saveCameraToFile(cm, info.scene_uid, name, save.filePath, info.view_id)
   })
 
   useRegisterCommand(CmdId.CameraSaveAs, async ({ name }) => {
@@ -115,7 +117,7 @@ export function useCameraCommands({ cm, getActiveSceneInfo }: CameraCommandsOpti
     if (!info) return
     const save = await window.electronAPI.invoke(IPC.DIALOG_CAMERA_SAVE, { defaultName: name })
     if (save.canceled || !save.filePath) return
-    await ops.saveCameraToFile(cm, info.scene_uid, name, save.filePath)
+    await ops.saveCameraToFile(cm, info.scene_uid, name, save.filePath, info.view_id)
   })
 
   useRegisterCommand(CmdId.CameraSaveFromView, async ({ name, withVisFlags }) => {

@@ -43,10 +43,11 @@ export function withUndoTxn<T>(scene: Scene, label: string, fn: () => T): T {
  *   - `fn()` throws                     -> `rollbackUndoTxn()` + `failFrom(e)`.
  *
  * Rolling back on a Fail return is the point. `commitUndoTxn` commits whatever
- * mutations happened, and -- because `UndoManager::commitTxn` clears the redo
- * stack even for an *empty* transaction (src/qsys/UndoManager.cpp) -- a body
- * that bailed out early without mutating used to leave the user's Redo dead.
- * Rollback touches neither stack.
+ * mutations happened before the body gave up, which would leave a half-done
+ * edit on the undo stack and drop the user's Redo; rollback takes those
+ * mutations back and touches neither stack. (A commit that recorded nothing
+ * keeps the redo side -- src/qsys/UndoManager.cpp -- so an early bail-out
+ * with no mutation is harmless either way.)
  *
  * Prefer this over {@link withUndoTxn} unless the body cannot fail short of
  * throwing.

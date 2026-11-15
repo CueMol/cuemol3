@@ -433,10 +433,13 @@ return undoTxnResult(scene, 'Label', () => {
 return withUndoTxn(scene, 'Label', () => { /* mutations */ return result; });
 ```
 
-- **Prefer `undoTxnResult`**. C++ `UndoManager::commitTxn` clears the redo stack
-  even for an *empty* transaction, so a `withUndoTxn` body that bails out early
-  without mutating silently kills the user's Redo. `undoTxnResult` rolls back
-  on a `Fail` return, which touches neither stack.
+- **Prefer `undoTxnResult`**. It rolls back on a `Fail` return, so a body that
+  gave up after a partial mutation leaves neither stack changed. (A commit that
+  recorded nothing keeps the redo side -- C++ `UndoManager::commitTxn` -- so
+  only a recorded edit drops the user's Redo.)
+- **`__current` camera**: the live view point is outside the undo history (C++
+  records nothing for it). Write it only through `syncCurrentCam`
+  (`services/camera/currentCam.ts`), right before something reads it.
 - `withUndoTxn` rethrows; the caller is responsible for translating the throw.
   Keep it for bodies that unconditionally mutate.
 

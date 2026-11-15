@@ -258,6 +258,11 @@ architecture, it belongs here.
 - [Animation strip の drag 表示と snap](anim-strip-drag-readout.md) (日本語) --
   strip の移動・伸縮中に長さや時刻を浮動 badge で表示し、ruler の目盛りの 1/10 に snap する
   (Alt で解除)。badge の配置と clamp、drag 中の canvas の伸長、cursor の固定。
+- [`__current` カメラ (いま見ている視点)](current-camera.md) (日本語) --
+  scene 作成時から存在し、消せず、undo の対象外で、視点だけを持つ camera。読む処理 (qsc 保存・
+  画像出力・render・animation 開始など) の直前に `syncCurrentCam` で更新する。C++ の
+  `setCamera` / `destroyCamera` / `visAppend` の特別扱い、空の undo commit で Redo を残す変更、
+  予約名の保護と action log の追随。
 - [Cmd+C / X / V をフォーカス文脈で振り分ける](focus-aware-edit-shortcuts.md) (日本語) --
   同じキーがテキスト欄・scene tree・paint deck で別の意味を持つようにする routing の設計。
   Electron の clipboard role では表現できない理由 (macOS はメニューの key equivalent が

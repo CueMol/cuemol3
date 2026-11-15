@@ -15,6 +15,7 @@ import { withUndoTxn } from '../withUndoTxn';
 import { getSceneOrNull } from '@renderer/worker/server/services/helpers/sceneResolver';
 import { parseSceneTreeJSON, type SceneTreeNode } from '@renderer/worker/shared/sceneTreeTypes';
 import { recordOp, recordedNodePath } from '@renderer/worker/server/actions/serviceOps';
+import { isReservedCameraName, RESERVED_CAMERA_ERROR } from './currentCam';
 
 /** One scene element (object / renderer) row in the vis-flags editor. */
 export interface VisFlagEntry {
@@ -48,6 +49,8 @@ export interface SetCameraVisFlagsArgs {
 
 export interface SetCameraVisFlagsResult {
     ok: boolean;
+    /** Why it failed, when there is more to say than `ok: false`. */
+    error?: string;
 }
 
 /** One record of the camera's stored vis set (`getVisSetJSON` value shape). */
@@ -124,6 +127,8 @@ export function setCameraVisFlags(
     ctx: WorkerContext,
     args: SetCameraVisFlagsArgs,
 ): SetCameraVisFlagsResult {
+    // `__current` holds the view state only (C++ drops any flags given to it).
+    if (isReservedCameraName(args.cameraName)) return { ok: false, error: RESERVED_CAMERA_ERROR };
     const scene = getSceneOrNull(ctx, args.sceneId);
     if (!scene) return { ok: false };
     const cam = getCameraRef(scene, args.cameraName);

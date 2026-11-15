@@ -40,6 +40,7 @@ import { emit, jobs, stopAnim, stopTimer } from "./jobRegistry";
 import { startAnimJob, startEncodeOnlyJob, startInProcessJob } from "./startJob";
 import { POLL_MS } from "./types";
 import type { RenderJobEntry } from "./types";
+import { syncCurrentCam } from "@renderer/worker/server/services/camera/currentCam";
 /** Start a render job. */
 export function renderStart(ctx: WorkerContext, args: RenderStartArgs): RenderStartResult {
   // Re-encode needs no scene: it runs ffmpeg over frames already on disk.
@@ -56,16 +57,7 @@ export function renderStart(ctx: WorkerContext, args: RenderStartArgs): RenderSt
   }
 
   // Capture the active view into the "__current" camera the exporter uses.
-  if (args.viewId !== undefined) {
-    const s = scene as unknown as {
-      saveViewToCam?: (viewId: number, camName: string) => boolean;
-    };
-    try {
-      s.saveViewToCam?.(args.viewId, "__current");
-    } catch {
-      /* fall back to the scene's default camera */
-    }
-  }
+  if (args.viewId !== undefined) syncCurrentCam(scene, args.viewId);
 
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "cuemol-render-"));
 

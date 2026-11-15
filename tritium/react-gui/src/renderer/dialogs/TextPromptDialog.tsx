@@ -11,7 +11,8 @@ import { isImeKey } from '@renderer/h3-kit/form'
  *
  * Resolves to the trimmed entered string on OK (Enter or button), or
  * `null` on Cancel / outside-close. Empty / whitespace-only input
- * disables OK to mirror UXP `util.prompt`.
+ * disables OK to mirror UXP `util.prompt`; so does input `validate`
+ * rejects, with its message shown under the field.
  */
 interface Props {
     visible: boolean
@@ -19,6 +20,8 @@ interface Props {
     label: string
     defaultValue: string
     confirmLabel?: string
+    /** Why the trimmed input cannot be used, or null when it can. */
+    validate?: (trimmed: string) => string | null
     onResult: (value: string | null) => void
 }
 
@@ -28,6 +31,7 @@ export function TextPromptDialog({
     label,
     defaultValue,
     confirmLabel,
+    validate,
     onResult,
 }: Props): React.JSX.Element {
     const inputRef = useRef<HTMLInputElement | null>(null)
@@ -46,7 +50,8 @@ export function TextPromptDialog({
     }, [visible, defaultValue])
 
     const trimmed = value.trim()
-    const canSubmit = trimmed.length > 0
+    const invalid = trimmed.length > 0 && validate ? validate(trimmed) : null
+    const canSubmit = trimmed.length > 0 && invalid === null
 
     const handleOk = (): void => {
         if (!canSubmit) return
@@ -70,7 +75,12 @@ export function TextPromptDialog({
             okLabel={confirmLabel ?? 'OK'}
             okDisabled={!canSubmit}
         >
-            <FormGroup label={label} labelFor="text-prompt-input">
+            <FormGroup
+                label={label}
+                labelFor="text-prompt-input"
+                helperText={invalid ?? undefined}
+                intent={invalid ? 'danger' : 'none'}
+            >
                 <InputGroup
                     id="text-prompt-input"
                     inputRef={(el) => {
@@ -79,6 +89,7 @@ export function TextPromptDialog({
                     value={value}
                     onChange={(e) => setValue(e.target.value)}
                     onKeyDown={handleKeyDown}
+                    intent={invalid ? 'danger' : 'none'}
                     fill
                     autoComplete="off"
                 />

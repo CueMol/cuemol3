@@ -321,7 +321,11 @@ void UndoManager::commitTxn()
     return;
   }
 
-  if (m_pPendInfo->size()>0) {
+  // A transaction that recorded nothing changed nothing undoable, so the
+  // redo history stays valid; only a recorded edit discards it.
+  const bool bEmpty = (m_pPendInfo->size()==0);
+
+  if (!bEmpty) {
     m_udata.push_front(m_pPendInfo);
     MB_DPRINTLN("===== Commit TXN (%d) =====", m_pPendInfo->size());
 
@@ -340,6 +344,9 @@ void UndoManager::commitTxn()
   }
 
   m_pPendInfo = NULL;
+
+  if (bEmpty)
+    return;
 
   // discard Redo info
   while (m_rdata.size()>0) {

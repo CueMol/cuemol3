@@ -1045,12 +1045,10 @@ bool Scene::isJustCreated() const
   if (isModified())
     return false;
 
-  // scene is not modified
-  
-  if (getObjectCount()==0 &&
-      getCameraCount()==0) {
-      //getCameraCount()==1 &&
-      //!getCamera("__current").isnull()) {
+  // scene is not modified; the live view-point camera ("__current") exists
+  // from the scene's creation, so it does not count as content
+  const int ncam = getCameraCount() - (hasCamera(CURRENT_CAMERA_NAME) ? 1 : 0);
+  if (getObjectCount()==0 && ncam==0) {
     // not modified but just created
     return true;
   }
@@ -1301,6 +1299,12 @@ void Scene::setCamera(const LString &name, CameraPtr pCam)
 {
   bool bCreate = !hasCamera(name);
 
+  // The "__current" camera is the live view point: it holds the view state
+  // only (no visibility flags) and is not part of the undo history.
+  const bool bCurrent = name.equals(CURRENT_CAMERA_NAME);
+  if (bCurrent)
+    pCam->resetVisSettings();
+
   // Assign the display slot before the undo info is recorded, so undo/redo
   // replays the camera with the order it had. A camera that already carries
   // a slot (a reorder, a rename, an undo replay) keeps it; a fresh one
@@ -1315,7 +1319,7 @@ void Scene::setCamera(const LString &name, CameraPtr pCam)
 
   // setup undo txn
   UndoUtil uu(this);
-  if (uu.isOK()) {
+  if (uu.isOK() && !bCurrent) {
     if (bCreate) {
       CameraCreateEditInfo *pPEI = MB_NEW CameraCreateEditInfo;
       pPEI->setupCreate(getUID(), pCam);
@@ -1380,6 +1384,11 @@ bool Scene::hasCamera(const LString &name) const
 
 bool Scene::destroyCamera(const LString &name)
 {
+  // "__current" always exists; throwing (rather than returning false) also
+  // stops callers that ignore the result, e.g. a destroy + setCamera rename.
+  if (name.equals(CURRENT_CAMERA_NAME))
+    MB_THROW(qlib::IllegalArgumentException, "camera \"__current\" cannot be destroyed");
+
   {
     // fire camera-removing event
     CameraEvent ev;
@@ -1437,7 +1446,7 @@ bool Scene::saveCameraTo(const LString &aName, const LString &aLocalFile) const
     return false;
   }
 
-  if (aName.equals("__current"))
+  if (aName.equals(CURRENT_CAMERA_NAME))
     return true;
 
   // Change file linkage

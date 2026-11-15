@@ -132,11 +132,18 @@ TEST(UndoManagerTest, CommitClearsRedoHistory)
 TEST(UndoManagerTest, EmptyTxnIsDiscarded)
 {
     UndoManager um;
+    um.startTxn("op");
+    um.addEditInfo(new CountEditInfo());
+    um.commitTxn();
+    um.undo();
+    ASSERT_EQ(um.getRedoSize(), 1);
+
     um.startTxn("empty");
-    um.commitTxn();  // no EditInfo added → discarded
+    um.commitTxn();  // no EditInfo added -> discarded, redo side kept
 
     EXPECT_FALSE(um.isUndoable());
     EXPECT_EQ(um.getUndoSize(), 0);
+    EXPECT_EQ(um.getRedoSize(), 1);
 }
 
 TEST(UndoManagerTest, RollbackUndoesPending)

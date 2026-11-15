@@ -11,7 +11,7 @@
 
 import { useCallback } from 'react'
 import type { SceneCtxMenuPayload } from '@shared/types/sceneCtxMenu'
-import type { CameraEntry } from '@renderer/worker/shared/cameraTypes'
+import { CURRENT_CAMERA_NAME, type CameraEntry } from '@renderer/worker/shared/cameraTypes'
 import {
     peekClipboardKind,
     useShowSceneCtxMenu,
@@ -43,7 +43,11 @@ export function useCameraCtxMenu({ onRename }: UseCameraCtxMenuOptions): (
                 hasVisibility: false,
                 clipboardKind: await peekClipboardKind(),
                 cameraInfo: camera
-                    ? { src: camera.src, visSize: camera.visSize }
+                    ? {
+                          src: camera.src,
+                          visSize: camera.visSize,
+                          reserved: camera.name === CURRENT_CAMERA_NAME,
+                      }
                     : undefined,
             }
             const action = await showMenu(payload)

@@ -10,6 +10,8 @@
  *   - scene.loadViewFromCam("__current") is invoked for every view in
  *     scene.view_uids (mirrors `m_bSetCamera=true` block of
  *     LoadSceneCommand::run)
+ *   - a scene left without "__current" (a failed read, an old file) gets it
+ *     from its first view: every scene has it
  *   - reader.detach is called even when reader.read throws (try/finally)
  *   - the whole flow runs OUTSIDE any undo txn (UXP parity): scene load is
  *     not an edit, so startUndoTxn / commitUndoTxn / rollbackUndoTxn are
@@ -40,10 +42,12 @@ function makeFixture(opts: {
         { name: 'qsc_xml', fext: '*.qsc', category: SCEREADER_CATEGORY },
     ])
 
+    // Cameras the scene holds; a file that reads brings its "__current".
+    const cameras = new Set<string>()
     const reader = {
         setPath: vi.fn((p: string) => calls.push(`setPath(${p})`)),
         attach: vi.fn((s: unknown) => calls.push(`attach(${s ? 'scene' : 'null'})`)),
-        read: vi.fn(opts.readFn ?? (() => calls.push('read'))),
+        read: vi.fn(opts.readFn ?? (() => { calls.push('read'); cameras.add('__current') })),
         detach: vi.fn(() => calls.push('detach')),
     }
 
@@ -59,7 +63,13 @@ function makeFixture(opts: {
             calls.push(`createView(${uid})`)
             return { name: '', getUID: () => uid }
         }),
-        clearAllData: vi.fn(() => calls.push('clearAllData')),
+        clearAllData: vi.fn(() => { cameras.clear(); calls.push('clearAllData') }),
+        hasCamera: vi.fn((name: string) => cameras.has(name)),
+        saveViewToCam: vi.fn((uid: number, name: string) => {
+            cameras.add(name)
+            calls.push(`saveViewToCam(${uid},${name})`)
+            return true
+        }),
         getView: vi.fn((uid: number) => ({ _uid: uid })),
         setName: vi.fn((n: string) => { scene.name = n; calls.push(`setName(${n})`) }),
         loadViewFromCam: vi.fn((uid: number, name: string) =>
@@ -197,6 +207,8 @@ describe('loadScene.service — direct API', () => {
         expect(loadScene(ctx, { filePath: '/test.qsc', sceneId: 1 }))
             .toEqual(expect.objectContaining({ ok: false, code: 'io', error: 'parse fail' }))
         expect(reader.detach).toHaveBeenCalled()
+        // The emptied scene still gets its live view point.
+        expect(scene.saveViewToCam).toHaveBeenCalledWith(10, '__current')
         // No txn was opened, so there is nothing to commit or roll back.
         expect(scene.startUndoTxn).not.toHaveBeenCalled()
         expect(scene.commitUndoTxn).not.toHaveBeenCalled()

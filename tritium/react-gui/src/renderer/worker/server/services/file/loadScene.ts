@@ -20,6 +20,8 @@ import { fail, failFrom, ok, type Result } from '@renderer/worker/shared/result'
 import { getSceneOrNull } from '@renderer/worker/server/services/helpers/sceneResolver';
 import { resetInitialSceneProps } from '@renderer/worker/server/services/scene/createNewSceneAndView';
 import { createInitialView } from '@renderer/worker/server/services/helpers/createSceneView';
+import { syncCurrentCam } from '@renderer/worker/server/services/camera/currentCam';
+import { CURRENT_CAMERA_NAME } from '@renderer/worker/shared/cameraTypes';
 
 const log = console;
 
@@ -87,16 +89,22 @@ export type LoadSceneResult = Result;
  * `m_bSetCamera == true` block in `LoadSceneCommand::run()`. A scene with no
  * views yet (the open-into-a-fresh-scene path creates its view afterwards)
  * is a no-op.
+ *
+ * A file without a "__current" (or a scene left empty by a failed read) gets
+ * one from its first view instead: the scene always has it.
  */
 function applyCurrentCamera(scene: Scene): void {
     const uidStr = scene.view_uids;
     if (!uidStr) return;
-    for (const tok of uidStr.split(',')) {
-        const uid = Number(tok.trim());
-        if (!Number.isFinite(uid)) continue;
+    const uids = uidStr.split(',').map((tok) => Number(tok.trim())).filter((uid) => Number.isFinite(uid));
+    if (!scene.hasCamera(CURRENT_CAMERA_NAME)) {
+        if (uids.length > 0) syncCurrentCam(scene, uids[0]);
+        return;
+    }
+    for (const uid of uids) {
         try {
             const view = scene.getView(uid) as View | null;
-            if (view) scene.loadViewFromCam(uid, '__current');
+            if (view) scene.loadViewFromCam(uid, CURRENT_CAMERA_NAME);
         } catch (e) {
             log.warn(`loadViewFromCam failed for view ${uid}:`, e);
         }
@@ -181,6 +189,7 @@ export function loadScene(ctx: WorkerContext, args: LoadSceneArgs): LoadSceneRes
         } catch (e) {
             log.warn('[worker] loadScene: clearAllData after a failed read failed:', e);
         }
+        applyCurrentCamera(scene);
         return res;
     }
 

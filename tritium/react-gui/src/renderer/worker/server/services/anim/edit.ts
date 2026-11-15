@@ -33,6 +33,8 @@ import { undoTxnResult } from "../withUndoTxn";
 import { animElementSpec, findByUid } from "./detail";
 import { recordOp } from "@renderer/worker/server/actions/serviceOps";
 import { applyTiming } from "./elementWrites";
+import { syncCurrentCam } from "@renderer/worker/server/services/camera/currentCam";
+import { CURRENT_CAMERA_NAME } from "@renderer/worker/shared/cameraTypes";
 import { readElement, readMgrState } from "./read";
 import type { TimeRefNode } from "./timeRefGraph";
 import { goneFail, noMgrFail } from "./types";
@@ -151,42 +153,24 @@ export function setElementTime(
 }
 
 /**
- * Name of the implicit "camera the user is looking through" (UXP convention;
- * also written by its file-open / image-export paths).
- */
-const CURRENT_CAM_NAME = "__current";
-
-/**
- * Seed the start camera from the live view when an element is added.
+ * Point an empty start camera at `__current` when an element is added.
  *
- * As UXP `anim-panel.js` onAddCmd: the `__current` camera is saved from the
- * active view whenever the scene lacks it, and `startcam` adopts it only when
- * still empty (an explicit choice is never overwritten). Without this a fresh
- * animation starts from wherever the camera happens to be at Play time
- * instead of from the view the elements were authored against.
+ * As UXP `anim-panel.js` onAddCmd, `startcam` adopts `__current` only when
+ * still empty (an explicit choice is never overwritten). Its value is not
+ * saved here: Play / seek from the stopped state refresh `__current` from the
+ * view right before the animation reads it (`transport.ts`). The scene has
+ * `__current` from its creation; one that somehow lacks it gets it here.
  *
- * Unlike UXP, `__current` is also saved again when the timeline is empty and
- * the start camera is (or is about to be) `__current`: it stands for the view
- * the animation was begun from, so a timeline emptied and begun again -- for
- * instance after a molecule was loaded into a scene that once had one --
- * starts from the view now, not from a stale one far from the molecule. With
- * elements already there the camera is left alone: they were authored
- * against it.
- *
- * Runs OUTSIDE the add's undo txn, as in UXP: neither `saveViewToCam` nor
- * `setStartCamName` belongs to the element edit, so undoing the add leaves both
- * in place. Any failure is swallowed -- a camera problem must not block the add.
+ * Runs OUTSIDE the add's undo txn, as in UXP: `setStartCamName` does not
+ * belong to the element edit, so undoing the add leaves it in place. Any
+ * failure is swallowed -- a camera problem must not block the add.
  */
 function ensureStartCam(scene: Scene, mgr: AnimMgr, viewId: number | undefined): void {
   if (viewId === undefined) return;
   try {
-    const startcam = safeStr(() => mgr.startcam);
-    const empty = safeNum(() => mgr.size) === 0;
-    const beginning = empty && (startcam === "" || startcam === CURRENT_CAM_NAME);
-    if (beginning || !scene.hasCamera(CURRENT_CAM_NAME)) scene.saveViewToCam(viewId, CURRENT_CAM_NAME);
-    // Never point startcam at a camera the save failed to create.
-    if (!scene.hasCamera(CURRENT_CAM_NAME)) return;
-    if (startcam === "") mgr.startcam = CURRENT_CAM_NAME;
+    // Never point startcam at a camera that could not be created.
+    if (!scene.hasCamera(CURRENT_CAMERA_NAME) && !syncCurrentCam(scene, viewId)) return;
+    if (safeStr(() => mgr.startcam) === "") mgr.startcam = CURRENT_CAMERA_NAME;
   } catch {
     /* camera seeding is best-effort */
   }

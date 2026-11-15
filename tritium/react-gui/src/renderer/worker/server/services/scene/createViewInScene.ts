@@ -1,5 +1,7 @@
 // Runs in Web Worker thread. Wrappers are sync (no await on C++ wrappers).
 import type { WorkerContext } from '@renderer/worker/server/types/WorkerContext';
+import { syncCurrentCam } from '@renderer/worker/server/services/camera/currentCam';
+import { CURRENT_CAMERA_NAME } from '@renderer/worker/shared/cameraTypes';
 
 export interface CreateViewInSceneArgs {
     sceneId: number;
@@ -23,7 +25,7 @@ export function createViewInScene(ctx: WorkerContext, args: CreateViewInSceneArg
 
     // Save current view camera state before creating new view (UXP: saveViewToCam before createView)
     if (inheritFromViewId !== undefined) {
-        scene.saveViewToCam(inheritFromViewId, '__current');
+        syncCurrentCam(scene, inheritFromViewId);
     }
 
     const view = scene.createView();
@@ -35,7 +37,7 @@ export function createViewInScene(ctx: WorkerContext, args: CreateViewInSceneArg
 
     // Restore camera state into the new view
     if (inheritFromViewId !== undefined) {
-        scene.loadViewFromCam(view_uid, '__current');
+        scene.loadViewFromCam(view_uid, CURRENT_CAMERA_NAME);
     }
 
     return { ok: true, view_uid };

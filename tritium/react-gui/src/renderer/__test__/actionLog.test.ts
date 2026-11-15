@@ -5,7 +5,7 @@
  *
  * The scene stands in for C++ `UndoManager` as it behaves: a nested
  * start/commit is absorbed into the outer one (whose label wins), a commit
- * with no change adds nothing but still drops the redo side, and undo / redo
+ * with no change adds nothing and keeps the redo side, and undo / redo
  * fire no event. What is checked is that the rows follow that stack without
  * being told, and that an op is recorded once, by the path it had before it
  * ran.
@@ -70,7 +70,9 @@ function stackScene(uid = 1): StackScene {
     },
     commitUndoTxn: () => {
       if (--depth > 0) return
-      if (changed) done.push(label)
+      // An empty commit leaves both stacks alone (UndoManager::commitTxn).
+      if (!changed) return
+      done.push(label)
       redo.length = 0
     },
     rollbackUndoTxn: () => {
@@ -140,6 +142,7 @@ describe('actionLog', () => {
 
   it('follows undo and redo, and a new edit drops the undone rows', () => {
     const scene = stackScene()
+    const { ctx } = makeWorkerCtx({ scenes: [scene] })
     edit(scene, 'a')
     edit(scene, 'b')
     edit(scene, 'c')
@@ -149,12 +152,44 @@ describe('actionLog', () => {
     scene.redoOne()
     expect(rowsOf(scene).map((r) => r.undone)).toEqual([false, false, true])
 
-    edit(scene, 'd')
+    editWith(scene, ctx, 'd', [HIDE])
     expect(rowsOf(scene).map((r) => `${r.label}${r.undone ? '*' : ''}`)).toEqual(['a', 'b', 'd'])
-    // An empty commit after an undo also drops the redo side, as C++ does.
+    // An empty commit after an undo keeps the redo side, ops and all, as C++
+    // keeps its redo stack (UndoManager::commitTxn).
     scene.undoOne()
     withUndoTxn(asScene(scene), 'empty', () => undefined)
-    expect(rowsOf(scene).map((r) => r.label)).toEqual(['a', 'b'])
+    const rows = rowsOf(scene)
+    expect(rows.map((r) => `${r.label}${r.undone ? '*' : ''}`)).toEqual(['a', 'b', 'd*'])
+    expect(rows[2].entries).toEqual([expect.objectContaining({ kind: 'op', op: HIDE[0], args: HIDE[1] })])
+  })
+
+  it('does not record writing "__current" to a file, even in a transaction with an edit', async () => {
+    // save_camera_file of __current refreshes it from the view and writes a
+    // file; it changes nothing undoable, so the edit's row must not carry it.
+    const { saveCameraFile } = await import('@renderer/worker/server/catalog/ops/cameraOps')
+    const scene = stackScene()
+    const order: string[] = []
+    Object.assign(scene, {
+      saveViewToCam: (viewId: number, name: string) => { order.push(`sync ${viewId} ${name}`); return true },
+      saveCameraTo: (name: string) => { order.push(`write ${name}`); return true },
+    })
+    const { ctx } = makeWorkerCtx({ scenes: [scene] })
+    const oc = { sceneId: scene.uid, viewId: 7, callId: 'c', markMutated: () => undefined, fileAccess: 'any' } as never
+    const hide = {
+      name: HIDE[0], params: {}, mutates: true,
+      run: () => { scene.touch(); return { ok: true } },
+    } as unknown as AnyOp
+
+    await runInTxn(asScene(scene), 'cmd', () => true, async () => {
+      await invokeOp(hide, ctx, {}, oc)
+      const res = await invokeOp(saveCameraFile as unknown as AnyOp, ctx, { name: '__current', path: '/tmp/view.xml' }, oc)
+      expect(res.ok).toBe(true)
+    })
+
+    expect(order).toEqual(['sync 7 __current', 'write __current'])
+    const rows = rowsOf(scene)
+    expect(rows).toHaveLength(1)
+    expect(rows[0].entries.map((e) => (e.kind === 'op' ? e.op : e.text))).toEqual([HIDE[0]])
   })
 
   it('rebuilds rows the stack no longer holds, and forgets a scene that is gone', () => {

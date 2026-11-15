@@ -4,7 +4,8 @@
  * native ops.
  *
  * One row per transaction on the scene's undo stack, in stack order: a commit
- * adds a row (and drops the redo side, as C++ does), undo and redo only move
+ * that recorded something adds a row (and drops the redo side, as C++ does;
+ * an empty commit changes neither), undo and redo only move
  * which rows count as undone. A row holds the ops that ran inside the
  * transaction -- the op catalogue's own name and typed arguments -- so a
  * range of rows can be written out as a qax file and run again.
@@ -247,8 +248,8 @@ export function txnBegin(scene: Scene, label: string, source: ActionSource): voi
  *
  * An inner commit hands its entries to the transaction around it; C++ folds
  * the inner one into the outer the same way. The outermost commit makes the
- * row, if the stack grew -- an empty commit adds nothing but still drops the
- * redo side.
+ * row, if the stack grew -- an empty commit adds nothing and keeps the redo
+ * side, as C++ `UndoManager::commitTxn` does.
  */
 export function txnEnd(scene: Scene, committed: boolean): void {
   const sceneId = sceneIdOf(scene)
@@ -263,8 +264,10 @@ export function txnEnd(scene: Scene, committed: boolean): void {
   }
   const undoSize = undoSizeOf(scene)
   const grew = undoSize > frame.undoSizeBefore
-  log.rows = log.rows.slice(0, frame.undoSizeBefore)
+  // An empty commit leaves the C++ redo side alone (UndoManager::commitTxn),
+  // so the rows above the cursor stay too; a recorded one drops them.
   if (grew) {
+    log.rows = log.rows.slice(0, frame.undoSizeBefore)
     // A GUI edit that changed the scene without saying how: a service that
     // records no op (docs/architecture/action-log.md 2.3).
     if (frame.source === 'gui' && frame.entries.length === 0 && typeof __DEV_UI__ !== 'undefined' && __DEV_UI__) {

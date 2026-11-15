@@ -15,6 +15,7 @@ import {
 } from '@renderer/worker/server/services/camera/cameraOps'
 import { loadCameraFromFile, reloadCameraFromSrc, saveCameraToCurrentSrc, saveCameraToFile } from '@renderer/worker/server/services/camera/cameraFile'
 import { setCameraVisFlags } from '@renderer/worker/server/services/camera/cameraVisFlags'
+import { isReservedCameraName } from '@renderer/worker/server/services/camera/currentCam'
 import type { VisFlagEntry } from '@renderer/worker/server/services/camera/cameraVisFlags'
 import { getViewProjection, setViewProjection } from '@renderer/worker/server/services/view/viewProjection'
 import type { WorkerContext } from '@renderer/worker/server/types/WorkerContext'
@@ -62,7 +63,7 @@ export const saveCamera = defineOp({
   aliases: [{ name: 'save_view', summary: 'Save the current view under a name: save_view front' }],
   run(ctx, args, oc) {
     const res = createCamera(ctx, { sceneId: oc.sceneId, viewId: oc.viewId, name: args.name })
-    if (!res.ok) return { ok: false, error: 'The camera could not be saved. Give a non-empty name.' }
+    if (!res.ok) return { ok: false, error: res.error ?? 'The camera could not be saved. Give a non-empty name.' }
     if (args.withVisibility) {
       const vis = saveViewToCamera(ctx, { sceneId: oc.sceneId, viewId: oc.viewId, name: args.name.trim(), withVisFlags: true })
       if (!vis.ok) return { ok: false, error: 'The camera was saved, but its visibility could not be.' }
@@ -274,7 +275,9 @@ export const saveCameraFile = defineOp({
     name: string('Name of the camera, from list_cameras.'),
     path: optional(path('Where to write it (.xml). Null uses its source file.')),
   },
-  mutates: true,
+  // Saving a named camera links it to the file (an undoable source change);
+  // writing "__current" changes nothing in the scene and is not recorded.
+  mutates: false,
   describe: (a) => `Save camera ${a.name}${a.path === null ? '' : ` to ${a.path}`}`,
   expose: { tool: false, console: true, mcp: true },
   group: 'viewing',
@@ -283,11 +286,14 @@ export const saveCameraFile = defineOp({
     if (args.path === null) {
       const res = saveCameraToCurrentSrc(ctx, { sceneId: oc.sceneId, name: args.name })
       if (res.ok && !res.saved) return { ok: false, error: `"${args.name}" has no source file; give a path.` }
+      if (res.ok) oc.markMutated()
       return normalizeServiceResult(res, `"${args.name}" could not be saved (is there such a camera?).`)
     }
     const out = outputPath(oc, args.path, '.xml')
     if ('error' in out) return { ok: false, error: out.error }
-    return normalizeServiceResult(saveCameraToFile(ctx, { sceneId: oc.sceneId, name: args.name, path: out.path }), `"${args.name}" could not be saved to ${out.path}.`)
+    const res = saveCameraToFile(ctx, { sceneId: oc.sceneId, viewId: oc.viewId, name: args.name, path: out.path })
+    if (res.ok && !isReservedCameraName(args.name)) oc.markMutated()
+    return normalizeServiceResult(res, `"${args.name}" could not be saved to ${out.path}.`)
   },
 })
 

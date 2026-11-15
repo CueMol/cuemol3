@@ -14,6 +14,7 @@
 import type { GUIView } from '@cuemol/core/src/wrappers/GUIView';
 import type { WorkerContext } from '@renderer/worker/server/types/WorkerContext';
 import { getSceneOrNull, getViewOrNull } from '@renderer/worker/server/services/helpers/sceneResolver';
+import { syncCurrentCam } from '@renderer/worker/server/services/camera/currentCam';
 
 export interface ExportSceneArgs {
     sceneId: number;
@@ -114,13 +115,7 @@ export function exportScene(ctx: WorkerContext, args: ExportSceneArgs): ExportSc
 
     // Persist the live view into the transient '__current' camera so the
     // off-screen exporter renders from the active viewpoint (UXP parity).
-    try {
-        (scene as unknown as {
-            saveViewToCam: (viewId: number, name: string) => boolean;
-        }).saveViewToCam(args.viewId, '__current');
-    } catch {
-        // ignore -- proceed with whatever camera the exporter resolves
-    }
+    syncCurrentCam(scene, args.viewId);
 
     let exporter: SceneExporterLike | null;
     try {

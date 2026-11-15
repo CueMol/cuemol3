@@ -23,6 +23,7 @@ import { withUndoTxn } from '../withUndoTxn';
 import { getSceneOrNull } from '@renderer/worker/server/services/helpers/sceneResolver';
 import { safeRead } from '@renderer/worker/server/services/helpers/safeRead';
 import { recordOp } from '@renderer/worker/server/actions/serviceOps';
+import { isReservedCameraName, RESERVED_CAMERA_ERROR, syncCurrentCam } from './currentCam';
 
 function getCameraRef(scene: Scene, name: string): Camera | null {
     return (safeRead(() => scene.getCameraRef(name) as Camera | null)) ?? null;
@@ -96,10 +97,17 @@ export interface SaveCameraToFileArgs {
     /** Camera name -- cameras are keyed by name, not uid. */
     name: string;
     path: string;
+    /**
+     * The view `__current` is refreshed from before it is written; required
+     * for that name, unused for any other.
+     */
+    viewId?: number;
 }
 
 export interface SaveCameraToFileResult {
     ok: boolean;
+    /** Why it failed, when there is more to say than `ok: false`. */
+    error?: string;
 }
 
 export function saveCameraToFile(
@@ -109,6 +117,16 @@ export function saveCameraToFile(
     if (args.path.length === 0) return { ok: false };
     const scene = getSceneOrNull(ctx, args.sceneId);
     if (!scene) return { ok: false };
+
+    // `__current` (Save Current View): refresh it from the view, then only
+    // write the file. C++ leaves its source and the undo history alone, so
+    // there is nothing to record and no transaction to open.
+    if (isReservedCameraName(args.name)) {
+        if (args.viewId === undefined) return { ok: false, error: 'no view to save the current view from' };
+        if (!syncCurrentCam(scene, args.viewId)) return { ok: false };
+        try { return { ok: scene.saveCameraTo(args.name.trim(), args.path) }; }
+        catch { return { ok: false }; }
+    }
 
     let ok = false;
     // UXP wraps Save As in an undo txn because saveCameraTo updates
@@ -129,6 +147,8 @@ export interface SaveCameraToCurrentSrcArgs {
 
 export interface SaveCameraToCurrentSrcResult {
     ok: boolean;
+    /** Why it failed, when there is more to say than `ok: false`. */
+    error?: string;
     /** True if there was a src and we wrote to it; false -> caller does Save As. */
     saved: boolean;
 }
@@ -137,6 +157,7 @@ export function saveCameraToCurrentSrc(
     ctx: WorkerContext,
     args: SaveCameraToCurrentSrcArgs,
 ): SaveCameraToCurrentSrcResult {
+    if (isReservedCameraName(args.name)) return { ok: false, saved: false, error: RESERVED_CAMERA_ERROR };
     const scene = getSceneOrNull(ctx, args.sceneId);
     if (!scene) return { ok: false, saved: false };
     const cam = getCameraRef(scene, args.name);
@@ -165,12 +186,15 @@ export interface ReloadCameraFromSrcArgs {
 
 export interface ReloadCameraFromSrcResult {
     ok: boolean;
+    /** Why it failed, when there is more to say than `ok: false`. */
+    error?: string;
 }
 
 export function reloadCameraFromSrc(
     ctx: WorkerContext,
     args: ReloadCameraFromSrcArgs,
 ): ReloadCameraFromSrcResult {
+    if (isReservedCameraName(args.name)) return { ok: false, error: RESERVED_CAMERA_ERROR };
     const scene = getSceneOrNull(ctx, args.sceneId);
     if (!scene) return { ok: false };
     const cam = getCameraRef(scene, args.name);

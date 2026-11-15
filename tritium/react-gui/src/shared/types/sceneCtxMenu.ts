@@ -262,5 +262,7 @@ export interface SceneCtxMenuPayload {
   cameraInfo?: {
     src: string
     visSize: number
+    /** The reserved `__current` row: only Save As (and the row-less items) apply. */
+    reserved?: boolean
   }
 }
