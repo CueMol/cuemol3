@@ -21,6 +21,7 @@
  */
 
 import React from 'react';
+import { Radio } from '@blueprintjs/core';
 
 export interface FieldGridProps {
     /** Layout-only class for positioning the grid within its parent. */
@@ -42,5 +43,40 @@ export const FieldGridRow: React.FC<FieldGridRowProps> = ({ label, children }) =
     <div className="h3-form-grid-row">
         <label className="h3-form-grid-label">{label}</label>
         <div className="h3-form-grid-control">{children}</div>
+    </div>
+);
+
+export interface FieldGridRadioHeadingProps {
+    /** Radio label. */
+    label: string;
+    /** Radio group name shared by the headings of one grid (keyboard grouping). */
+    name: string;
+    checked: boolean;
+    onSelect: () => void;
+    disabled?: boolean;
+}
+
+/**
+ * A group heading that is itself a radio choice ("New Scene" / "New View"):
+ * picking it picks the group, and the rows below it are that choice's options.
+ * Spans both columns. In a grid that has radio headings, the row labels are
+ * indented to the radio's text, so the options read as belonging to the
+ * choice above them while every group still shares one label column.
+ */
+export const FieldGridRadioHeading: React.FC<FieldGridRadioHeadingProps> = ({
+    label,
+    name,
+    checked,
+    onSelect,
+    disabled,
+}) => (
+    <div className="h3-form-grid-heading h3-form-grid-radio-heading h3-form-radio-group">
+        <Radio
+            name={name}
+            label={label}
+            checked={checked}
+            disabled={disabled}
+            onChange={() => onSelect()}
+        />
     </div>
 );

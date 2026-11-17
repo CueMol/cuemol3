@@ -16,8 +16,12 @@ export { FieldGroup } from './FieldGroup';
 export type { FieldGroupProps } from './FieldGroup';
 export { FieldSection } from './FieldSection';
 export type { FieldSectionProps } from './FieldSection';
-export { FieldGrid, FieldGridRow } from './FieldGrid';
-export type { FieldGridProps, FieldGridRowProps } from './FieldGrid';
+export { FieldGrid, FieldGridRadioHeading, FieldGridRow } from './FieldGrid';
+export type {
+    FieldGridProps,
+    FieldGridRadioHeadingProps,
+    FieldGridRowProps,
+} from './FieldGrid';
 export { SectionHeader } from './SectionHeader';
 export type { SectionHeaderProps } from './SectionHeader';
 export { TextField } from './TextField';
