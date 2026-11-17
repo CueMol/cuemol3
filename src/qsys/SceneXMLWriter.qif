@@ -25,6 +25,12 @@ runtime_class SceneXMLWriter extends InOutHandler
   /// since the file should be saved with the same version format in the next time)
   property string version => redirect(getStrVersion, setStrVersion);
 
+  /// The oldest app version the file is written for ("2.2", "2.3", "3.0", ...).
+  /// 3.0 or later refers to a style file of the application (e.g.
+  /// data/cuemol3_look.xml) as %%CONFDIR%%/...; an older one (the default)
+  /// embeds its contents. Persistent, like version.
+  property string compat => redirect(getCompat, setCompat);
+
   ////////////////////
   // Method definition
 

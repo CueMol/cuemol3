@@ -5,9 +5,17 @@ import { DialogShell } from './DialogShell';
 export type QscVersion = 'QDF0' | 'QDF1';
 export type QscCompress = 'xzip' | 'gzip' | 'none';
 
+/** The oldest app version the file is written for (the writer's `compat`). */
+export type QscCompat = '2.2' | '2.3' | '3.0';
+
 export interface QscWriterOptions {
     embedAll: boolean;
     version: QscVersion;
+    /**
+     * 3.0 refers to an application style file (the scene's `cuemol3_look`)
+     * as `%%CONFDIR%%/...`; an older target embeds its contents.
+     */
+    compat: QscCompat;
     compress: QscCompress;
     base64: boolean;
 }
@@ -18,10 +26,16 @@ interface Props {
     onCancel: () => void;
 }
 
-const VERSION_OPTIONS: { value: QscVersion; label: string }[] = [
-    { value: 'QDF0', label: 'Ver 2.2 or later' },
-    { value: 'QDF1', label: 'Ver 2.3 or later' },
+const COMPAT_OPTIONS: { value: QscCompat; label: string }[] = [
+    { value: '3.0', label: 'Ver 3.0 or later' },
+    { value: '2.3', label: 'Ver 2.3 or later' },
+    { value: '2.2', label: 'Ver 2.2 or later' },
 ];
+
+/** The data format (QDF version) a compatibility target writes. */
+function versionOf(compat: QscCompat): QscVersion {
+    return compat === '2.2' ? 'QDF0' : 'QDF1';
+}
 
 const COMPRESS_OPTIONS: { value: QscCompress; label: string }[] = [
     { value: 'xzip', label: 'xz' },
@@ -32,13 +46,13 @@ const COMPRESS_OPTIONS: { value: QscCompress; label: string }[] = [
 export function QscWriterOptionDialog({ visible, onConfirm, onCancel }: Props): React.JSX.Element {
 
     const [embedAll, setEmbedAll] = useState(false);
-    const [version, setVersion] = useState<QscVersion>('QDF1');
+    const [compat, setCompat] = useState<QscCompat>('3.0');
     const [compress, setCompress] = useState<QscCompress>('xzip');
     const [base64, setBase64] = useState(false);
 
     useEffect(() => {
         if (visible) {
-            // Defaults: QDF1 + embed off + base64 off + xz.
+            // Defaults: Ver 3.0 (QDF1) + embed off + base64 off + xz.
             //
             // UXP qscwriter-option-dlg.js onLoad picks QDF0 ("default: qdf0
             // (compat)"), which predates QDF1 being the established format --
@@ -48,13 +62,15 @@ export function QscWriterOptionDialog({ visible, onConfirm, onCancel }: Props): 
             // default here instead, which leaves the compression option live
             // and lands on xz. Everything else, including the QDF0 disable
             // rule enforced at OK time (see handleOk), stays UXP-faithful.
+            // Ver 3.0 is QDF1 that may refer to CueMol3's own style files.
             setEmbedAll(false);
-            setVersion('QDF1');
+            setCompat('3.0');
             setCompress('xzip');
             setBase64(false);
         }
     }, [visible]);
 
+    const version = versionOf(compat);
     const advancedDisabled = version === 'QDF0';
 
     const handleOk = (): void => {
@@ -62,9 +78,9 @@ export function QscWriterOptionDialog({ visible, onConfirm, onCancel }: Props): 
         // notion of compression / text encoding, so coerce them at submit
         // time regardless of the (disabled) UI state.
         if (advancedDisabled) {
-            onConfirm({ embedAll, version, compress: 'none', base64: false });
+            onConfirm({ embedAll, version, compat, compress: 'none', base64: false });
         } else {
-            onConfirm({ embedAll, version, compress, base64 });
+            onConfirm({ embedAll, version, compat, compress, base64 });
         }
     };
 
@@ -88,9 +104,9 @@ export function QscWriterOptionDialog({ visible, onConfirm, onCancel }: Props): 
                 <FormGroup label="Compatibility" inline>
                     <HTMLSelect
                         className="h3-form-select"
-                        value={version}
-                        onChange={(e) => setVersion(e.currentTarget.value as QscVersion)}
-                        options={VERSION_OPTIONS}
+                        value={compat}
+                        onChange={(e) => setCompat(e.currentTarget.value as QscCompat)}
+                        options={COMPAT_OPTIONS}
                     />
                 </FormGroup>
 

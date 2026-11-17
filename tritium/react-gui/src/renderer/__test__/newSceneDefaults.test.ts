@@ -33,7 +33,8 @@ const CPP_DEFAULTS = {
 
 describe('newSceneDefaults', () => {
   it('expands the factory defaults to the C++ property defaults', () => {
-    expect(toInitialProps(FACTORY_NEW_SCENE_DEFAULTS)).toEqual(CPP_DEFAULTS)
+    // The look is not a scene property: a new scene gets the CueMol3 look.
+    expect(toInitialProps(FACTORY_NEW_SCENE_DEFAULTS)).toEqual({ ...CPP_DEFAULTS, look: 'cuemol3' })
   })
 
   it('reads a stored preference back', () => {
@@ -44,6 +45,7 @@ describe('newSceneDefaults', () => {
         aoPreset: 'high',
         bgcolor: '#ffffff',
         useColproof: true,
+        look: 'cuemol2',
       }),
     ).toEqual({
       aaPreset: 'ultra',
@@ -51,11 +53,12 @@ describe('newSceneDefaults', () => {
       aoPreset: 'high',
       bgcolor: '#ffffff',
       useColproof: true,
+      look: 'cuemol2',
     })
   })
 
-  it('falls back to the factory value for an unknown preset or a missing field', () => {
-    expect(sanitizeNewSceneDefaults({ aaPreset: 'gone', aoPreset: 'gone' })).toEqual(
+  it('falls back to the factory value for an unknown preset or look, or a missing field', () => {
+    expect(sanitizeNewSceneDefaults({ aaPreset: 'gone', aoPreset: 'gone', look: 'gone' })).toEqual(
       FACTORY_NEW_SCENE_DEFAULTS,
     )
     expect(sanitizeNewSceneDefaults({})).toEqual(FACTORY_NEW_SCENE_DEFAULTS)

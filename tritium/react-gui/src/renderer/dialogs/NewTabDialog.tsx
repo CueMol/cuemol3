@@ -1,8 +1,27 @@
+/**
+ * @file dialogs/NewTabDialog.tsx
+ * @description The New Tab/Window dialog: a new scene (with its name and the
+ * settings it starts with) or a new view of the current scene.
+ *
+ * Built from the form-kit catalog only: one `FieldGrid` whose groups are
+ * headed by the mode radios (`FieldGridRadioHeading`), each followed by that
+ * mode's options, indented under it. Every row shares one label column and one
+ * row height, so the controls of both groups line up. Spacing comes from the
+ * kit, not this file. The section of the mode not chosen stays visible but disabled.
+ */
+
 import React, { useState, useEffect } from 'react';
-import { Checkbox, FormGroup, InputGroup, Radio, RadioGroup } from '@blueprintjs/core';
 import { DialogShell } from './DialogShell';
 import { NewSceneSettingsFields } from './NewSceneSettingsFields';
 import type { NewSceneDefaults } from '@renderer/data/newSceneDefaults';
+import {
+    FieldGrid,
+    FieldGridRadioHeading,
+    FieldGridRow,
+    FieldSection,
+    SwitchField,
+    TextField,
+} from '@renderer/h3-kit/form';
 
 export type NewTabMode = 'new-scene' | 'new-view';
 
@@ -52,10 +71,6 @@ export function NewTabDialog({
         }
     }, [visible, defaultSceneName, defaultViewName, sceneDefaults]);
 
-    const handleModeChange = (e: React.FormEvent<HTMLInputElement>) => {
-        setMode(e.currentTarget.value as NewTabMode);
-    };
-
     const handleOk = () => {
         const name = mode === 'new-scene' ? sceneName.trim() : viewName.trim();
         onConfirm({
@@ -78,52 +93,50 @@ export function NewTabDialog({
             onCancel={onCancel}
             onOk={handleOk}
         >
-            <p style={{ marginBottom: 10, marginTop: 0 }}>Create new tab for:</p>
-            <RadioGroup selectedValue={mode} onChange={handleModeChange}>
-                <Radio value="new-scene" label="New Scene" />
-                <div style={{ paddingLeft: 24, marginBottom: 8 }}>
-                    <FormGroup label="Name:" inline labelFor="new-tab-scene-name" style={{ marginBottom: 0 }}>
-                        <InputGroup
-                            id="new-tab-scene-name"
+            <FieldSection title="Create new tab for">
+                <FieldGrid>
+                    <FieldGridRadioHeading
+                        name="new-tab-mode"
+                        label="New Scene"
+                        checked={mode === 'new-scene'}
+                        onSelect={() => setMode('new-scene')}
+                    />
+                    <FieldGridRow label="Name">
+                        <TextField
                             value={sceneName}
-                            onChange={(e) => setSceneName(e.target.value)}
+                            onChange={setSceneName}
                             disabled={mode !== 'new-scene'}
-                            style={{ width: 200 }}
                         />
-                    </FormGroup>
+                    </FieldGridRow>
                     <NewSceneSettingsFields
                         value={scene}
                         onChange={setScene}
                         disabled={mode !== 'new-scene'}
                     />
-                </div>
 
-                <Radio
-                    value="new-view"
-                    label={newViewLabel}
-                    disabled={!currentSceneName}
-                />
-                <div style={{ paddingLeft: 24, marginBottom: 8 }}>
-                    <FormGroup label="Name:" inline labelFor="new-tab-view-name" style={{ marginBottom: 0 }}>
-                        <InputGroup
-                            id="new-tab-view-name"
-                            value={viewName}
-                            onChange={(e) => setViewName(e.target.value)}
-                            disabled={mode !== 'new-view'}
-                            style={{ width: 200 }}
-                        />
-                    </FormGroup>
-                </div>
-
-                <div style={{ paddingLeft: 24 }}>
-                    <Checkbox
-                        label="Inherit view props"
-                        checked={inherit}
-                        onChange={(e) => setInherit(e.currentTarget.checked)}
-                        disabled={mode !== 'new-view'}
+                    <FieldGridRadioHeading
+                        name="new-tab-mode"
+                        label={newViewLabel}
+                        checked={mode === 'new-view'}
+                        disabled={!currentSceneName}
+                        onSelect={() => setMode('new-view')}
                     />
-                </div>
-            </RadioGroup>
+                    <FieldGridRow label="Name">
+                        <TextField
+                            value={viewName}
+                            onChange={setViewName}
+                            disabled={mode !== 'new-view'}
+                        />
+                    </FieldGridRow>
+                    <FieldGridRow label="Inherit view props">
+                        <SwitchField
+                            checked={inherit}
+                            onChange={setInherit}
+                            disabled={mode !== 'new-view'}
+                        />
+                    </FieldGridRow>
+                </FieldGrid>
+            </FieldSection>
         </DialogShell>
     );
 }

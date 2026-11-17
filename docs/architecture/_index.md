@@ -339,9 +339,10 @@ architecture, it belongs here.
   vertex = `defaultcolor`, separate per-mode target names,
   `setupParentData("multi_grad")` placement, `target` kept as an inert
   string) and the test map.
-- [CueMol3 専用のスタイルファイル (`cuemol3_style.xml`)](cuemol3-style-file.md) (日本語) --
-  CueMol3 は `sysconfig_cuemol3.xml` で `default_style.xml` の上に `cuemol3_style.xml` を重ねて読む。
-  上書きはプロパティ単位で、CueMol2 は `default_style.xml` だけを読むので見た目が変わらない。
+- [CueMol3 のスタイルファイルとシーンの Look (`cuemol3_style.xml` / `cuemol3_look.xml`)](cuemol3-style-file.md) (日本語) --
+  追加 (`cuemol3_style.xml`) は global に、既存スタイルの上書き (`cuemol3_look.xml`) はシーンごとの style set
+  として持つ。CueMol2 で作った qsc は CueMol2 の見た目のまま。qsc には `%%CONFDIR%%` 参照 (Ver 3.0) か埋め込み
+  (古い版向け) で書き、Legacy mode (New Tab / Settings / Scene Properties) で Look を切り替える。
 - [分子の既定の色分け (パレットのテーマ)](default-paint-palette.md) (日本語) -- 読み込んだ分子の
   PaintColoring: n 番目の分子が style で選んだテーマ (既定 Okabe-Ito) の n 番目の色を主色にし、
   核酸 / coil は NamedColor の修飾子で派生させる。使った色は scene の style set に複製して qsc に保存する。

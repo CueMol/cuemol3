@@ -20,6 +20,8 @@ export interface SaveSceneOptions {
     compress?: string;
     base64?: boolean;
     version?: string;
+    /** Target app version ('2.2' | '2.3' | '3.0'); see the writer's `compat`. */
+    compat?: string;
 }
 
 export interface SaveSceneArgs {
@@ -61,6 +63,10 @@ export function saveScene(ctx: WorkerContext, args: SaveSceneArgs): SaveSceneRes
 
     const writer = ctx.strMgr.createHandler('qsc_xml', 4) as SceneXMLWriter;
     writer.setDefaultOpts(scene);
+    // The C++ default target is the oldest version (an application style set
+    // such as `cuemol3_look` is embedded). CueMol3 writes for itself unless
+    // the scene remembers another choice (or the caller passes one).
+    if (!writer.compat) writer.compat = '3.0';
 
     const o = args.options;
     if (o) {
@@ -70,6 +76,7 @@ export function saveScene(ctx: WorkerContext, args: SaveSceneArgs): SaveSceneRes
         if (o.compress !== undefined) writer.compress = o.compress as unknown as number;
         if (o.base64 !== undefined) writer.base64 = o.base64;
         if (o.version !== undefined) writer.version = o.version;
+        if (o.compat !== undefined) writer.compat = o.compat;
     }
 
     writer.attach(scene);

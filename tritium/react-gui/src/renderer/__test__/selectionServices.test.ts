@@ -106,11 +106,15 @@ describe('saveSelDef', () => {
     it('creates the scene set named "default"', () => {
         // Not `user`: that name belongs to the global scope, where the user's
         // own stylesheet is loaded, and a scene-scoped set by the same name
-        // showed up as a second, unrelated `user` in the style list.
+        // showed up as a second, unrelated `user` in the style list. The look
+        // set is never written to, even when embedded (and so writable).
         const setStrData = vi.fn(() => true)
         const styleMgr = {
             getStyleSetsJSON: vi.fn(() =>
-                JSON.stringify([{ name: 'builtin', scene_id: 100, uid: 1, readonly: true }]),
+                JSON.stringify([
+                    { name: 'builtin', scene_id: 100, uid: 1, readonly: true },
+                    { name: 'cuemol3_look', scene_id: 100, uid: 2, readonly: false },
+                ]),
             ),
             hasStyleSet: vi.fn(() => 0),
             createStyleSet: vi.fn(() => 9),

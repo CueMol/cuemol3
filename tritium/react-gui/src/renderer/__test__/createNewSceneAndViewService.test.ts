@@ -15,6 +15,9 @@
  *   3. Enabling colour proofing seeds a profile when none is set -- the same
  *      pairing `toggleSceneColorProofing` holds, since proofing with no
  *      profile does nothing.
+ *   4. The CueMol3 look is the read-only `cuemol3_look` style set, loaded at
+ *      the lowest priority (appended) from its %%CONFDIR%% path -- also
+ *      outside any undo txn -- unless the look asked for is CueMol2.
  */
 
 import { describe, it, expect, vi } from 'vitest'
@@ -172,13 +175,14 @@ describe('applyInitialSceneProps', () => {
 })
 
 describe('createNewSceneAndView', () => {
-  it('applies the initial properties without opening an undo transaction', () => {
+  function create(look?: 'cuemol3' | 'cuemol2') {
     const { scene } = makeScene()
+    const loadStyleSetFromFileAt = vi.fn(() => 55)
     const ctx = makeWorkerCtx({
       scenes: [scene],
       extra: {
         sceMgr: { createScene: vi.fn(() => scene) },
-        styleMgr: { compileColor: vi.fn(() => color(255, 255, 255)) },
+        styleMgr: { compileColor: vi.fn(() => color(255, 255, 255)), loadStyleSetFromFileAt },
       },
     }).ctx as unknown as WorkerContext
 
@@ -186,13 +190,25 @@ describe('createNewSceneAndView', () => {
       dpr: 1,
       name: 'Untitled 1',
       bindView: false,
-      initialProps: { aoEnabled: true, bgcolor: '#ffffff' },
+      initialProps: { aoEnabled: true, bgcolor: '#ffffff', look },
     })
+    return { scene, loadStyleSetFromFileAt }
+  }
+
+  it('applies the initial properties and the look without opening an undo transaction', () => {
+    const { scene, loadStyleSetFromFileAt } = create('cuemol3')
 
     expect(scene.sets.aoEnabled).toHaveBeenCalledWith(true)
+    expect(loadStyleSetFromFileAt).toHaveBeenCalledWith(
+      100, '%%CONFDIR%%/data/cuemol3_look.xml', true, true,
+    )
     // An undo entry here would make the untouched scene read as modified.
     expect(scene.undo.started).toEqual([])
     expect(scene.undo.committed).toEqual([])
+  })
+
+  it('leaves the look set out for the CueMol2 look', () => {
+    expect(create('cuemol2').loadStyleSetFromFileAt).not.toHaveBeenCalled()
   })
 })
 

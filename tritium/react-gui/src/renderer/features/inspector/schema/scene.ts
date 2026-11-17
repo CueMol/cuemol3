@@ -4,8 +4,8 @@
  *
  * The Scene has no dedicated UXP property dialog -- its rendering settings
  * were only editable through the generic property tree. These pages surface
- * the meaningful subset (ambient occlusion / GTAO, post-process
- * anti-aliasing, background colour, CMYK colour proofing).
+ * the meaningful subset (the CueMol3 / CueMol2 look, ambient occlusion /
+ * GTAO, post-process anti-aliasing, background colour, CMYK colour proofing).
  *
  * The AO and AA pages are deliberately preset-only, one dropdown each: the
  * individual tuning knobs stay in the generic property tree, and a hand edit
@@ -19,6 +19,7 @@
 
 import { isOff } from './predicates'
 import { qualityPresetRow } from '@renderer/features/inspector/rows'
+import { SceneLookRow } from '@renderer/features/inspector/rows/SceneLookRow'
 import { SCENE_AA_QUALITY_AXIS, SCENE_AO_PRESET_AXIS } from '@renderer/data/sceneQualityPresets'
 import type { SchemaSectionDef } from './types'
 import type { PropMultiWrite } from '@renderer/features/inspector/rendererPropSections'
@@ -91,5 +92,13 @@ export const SCENE_SECTIONS: SchemaSectionDef[] = [
       { kind: 'text', key: 'icc_filename', label: 'Profile', placeholder: 'ICC profile' },
       { kind: 'mappedEnum', key: 'icc_intent', label: 'Intent', labels: ICC_INTENT_LABELS },
     ],
+  },
+  {
+    // The look is not a property but the scene's `cuemol3_look` style set:
+    // the row reads and switches it through its own worker services.
+    key: 'scene-compat',
+    title: 'Compatibility',
+    defaultExpanded: true,
+    rows: [{ kind: 'custom', key: 'scene-legacy-mode', Component: SceneLookRow }],
   },
 ]

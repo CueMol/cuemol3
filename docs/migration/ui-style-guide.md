@@ -47,6 +47,8 @@ Blueprint の portal (popover / dialog) に dark テーマを効かせる `porta
 |---|---|---|
 | `FieldSection` | **pane 内の最上位グループ** (`title` = グループ見出し + 任意の中身) | title は `.type-group-label` role, section 間 gap は親 container の `gap: --form-section-gap` |
 | `Field` | label + control の1行 (stack / `inline` / `inline controlFirst` / `inline fill`) — **下位ラベル**。`inline fill` は control がラベルの右の残り幅を全部使う (SliderField の行と同じ並び。slider 行と並ぶ `DragNumericField` など) | 行 padding `--field-row-pad`, label↔control gap `--field-label-gap`, label は `.type-label` |
+| `FieldGrid` / `FieldGridRow` | ラベル列を共有する 2 列の行 (ラベル左・control 右で、全行の control の左端が揃う)。`FieldSection` の直下に置くと見出しが 1 行分の高さになり、見出し -> 1 行目も行の間隔と同じになる。switch の行も text / select の行と同じ高さ | `.h3-form-grid*` (`_form-kit.css`), 行間 `--form-row-gap` |
+| `FieldGridRadioHeading` | grid の中の、**それ自体がラジオの選択肢であるグループ見出し** (New Tab の New Scene / New View)。下の行はその選択肢のオプションで、ラベルはラジオの文字の位置まで字下げされる。複数グループが 1 つのラベル列を共有するので control が揃う。2 つ目以降の見出しの上は section gap | `.h3-form-grid-radio-heading` (`_form-kit.css`), 高 `--field-h` |
 | `FieldGroup` | Field の縦スタック / セクション (任意で `title` → 重い `SectionHeader` バー) | 行間 `--form-row-gap`, section 間 `--form-section-gap` |
 | `SectionHeader` | サブセクション見出し**バー** (背景tint+下線, 大文字) | `.section-header` role (高 `--ctrl-h-md`) |
 | `TextField` | 単一行テキスト入力 (任意 `leftIcon` = フィルタ/検索、`password` で伏字 = API キー等) | 高 `--field-h` (22px) |

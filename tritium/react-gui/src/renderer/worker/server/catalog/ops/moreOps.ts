@@ -176,7 +176,9 @@ export const saveSceneOp = defineOp({
     const options = {
       ...(args.embedAll !== null ? { embedAll: args.embedAll } : {}),
       ...(version !== null ? { version } : {}),
-      ...(version === 'QDF0' ? { compress: 'none', base64: false } : {}),
+      // QDF0 is for CueMol 2.2, which cannot expand %%CONFDIR%%: embed the
+      // application style sets (the scene's look) too.
+      ...(version === 'QDF0' ? { compress: 'none', base64: false, compat: '2.2' } : {}),
       ...(args.compress !== null ? { compress: args.compress } : {}),
       ...(args.base64 !== null ? { base64: args.base64 } : {}),
     }

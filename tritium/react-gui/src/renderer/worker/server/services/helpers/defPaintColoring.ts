@@ -32,6 +32,11 @@
  * still resolves it, and changing the global value later leaves a saved scene
  * as it was.
  *
+ * A scene with the CueMol2 (legacy) look (no `cuemol3_look` style set, e.g.
+ * one made by CueMol2) is painted as CueMol2 paints it instead: the four
+ * fixed colours of UXP `renderer.js`, standard colour names that need no
+ * palette nor a copy into the scene's style set.
+ *
  * Runs in the Web Worker thread; C++ wrappers are called synchronously.
  */
 import type { PaintColoring } from '@cuemol/core/src/wrappers/PaintColoring';
@@ -41,6 +46,7 @@ import { makeColor } from './makeColor';
 import { ensureWritableSceneSet } from '@renderer/worker/server/services/select/saveSelDef';
 import { listSceneObjects } from '@renderer/worker/server/services/scene/listSceneObjects';
 import { isMoleculeClass } from '@renderer/worker/shared/objectClasses';
+import { sceneLookOf } from '@renderer/worker/server/services/scene/sceneLook';
 
 const log = console;
 
@@ -59,6 +65,14 @@ const DEFAULT_PAINT_ENTRIES: { sel: string; modifier: string }[] = [
     { sel: 'helix', modifier: '' },
     { sel: 'nucleic', modifier: '{mod_h:15}' },
     { sel: '*', modifier: '{mod_s:-0.6;mod_b:0.1}' },
+];
+
+/** CueMol2's default paint (UXP `renderer.js` `createDefPaintColoring`). */
+const LEGACY_PAINT_ENTRIES: { sel: string; color: string }[] = [
+    { sel: 'sheet', color: 'SteelBlue' },
+    { sel: 'helix', color: 'khaki' },
+    { sel: 'nucleic', color: 'yellow' },
+    { sel: '*', color: 'FloralWhite' },
 ];
 
 /** `#rrggbb` from 0-255 components. */
@@ -146,12 +160,24 @@ function ensureSceneColor(ctx: WorkerContext, sceneUid: number, name: string): v
  * @param molUid - the molecule painted, which picks its palette colour.
  * @returns the coloring, or null when the object, any selection, or the
  *   palette could not be had (the caller then leaves the coloring alone).
+ * @remarks Follows the scene's look: the palette for CueMol3, CueMol2's four
+ *   fixed colours for the legacy look.
  */
 export function createDefPaintColoring(
     ctx: WorkerContext,
     sceneUid: number,
     molUid: number,
 ): PaintColoring | null {
+    if (sceneLookOf(ctx, sceneUid) === 'cuemol2') {
+        const legacy = ctx.svc.createObj('PaintColoring') as PaintColoring;
+        if (!legacy) return null;
+        for (const entry of LEGACY_PAINT_ENTRIES) {
+            const sel = makeSel(ctx, entry.sel, sceneUid);
+            if (!sel) return null;
+            legacy.append(sel, makeColor(ctx, entry.color, sceneUid));
+        }
+        return legacy;
+    }
     const theme = currentTheme(ctx, sceneUid);
     if (theme.length === 0) return null;
     const coloring = ctx.svc.createObj('PaintColoring') as PaintColoring;

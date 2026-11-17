@@ -723,9 +723,17 @@ namespace qsys {
   private:
     qlib::LDom2Node *m_pQscOpts;
 
+    /// Write a style set loaded from the config dir as a %%CONFDIR%%
+    /// reference (true) or embed its contents (false). Set by the qsc writer
+    /// for the version it writes for; not persisted.
+    bool m_bStyleConfRef = false;
+
   public:
     void setQscOpts(qlib::LDom2Node *ptree);
     qlib::LDom2Node *getQscOpts() const { return m_pQscOpts; }
+
+    void setStyleConfRef(bool b) { m_bStyleConfRef = b; }
+    bool isStyleConfRef() const { return m_bStyleConfRef; }
 
     ////////////////////////////////////////////////////////////
     // Misc operations

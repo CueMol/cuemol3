@@ -1,7 +1,9 @@
 /**
  * @file dialogs/NewSceneSettingsFields.tsx
- * @description The New Tab dialog's "Scene settings" rows: what a new scene
- * starts out looking like.
+ * @description The New Tab dialog's scene-settings rows: what a new scene
+ * starts out looking like. `FieldGridRow`s only; the dialog puts them in the
+ * "New scene" section's grid, under the scene's name, so all the labels share
+ * one column.
  *
  * The two quality rows offer the same preset ladders as the Scene inspector
  * (`data/sceneQualityPresets`), so a setting chosen here and the one read back
@@ -14,8 +16,7 @@ import React from 'react'
 import { ColorPickerProvider } from '@renderer/h3-kit/colorpicker'
 import {
   ColorField,
-  Field,
-  FieldSection,
+  FieldGridRow,
   SelectField,
   SwitchField,
 } from '@renderer/h3-kit/form'
@@ -53,8 +54,8 @@ export const NewSceneSettingsFields: React.FC<NewSceneSettingsFieldsProps> = ({
   const patch = (part: Partial<NewSceneDefaults>): void => onChange({ ...value, ...part })
 
   return (
-    <FieldSection title="Scene settings">
-      <Field label="Anti-aliasing">
+    <>
+      <FieldGridRow label="Anti-aliasing">
         <SelectField
           value={value.aaPreset}
           disabled={disabled}
@@ -66,9 +67,9 @@ export const NewSceneSettingsFields: React.FC<NewSceneSettingsFieldsProps> = ({
             </option>
           ))}
         </SelectField>
-      </Field>
+      </FieldGridRow>
 
-      <Field label="Ambient occlusion">
+      <FieldGridRow label="Ambient occlusion">
         <SelectField
           value={value.aoEnabled ? value.aoPreset : AO_OFF}
           disabled={disabled}
@@ -83,9 +84,9 @@ export const NewSceneSettingsFields: React.FC<NewSceneSettingsFieldsProps> = ({
             </option>
           ))}
         </SelectField>
-      </Field>
+      </FieldGridRow>
 
-      <Field label="Background">
+      <FieldGridRow label="Background">
         <ColorPickerProvider cm={cm} sceneId={undefined}>
           <ColorField
             value={value.bgcolor}
@@ -94,15 +95,23 @@ export const NewSceneSettingsFields: React.FC<NewSceneSettingsFieldsProps> = ({
             onCommit={(v) => patch({ bgcolor: v })}
           />
         </ColorPickerProvider>
-      </Field>
+      </FieldGridRow>
 
-      <Field label="CMYK color proofing" inline>
+      <FieldGridRow label="CMYK color proofing">
         <SwitchField
           checked={value.useColproof}
           disabled={disabled}
           onChange={(checked) => patch({ useColproof: checked })}
         />
-      </Field>
-    </FieldSection>
+      </FieldGridRow>
+
+      <FieldGridRow label="Legacy mode (CueMol2 look)">
+        <SwitchField
+          checked={value.look === 'cuemol2'}
+          disabled={disabled}
+          onChange={(checked) => patch({ look: checked ? 'cuemol2' : 'cuemol3' })}
+        />
+      </FieldGridRow>
+    </>
   )
 }

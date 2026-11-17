@@ -118,10 +118,10 @@ namespace qsys {
     
     qlib::uid_t hasStyleSet(const LString &id, qlib::uid_t ctxt);
 
-    /// Add new style to the last of the style set
+    /// Add new style set at the front (highest priority) of the scope
     StyleSetPtr createStyleSet(const LString &id, qlib::uid_t ctxt);
     
-    /// Add new style to the last of the style set (scripting interface)
+    /// Add new style set at the front of the scope (scripting interface)
     qlib::uid_t createStyleSetScr(const LString &id, qlib::uid_t ctxt);
     
     /// Register existing style set object at nord (for Undo/Redo)
@@ -149,6 +149,12 @@ namespace qsys {
 
     /// Load styleset from file and returns styleset UID (impl: StyleMgrStyleImpl.cpp)
     qlib::uid_t loadStyleSetFromFile(qlib::uid_t nScopeID, const LString &path, bool bReadOnly);
+
+    /// Load styleset from file, at the front (highest priority) of the scope or,
+    /// with bAppend, at the end (lowest priority). The path may start with
+    /// %%CONFDIR%%. Returns the styleset UID (impl: StyleMgrStyleImpl.cpp)
+    qlib::uid_t loadStyleSetFromFileAt(qlib::uid_t nScopeID, const LString &path,
+                                       bool bReadOnly, bool bAppend);
 
     /// Retrieve info for style sets of the scene
     LString getStyleSetsJSON(qlib::uid_t nSceneID);

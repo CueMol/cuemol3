@@ -9,7 +9,9 @@
  * stores. And the colour used is copied into the scene's own style set from
  * its global value, only where the scene has no definition yet: the copy is
  * what lets an older CueMol resolve the name, and overwriting would undo the
- * user's recolouring of the scene.
+ * user's recolouring of the scene. A scene with the CueMol2 (legacy) look
+ * (no `cuemol3_look` style set) is painted with CueMol2's four fixed colours
+ * instead, and nothing is copied into it.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -29,8 +31,11 @@ import { createDefPaintColoring } from './defPaintColoring'
 /** Global themes: okabeito with two colours, tolbright with three (#0n0000 for the n-th). */
 const GLOBAL = ['okabeito_1', 'okabeito_2', 'tolbright_3', 'tolbright_1', 'tolbright_2', 'Red']
 
-/** A context whose style names `theme` and whose scene defines `sceneNames`. */
-function makeCtx(theme: string, sceneNames: string[] = []) {
+/**
+ * A context whose style names `theme` and whose scene defines `sceneNames`;
+ * the scene has the CueMol3 look unless `legacy`.
+ */
+function makeCtx(theme: string, sceneNames: string[] = [], legacy = false) {
   const append = vi.fn()
   const setColor = vi.fn()
   const ctx = {
@@ -43,6 +48,8 @@ function makeCtx(theme: string, sceneNames: string[] = []) {
         return { r: () => n, g: () => 0, b: () => 0 }
       },
       setColor,
+      // The uid of the scene's `cuemol3_look` set (0 = none).
+      hasStyleSet: (name: string) => (name === 'cuemol3_look' && !legacy ? 99 : 0),
     },
   } as unknown as WorkerContext
   return { ctx, append, setColor }
@@ -95,5 +102,17 @@ describe('the default painting', () => {
     const recoloured = makeCtx('okabeito', ['okabeito_2'])
     createDefPaintColoring(recoloured.ctx, 1, 20)
     expect(recoloured.setColor).not.toHaveBeenCalled()
+  })
+
+  it('paints a legacy-look scene with the CueMol2 colours and copies nothing', () => {
+    const legacy = makeCtx('okabeito', [], true)
+    createDefPaintColoring(legacy.ctx, 1, 20)
+    expect(painted(legacy.append)).toEqual({
+      sheet: 'SteelBlue',
+      helix: 'khaki',
+      nucleic: 'yellow',
+      '*': 'FloralWhite',
+    })
+    expect(legacy.setColor).not.toHaveBeenCalled()
   })
 })

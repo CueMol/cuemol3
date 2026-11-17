@@ -374,6 +374,7 @@ assert_file() {
 }
 assert_file "$RUNTIME_DEST/share/sysconfig_cuemol3.xml"
 assert_file "$RUNTIME_DEST/share/data/cuemol3_style.xml"
+assert_file "$RUNTIME_DEST/share/data/cuemol3_look.xml"
 assert_file "$RUNTIME_DEST/bin/$BLENDPNG_EXE"
 assert_file "$STAGING_DEST/@cuemol/core/package.json"
 assert_file "$STAGING_DEST/@cuemol/core/src/index.cjs"

@@ -16,6 +16,7 @@ import { listSceneObjects } from './listSceneObjects';
 import { proposeNewTabNames } from './proposeNewTabNames';
 import { proposeUniqName } from './proposeUniqName';
 import { getSceneSaveInfo, saveScene } from './saveScene';
+import { getSceneLook, setSceneLook } from './sceneLook';
 import { getSceneBgColor, getSceneColorProofing, setSceneBgColor, toggleSceneColorProofing } from './sceneBgColor';
 
 export const services = {
@@ -36,6 +37,8 @@ export const services = {
     setSceneBgColor,
     getSceneColorProofing,
     toggleSceneColorProofing,
+    getSceneLook,
+    setSceneLook,
 };
 
 export type * from './createNewSceneAndView';
@@ -49,3 +52,4 @@ export type * from './proposeNewTabNames';
 export type * from './proposeUniqName';
 export type * from './saveScene';
 export type * from './sceneBgColor';
+export type * from './sceneLook';

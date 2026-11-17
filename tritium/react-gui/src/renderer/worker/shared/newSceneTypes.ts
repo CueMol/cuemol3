@@ -8,6 +8,8 @@
  * optional: an absent one leaves the C++ default alone.
  */
 
+import type { SceneLook } from './sceneLook'
+
 export interface NewSceneInitialProps {
   /** Post-process AA method: 'none' | 'fxaa' | 'smaa' (a C++ enum, by id). */
   aa_method?: string
@@ -22,4 +24,9 @@ export interface NewSceneInitialProps {
   bgcolor?: string
   /** CMYK colour proofing; enabling it also seeds a profile when none is set. */
   use_colproof?: boolean
+  /**
+   * The scene's look: 'cuemol3' loads the `cuemol3_look` style set into it,
+   * 'cuemol2' leaves it out. Not a scene property; absent means 'cuemol3'.
+   */
+  look?: SceneLook
 }

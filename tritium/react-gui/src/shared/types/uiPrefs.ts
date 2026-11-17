@@ -53,6 +53,8 @@ export interface NewSceneDefaultsPrefs {
   bgcolor?: string
   /** CMYK colour proofing. */
   useColproof?: boolean
+  /** The look of a new scene: 'cuemol3' | 'cuemol2' (legacy). */
+  look?: string
 }
 
 /** Miscellaneous UI preferences exchanged with the main process. */

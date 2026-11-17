@@ -16,6 +16,24 @@ Okabe-Ito。
   ユーザーが編集した paint などが黙って消える (UXP も New Renderer では `result.new_obj = false`)。
 - coloring パネル / renderer メニューの Paint coloring -> Default (`applyColoring.ts` の `paint-type-paint`)
 
+## シーンの Look による分岐
+
+パレットで塗るのは、シーンの Look が CueMol3 (scene の style set に `cuemol3_look` がある) のときだけ
+([cuemol3-style-file.md](cuemol3-style-file.md) の「シーンの Look」)。Look が CueMol2 (Legacy mode。CueMol2 で
+作った qsc や、Legacy mode で作ったシーン) のときは、UXP と同じ固定の 4 色で塗る (`LEGACY_PAINT_ENTRIES`):
+
+| sel | 色 |
+|---|---|
+| `sheet` | `SteelBlue` |
+| `helix` | `khaki` |
+| `nucleic` | `yellow` |
+| `*` (coil など) | `FloralWhite` |
+
+- どれも CueMol2 にもある標準の色名なので、`default_paint` パレットを引かず、scene の style set への色の
+  コピー (`ensureSceneColor`) もしない。
+- 分岐は `createDefPaintColoring` の中にあり、2 つの呼び出し元の両方に効く。Look を切り替えても、塗り済みの
+  分子の色は変わらない (以後に読む分子と Paint -> Default に効く)。
+
 ## テーマ
 
 `data/cuemol3_style.xml` (CueMol3 だけが読む。[cuemol3-style-file.md](cuemol3-style-file.md)) に、テーマごとに `<テーマ名>_<番号>` の named color で定義する。

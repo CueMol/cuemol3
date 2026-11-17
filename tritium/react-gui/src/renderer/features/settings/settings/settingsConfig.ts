@@ -58,6 +58,7 @@ export const CATEGORY_TREE: CategoryNode[] = [
       { id: 'display.theme',      label: 'Theme',       icon: 'settings.theme',      children: [] },
       { id: 'display.atomLabels', label: 'Atom Labels',  icon: 'settings.atomLabels', children: [] },
       { id: 'display.rendering',  label: 'Rendering',    icon: 'settings.rendering',  children: [] },
+      { id: 'display.compatibility', label: 'Compatibility', icon: 'settings.display', children: [] },
     ],
   },
   {
@@ -261,6 +262,18 @@ export const SETTINGS: SettingDef[] = [
     category: 'input.mouse',
     control: { kind: 'number', min: 1, max: 50, step: 1, unit: 'px' },
   },
+  // --- Display > Compatibility ---
+  {
+    key: 'newScene.legacyMode',
+    label: 'Legacy mode for new scenes',
+    description:
+      'Create new scenes with the CueMol2 look: its ribbon and base sizes and its default ' +
+      'colours. Off: the CueMol3 look (slimmer ribbons, palette colours). Also offered in the ' +
+      'New Tab dialog. A scene already open is switched in its Scene properties (Compatibility).',
+    category: 'display.compatibility',
+    control: { kind: 'toggle' },
+  },
+
   // --- General > Files ---
   {
     key: 'files.dropTarget',
@@ -439,6 +452,9 @@ export const PICKING_PREF_SETTING_KEYS: Record<string, keyof PickingPrefs> = {
 // Backed by FileOpenPrefsContext (electron-store). One key per entry point
 // that carries an expectation of its own; the in-app File > Open paths have
 // no row because they always use the current scene.
+
+/** Setting key of `NewSceneDefaults.look` (contexts/NewSceneDefaultsContext), as a switch. */
+export const NEW_SCENE_LEGACY_SETTING_KEY = 'newScene.legacyMode'
 
 export const DROP_TARGET_SETTING_KEY = 'files.dropTarget'
 export const SHELL_TARGET_SETTING_KEY = 'files.shellTarget'

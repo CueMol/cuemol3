@@ -35,6 +35,9 @@ namespace qsys {
     
     int m_nVersion;
 
+    /// Target app version (see the compat property)
+    LString m_strCompat;
+
     //////////
 
   public:
@@ -101,6 +104,13 @@ namespace qsys {
     }
     /// Set version (in integer)
     void setNumVersion(int n) { m_nVersion = n; }
+
+    /// Target app version ("2.3", "3.0", ...; empty = the oldest)
+    LString getCompat() const { return m_strCompat; }
+    void setCompat(const LString &s) { m_strCompat = s; }
+
+    /// True when the target version expands %%CONFDIR%% in a style src (3.0 or later)
+    bool isConfRefCompat() const;
 
     void setDefaultOpts(ScenePtr pScene);
 

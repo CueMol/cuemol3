@@ -98,8 +98,49 @@
   text-overflow: ellipsis;
 }
 
+/* A group heading inside the grid (FieldGridRadioHeading): spans both columns.
+   One heading following rows gets the section gap on top of the row gap, so
+   groups read apart exactly as sibling FieldSections do. */
+.h3-form-grid-heading {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.h3-form-grid-heading:not(:first-child) {
+  margin-top: var(--form-section-gap);
+}
+
+/* A FieldSection title over a grid is as high as one of the grid's rows, so
+   the title -> first row distance is the same row pitch as between rows (the
+   grid rows carry no padding of their own, unlike a Field row). */
+.h3-form-field-section-head:has(+ .h3-form-grid) {
+  min-height: var(--field-h);
+}
+
+/* A radio heading is as high as the grid's rows (a text / select row), so the
+   space above and below it matches the rhythm of the rows it heads. */
+.h3-form-grid-radio-heading .bp5-control.bp5-radio {
+  min-height: var(--field-h);
+}
+
+/* FieldGridRadioHeading: the rows under radio headings are that choice's
+   options, so their labels start at the radio's text (circle + its gap; see
+   the .h3-form-radio-group indicator rule). */
+.h3-form-grid:has(> .h3-form-grid-radio-heading) .h3-form-grid-label {
+  padding-left: calc(var(--icon-md) + var(--space-2));
+}
+
 .h3-form-grid-control {
   min-width: 0;
+}
+
+/* A row holding a switch is as high as a text / select row, so it keeps the
+   grid's rhythm instead of collapsing to the pill's height. Scoped to the
+   switch: rows of compact controls (numeric cells) keep their own height. */
+.h3-form-grid-control:has(> .h3-form-switch) {
+  min-height: var(--field-h);
+  display: flex;
+  align-items: center;
 }
 
 .h3-form-field-label {
