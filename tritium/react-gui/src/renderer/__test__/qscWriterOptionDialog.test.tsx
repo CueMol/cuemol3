@@ -1,8 +1,9 @@
 /**
  * Pins two contracts of the scene save option dialog:
  *
- * 1. The default format is QDF1 ("Ver 2.3 or later") with compression live
- *    and set to xz -- a deliberate divergence from UXP
+ * 1. The default is "Ver 3.0 or later" (QDF1, compat 3.0: the scene's
+ *    CueMol3 look is written as a %%CONFDIR%% reference) with compression
+ *    live and set to xz -- a deliberate divergence from UXP
  *    qscwriter-option-dlg.js onLoad, which defaults to QDF0 and thereby
  *    forces every straight-through save to be uncompressed.
  * 2. The QDF0 disable rule from UXP qscwriter-option-dlg.js:34-49 -- when the
@@ -70,7 +71,7 @@ describe('QscWriterOptionDialog', () => {
         )
     }
 
-    it('defaults to QDF1 with xz compression live and embedAll=false', async () => {
+    it('defaults to Ver 3.0 (QDF1) with xz compression live and embedAll=false', async () => {
         const handle = mount()
         await flushPromises()
 
@@ -89,6 +90,7 @@ describe('QscWriterOptionDialog', () => {
         expect(captured).toEqual({
             embedAll: false,
             version: 'QDF1',
+            compat: '3.0',
             compress: 'xzip',
             base64: false,
         })
@@ -115,20 +117,21 @@ describe('QscWriterOptionDialog', () => {
         expect(captured).toEqual({
             embedAll: false,
             version: 'QDF1',
+            compat: '3.0',
             compress: 'gzip',
             base64: false,
         })
         handle.unmount()
     })
 
-    it('disables and coerces compress / base64 when switched to QDF0', async () => {
+    it('disables and coerces compress / base64 when switched to Ver 2.2 (QDF0)', async () => {
         const handle = mount()
         await flushPromises()
 
         const versionSelect = findSelectByLabel(document.body, 'Compatibility')
         expect(versionSelect).toBeTruthy()
         await act(async () => {
-            versionSelect!.value = 'QDF0'
+            versionSelect!.value = '2.2'
             versionSelect!.dispatchEvent(new Event('change', { bubbles: true }))
         })
         await flushPromises()
@@ -146,6 +149,7 @@ describe('QscWriterOptionDialog', () => {
         expect(captured).toEqual({
             embedAll: false,
             version: 'QDF0',
+            compat: '2.2',
             compress: 'none',
             base64: false,
         })

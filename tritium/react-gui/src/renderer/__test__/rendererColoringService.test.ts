@@ -126,7 +126,7 @@ function makeFixture(opts: MakeFixtureOpts = {}) {
         svc: { createObj },
         // No theme named: okabeito, which the scene already defines, so the
         // paint copies nothing.
-        styleMgr: { getStyleNamesJSON, getStrData: () => '', getColorDefsJSON: () => JSON.stringify(['okabeito_1', 'okabeito_2']) },
+        styleMgr: { getStyleNamesJSON, getStrData: () => '', getColorDefsJSON: () => JSON.stringify(['okabeito_1', 'okabeito_2']), hasStyleSet: () => 99 },
     } as unknown as WorkerContext
 
     return {
@@ -746,7 +746,7 @@ function makeRichFixture(opts: MakeRichOpts) {
     const ctx = {
         sceMgr: { getScene: vi.fn(() => (sceneExists ? scene : null)) },
         svc: { createObj },
-        styleMgr: { getStyleNamesJSON: vi.fn(() => '[]'), getStrData: () => '', getColorDefsJSON: () => JSON.stringify(['okabeito_1', 'okabeito_2']) },
+        styleMgr: { getStyleNamesJSON: vi.fn(() => '[]'), getStrData: () => '', getColorDefsJSON: () => JSON.stringify(['okabeito_1', 'okabeito_2']), hasStyleSet: () => 99 },
     } as unknown as WorkerContext
 
     return { ctx, scene, rendWrappers, startUndoTxn, commitUndoTxn }
@@ -1548,7 +1548,7 @@ function makeElepotFixture(opts: ElepotRendOpts = {}) {
     const ctx = {
         sceMgr: { getScene: vi.fn(() => scene) },
         svc: { createObj: vi.fn() },
-        styleMgr: { getStyleNamesJSON: vi.fn(() => '[]'), getStrData: () => '', getColorDefsJSON: () => JSON.stringify(['okabeito_1', 'okabeito_2']) },
+        styleMgr: { getStyleNamesJSON: vi.fn(() => '[]'), getStrData: () => '', getColorDefsJSON: () => JSON.stringify(['okabeito_1', 'okabeito_2']), hasStyleSet: () => 99 },
     } as unknown as WorkerContext
 
     return { ctx, scene, rend, setProp, props }

@@ -33,6 +33,7 @@ const STORED = {
   aoPreset: 'high',
   bgcolor: '#ffffff',
   useColproof: true,
+  look: 'cuemol2' as const,
 }
 
 let api: ReturnType<typeof setupElectronAPI>

@@ -6,6 +6,7 @@ import { createInitialView } from '@renderer/worker/server/services/helpers/crea
 import { makeColor } from '@renderer/worker/server/services/helpers/makeColor';
 import { syncCurrentCam } from '@renderer/worker/server/services/camera/currentCam';
 import { DEFAULT_ICC_PROFILE } from './sceneBgColor';
+import { addLookSet } from './sceneLook';
 
 const log = console;
 
@@ -141,6 +142,15 @@ export function createNewSceneAndView(
         applyInitialSceneProps(ctx, scene, args.initialProps);
     }
     const scene_uid = scene.getUID();
+    if (args.initialProps?.look !== 'cuemol2') {
+        // The CueMol3 look, outside any undo txn like the props above: the
+        // new scene must stay unmodified (`isSceneJustCreated`).
+        try {
+            addLookSet(ctx, scene_uid);
+        } catch (e) {
+            log.warn('[worker] could not load the CueMol3 look style set:', e);
+        }
+    }
     const { view_uid, view_name } = createInitialView(ctx, scene, args.dpr, args.bindView !== false);
     // The scene has its live view point from the start (outside any undo txn,
     // and C++ never records "__current" anyway).

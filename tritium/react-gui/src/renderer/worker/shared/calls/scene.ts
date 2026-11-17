@@ -59,6 +59,12 @@ import type {
   SceneColorProofingResult,
   SetSceneBgColorArgs,
 } from '@renderer/worker/server/services/scene/sceneBgColor'
+import type {
+  GetSceneLookResult,
+  SceneLookArgs,
+  SetSceneLookArgs,
+  SetSceneLookResult,
+} from '@renderer/worker/server/services/scene/sceneLook'
 
 export interface SceneCalls {
   createNewSceneAndView:      { args: CreateNewSceneAndViewArgs; result: CreateNewSceneAndViewResult }
@@ -78,6 +84,8 @@ export interface SceneCalls {
   getSceneColorProofing:      { args: SceneColorProofingArgs; result: SceneColorProofingResult }
   toggleSceneColorProofing:   { args: SceneColorProofingArgs; result: SceneColorProofingResult }
   listSceneObjects:           { args: ListSceneObjectsArgs; result: ListSceneObjectsResult }
+  getSceneLook:               { args: SceneLookArgs; result: GetSceneLookResult }
+  setSceneLook:               { args: SetSceneLookArgs; result: SetSceneLookResult }
 }
 
 export const SCENE_KEYS = [
@@ -98,4 +106,6 @@ export const SCENE_KEYS = [
   'getSceneColorProofing',
   'toggleSceneColorProofing',
   'listSceneObjects',
+  'getSceneLook',
+  'setSceneLook',
 ] as const satisfies readonly (keyof SceneCalls)[]

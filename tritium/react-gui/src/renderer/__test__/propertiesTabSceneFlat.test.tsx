@@ -17,6 +17,11 @@ import { mountTree } from '@renderer/__test__/helpers/testHarness'
 import { PropertiesTab } from '@renderer/features/inspector/PropertiesTab'
 import type { GenericPropEntry } from '@renderer/worker/shared/genericProps'
 
+// The Compatibility page's Legacy mode switch reads the look through useCueMol.
+vi.mock('@renderer/hooks/cuemol/useCueMol', () => ({
+  useCueMol: () => ({ cm: null, cueMolReady: false }),
+}))
+
 void React
 
 function entry(key: string, type: string, value: unknown): GenericPropEntry {

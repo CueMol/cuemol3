@@ -11,13 +11,19 @@
  *
  * `FACTORY_NEW_SCENE_DEFAULTS` must read as the C++ defaults (Scene.qif) --
  * the same contract the preset axes carry -- so that a user who has never
- * touched the dialog gets exactly the scene they got before it existed.
+ * touched the dialog gets exactly the scene they got before it existed. The
+ * look is not a scene property; its factory value is the CueMol3 look.
  */
 
 import type { NewSceneInitialProps } from '@renderer/worker/shared/newSceneTypes'
 import type { NewSceneDefaultsPrefs } from '@shared/types/uiPrefs'
 import type { RenderQualityAxis } from './renderSettings'
 import { SCENE_AA_QUALITY_AXIS, SCENE_AO_PRESET_AXIS } from './sceneQualityPresets'
+import {
+  DEFAULT_SCENE_LOOK,
+  isSceneLook,
+  type SceneLook,
+} from '@renderer/worker/shared/sceneLook'
 
 export interface NewSceneDefaults {
   /** Step id of `SCENE_AA_QUALITY_AXIS`. */
@@ -28,6 +34,8 @@ export interface NewSceneDefaults {
   /** A CueMol colour string. */
   bgcolor: string
   useColproof: boolean
+  /** The scene's look (the `cuemol3_look` style set or not). */
+  look: SceneLook
 }
 
 /** = the C++ property defaults (Scene.qif). */
@@ -37,6 +45,7 @@ export const FACTORY_NEW_SCENE_DEFAULTS: NewSceneDefaults = {
   aoPreset: SCENE_AO_PRESET_AXIS.defaultStep,
   bgcolor: '#000000',
   useColproof: false,
+  look: DEFAULT_SCENE_LOOK,
 }
 
 function presetOr(axis: RenderQualityAxis, id: unknown): string {
@@ -66,6 +75,7 @@ export function sanitizeNewSceneDefaults(prefs?: NewSceneDefaultsPrefs): NewScen
       typeof prefs.useColproof === 'boolean'
         ? prefs.useColproof
         : FACTORY_NEW_SCENE_DEFAULTS.useColproof,
+    look: isSceneLook(prefs.look) ? prefs.look : FACTORY_NEW_SCENE_DEFAULTS.look,
   }
 }
 
@@ -79,5 +89,6 @@ export function toInitialProps(defaults: NewSceneDefaults): NewSceneInitialProps
     aoEnabled: defaults.aoEnabled,
     bgcolor: defaults.bgcolor,
     use_colproof: defaults.useColproof,
+    look: defaults.look,
   }
 }

@@ -3,8 +3,9 @@
  * `type === "scene"`).
  *
  * Pins:
- *   - the registry resolves `type_name === "scene"` to the four curated
- *     sections (Ambient occlusion / Anti-aliasing / Background / Color proofing);
+ *   - the registry resolves `type_name === "scene"` to the curated sections
+ *     (Ambient occlusion / Anti-aliasing / Background / Color proofing /
+ *     Compatibility);
  *   - the AO/AA sections are preset-only: AO renders Enabled + Preset, AA
  *     renders Quality, and none of the individual tuning knobs (radius /
  *     intensity / slices / steps / half-res / method / jitter /
@@ -117,13 +118,14 @@ describe('Scene section registry', () => {
   // The registry is keyed by the typeLabel PropertiesTab receives as
   // `rendererType` -- genericProps `typeLabelOf` returns "Scene" for a scene
   // node, NOT the lowercase tree node type.
-  it('resolves the scene typeLabel "Scene" to the four curated sections', () => {
+  it('resolves the scene typeLabel "Scene" to the curated sections', () => {
     const sections = getRendererPropSections('Scene')
     expect(sections.map((s) => s.title)).toEqual([
       'Ambient occlusion',
       'Anti-aliasing',
       'Background',
       'Color proofing',
+      'Compatibility',
     ])
   })
 })

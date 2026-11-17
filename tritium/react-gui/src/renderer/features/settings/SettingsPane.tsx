@@ -38,6 +38,7 @@ import { useViewInputConfig } from '@renderer/contexts/ViewInputConfigContext'
 import { useAppSettings } from '@renderer/contexts/AppSettingsContext'
 import { usePickingPrefs } from '@renderer/contexts/PickingPrefsContext'
 import { useFileOpenPrefs } from '@renderer/contexts/FileOpenPrefsContext'
+import { useNewSceneDefaults } from '@renderer/contexts/NewSceneDefaultsContext'
 import {
   OPEN_FILE_TARGET_LABELS,
   openFileTargetFromLabel,
@@ -63,6 +64,7 @@ import {
   PICKING_PREF_SETTING_KEYS,
   DROP_TARGET_SETTING_KEY,
   UPDATE_CHECK_SETTING_KEY,
+  NEW_SCENE_LEGACY_SETTING_KEY,
   SHELL_TARGET_SETTING_KEY,
 } from '@renderer/features/settings/settings/settingsConfig'
 import {
@@ -101,6 +103,8 @@ export const SettingsPane: React.FC = () => {
   const pickingPrefs = usePickingPrefs()
   const fileOpenPrefs = useFileOpenPrefs()
   const { updateCheck, setUpdateCheck } = useUpdateCheckPref()
+  // The look of a new scene is one of the New Tab dialog's remembered values.
+  const { defaults: newSceneDefaults, setDefaults: setNewSceneDefaults } = useNewSceneDefaults()
   // Installed system fonts for the atom-label font picker (falls back to a
   // curated list until `queryLocalFonts` resolves). Ensure the current value is
   // always selectable even if that family is not installed / not enumerated.
@@ -213,6 +217,10 @@ export const SettingsPane: React.FC = () => {
         setUpdateCheck(Boolean(value))
         return
       }
+      if (key === NEW_SCENE_LEGACY_SETTING_KEY) {
+        setNewSceneDefaults({ ...newSceneDefaults, look: value ? 'cuemol2' : 'cuemol3' })
+        return
+      }
 
       // A plugin's own preferences are owned by the plugin registry too.
       // Checked before the switch below: `plugin.` and `plugins.` are
@@ -237,7 +245,7 @@ export const SettingsPane: React.FC = () => {
         setTheme(value ? 'dark' : 'light')
       }
     },
-    [setTheme, setBinary, setApbsValue, setInputDevicePreference, setLabelDefault, setViewInputParam, pickingPrefs, setEnabled, setPref, setUpdateCheck],
+    [setTheme, setBinary, setApbsValue, setInputDevicePreference, setLabelDefault, setViewInputParam, pickingPrefs, setEnabled, setPref, setUpdateCheck, newSceneDefaults, setNewSceneDefaults],
   )
 
   // Keep the toggle in sync if theme changes externally.
@@ -415,6 +423,8 @@ export const SettingsPane: React.FC = () => {
                     value = OPEN_FILE_TARGET_LABELS[fileOpenPrefs.shellTarget]
                   } else if (s.key === UPDATE_CHECK_SETTING_KEY) {
                     value = updateCheck
+                  } else if (s.key === NEW_SCENE_LEGACY_SETTING_KEY) {
+                    value = newSceneDefaults.look === 'cuemol2'
                   } else {
                     const labelKey = LABEL_DEFAULT_SETTING_KEYS[s.key]
                     const viewParamKey = VIEW_INPUT_PARAM_SETTING_KEYS[s.key]

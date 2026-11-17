@@ -23,6 +23,7 @@ import { withUndoTxn } from '../withUndoTxn';
 import { recordOp } from '@renderer/worker/server/actions/serviceOps';
 import { styleSetNameOf } from '@renderer/worker/server/services/style/styleSetEdit';
 import { isValidUid } from '@renderer/worker/shared/uid';
+import { CUEMOL3_LOOK_SET } from '@renderer/worker/shared/sceneLook';
 
 export interface SaveSelDefArgs {
     sceneId: number;
@@ -45,14 +46,16 @@ interface StyleSetEntry {
 
 /**
  * Find a writable style set in the given scene scope, returning its UID, or
- * null when the scope has no writable set.
+ * null when the scope has no writable set. The look set (`cuemol3_look`) is
+ * never picked, even when it is writable (embedded from a qsc saved for an
+ * older version): what the user defines belongs to the scene's own set.
  */
 function findWritableSceneSet(styleMgr: StyleManager, sceneId: number): number | null {
     try {
         const parsed: unknown = JSON.parse(styleMgr.getStyleSetsJSON(sceneId));
         if (!Array.isArray(parsed)) return null;
         const entry = (parsed as StyleSetEntry[]).find(
-            (s) => s.scene_id === sceneId && s.readonly === false,
+            (s) => s.scene_id === sceneId && s.readonly === false && s.name !== CUEMOL3_LOOK_SET,
         );
         return entry ? entry.uid : null;
     } catch {
