@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+  The CueMol3 look: overrides of styles in default_style.xml.
+
+  Not loaded globally. CueMol3 loads it as a read-only style set of each new
+  scene (at the lowest priority of the scene's sets), and a qsc refers to it
+  as %%CONFDIR%%/data/cuemol3_look.xml (or embeds it when saved for an older
+  version). A scene without this set (e.g. made by CueMol2) keeps the CueMol2
+  look. A style here is looked up before the one of the same name in
+  default_style.xml, one property at a time: a property this file leaves out
+  falls back to default_style.xml.
+-->
+<styles id="cuemol3_look">
+
+  <!-- Slimmer ribbon than CueMol2's, with a coil width of its own -->
+  <style id="DefaultRibbon" type="renderer" desc="Default">
+    <helix tuber="6.5" width="0.18"/>
+    <sheet tuber="6.5" width="0.18"/>
+    <coil width="0.2"/>
+  </style>
+
+  <!-- Smaller bases and a round-square backbone tube -->
+  <style id="DefaultNucl" type="renderer" base_size="0.3" base_thick="0.3">
+    <section type="roundsquare" width="0.4"/>
+  </style>
+
+</styles>

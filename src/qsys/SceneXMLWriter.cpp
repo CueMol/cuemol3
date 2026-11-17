@@ -23,6 +23,8 @@ namespace fs = boost::filesystem;
 #include <qlib/StringStream.hpp>
 #include <qlib/LByteArray.hpp>
 
+#include <cstdlib>
+
 using namespace qsys;
 using qlib::LDataSrcContainer;
 
@@ -109,6 +111,12 @@ LString SceneXMLWriter::getStrVersion() const
 void SceneXMLWriter::setStrVersion(const LString &s)
 {
   m_nVersion = QdfDataType::parseVerString(s);
+}
+
+bool SceneXMLWriter::isConfRefCompat() const
+{
+  // the major version number
+  return std::atoi(m_strCompat.c_str()) >= 3;
 }
 
 void SceneXMLWriter::setDefaultOpts(ScenePtr pScene)
@@ -226,7 +234,15 @@ void SceneXMLWriter::write()
   // build LDOM2 tree
   //
   qlib::LDom2Tree tree("scene");
-  tree.serialize(m_pClient.get(), false);
+  m_pClient->setStyleConfRef(isConfRefCompat());
+  try {
+    tree.serialize(m_pClient.get(), false);
+  }
+  catch (...) {
+    m_pClient->setStyleConfRef(false);
+    throw;
+  }
+  m_pClient->setStyleConfRef(false);
   qlib::LDom2Node *pNode = tree.top();
 
   //

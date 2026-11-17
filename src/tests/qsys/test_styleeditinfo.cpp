@@ -27,32 +27,46 @@ size_t posOf(qlib::uid_t ctxt, const char *name)
 
 }  // namespace
 
-// Undo/redo of a style-set creation must put the set back where it was
-// (at the end, nbefore = -1), not at the front of the list.
+// A created set goes to the front (the highest priority) and a set loaded with
+// bAppend to the end (the lowest); undo/redo puts each back where it was.
 TEST(StyleCreateEditInfo, RedoRestoresListPosition)
 {
-    // a private context id: no scene is attached, so no events are fired
-    const qlib::uid_t ctxt = 987654;
+    qsys::ScenePtr scene = qsys::SceneManager::getInstance()->createScene();
+    const qlib::uid_t ctxt = scene->getUID();
     StyleMgr *pSM = StyleMgr::getInstance();
 
-    StyleSetPtr pA = pSM->createStyleSet("styA", ctxt);
-    StyleSetPtr pB = pSM->createStyleSet("styB", ctxt);
-    ASSERT_FALSE(pA.isnull());
-    ASSERT_FALSE(pB.isnull());
-    ASSERT_LT(posOf(ctxt, "styA"), posOf(ctxt, "styB"));
+    const auto path = std::filesystem::temp_directory_path() / "cuemol_test_styappend.xml";
+    {
+        std::ofstream out(path);
+        out << "<styles id=\"styLow\"><color id=\"c1\" value=\"#FF0000\"/></styles>\n";
+    }
 
-    StyleCreateEditInfo ei;
-    ei.setupCreate(ctxt, pB, -1);
+    scene->startUndoTxn("Create A");
+    ASSERT_FALSE(pSM->createStyleSet("styA", ctxt).isnull());
+    scene->commitUndoTxn();
+    scene->startUndoTxn("Load low");
+    pSM->loadStyleSetFromFileAt(ctxt, path.string().c_str(), true, true);
+    scene->commitUndoTxn();
+    scene->startUndoTxn("Create B");
+    ASSERT_FALSE(pSM->createStyleSet("styB", ctxt).isnull());
+    scene->commitUndoTxn();
+    std::filesystem::remove(path);
 
-    ASSERT_TRUE(ei.undo());
+    auto checkOrder = [&]() {
+        EXPECT_LT(posOf(ctxt, "styB"), posOf(ctxt, "styA"));
+        EXPECT_LT(posOf(ctxt, "styA"), posOf(ctxt, "styLow"));
+    };
+    checkOrder();
+
+    scene->undo(0);
+    scene->undo(0);
     EXPECT_EQ(posOf(ctxt, "styB"), std::string::npos);
+    EXPECT_EQ(posOf(ctxt, "styLow"), std::string::npos);
+    scene->redo(0);
+    scene->redo(0);
+    checkOrder();
 
-    ASSERT_TRUE(ei.redo());
-    EXPECT_NE(posOf(ctxt, "styB"), std::string::npos);
-    EXPECT_LT(posOf(ctxt, "styA"), posOf(ctxt, "styB"));
-
-    pSM->destroyStyleSet(ctxt, pB->getUID());
-    pSM->destroyStyleSet(ctxt, pA->getUID());
+    qsys::SceneManager::getInstance()->destroyScene(ctxt);
 }
 
 // Loading a style file and switching a set's read-only flag from a script,

@@ -18,6 +18,7 @@
 #include <qlib/PropSpec.hpp>
 #include <gfx/NamedColor.hpp>
 #include <qsys/SceneManager.hpp>
+#include <qsys/SysConfig.hpp>
 
 using namespace qsys;
 using qlib::LDom2Node;
@@ -210,8 +211,9 @@ StyleSetPtr StyleMgr::createStyleSet(const LString &id, qlib::uid_t ctxt)
   pSet->setSource("");
   pSet->setName(id);
 
-  // Register new style to the end of the style list
-  pSL->push_back(pSet);
+  // Register new style to the front (highest priority) of the style list,
+  // as a style set loaded from a file is.
+  pSL->push_front(pSet);
 
   ScenePtr pScene = SceneManager::getSceneS(ctxt);
 
@@ -229,7 +231,7 @@ StyleSetPtr StyleMgr::createStyleSet(const LString &id, qlib::uid_t ctxt)
   UndoUtil uu(ctxt);
   if (uu.isOK()) {
     StyleCreateEditInfo *pInfo = MB_NEW StyleCreateEditInfo();
-    pInfo->setupCreate(ctxt, pSet, -1);
+    pInfo->setupCreate(ctxt, pSet, 0);
     uu.add(pInfo);
   }
 
@@ -409,20 +411,39 @@ bool StyleMgr::saveStyleSetToFile(qlib::uid_t nScopeID, qlib::uid_t nStyleSetID,
 
 qlib::uid_t StyleMgr::loadStyleSetFromFile(qlib::uid_t nScopeID, const LString &path, bool bReadOnly)
 {
+  return loadStyleSetFromFileAt(nScopeID, path, bReadOnly, false);
+}
+
+qlib::uid_t StyleMgr::loadStyleSetFromFileAt(qlib::uid_t nScopeID, const LString &aPath,
+                                             bool bReadOnly, bool bAppend)
+{
+  // A path may start with %%CONFDIR%% (the directory of the sysconfig file)
+  LString path = SysConfig::getInstance()->convPathName(aPath);
+
   StyleFile sfile;
   qlib::uid_t uid = sfile.loadFile(path, nScopeID);
 
   StyleSetPtr pSet = qlib::ensureNotNull( getStyleSetById2(uid) );
   pSet->setReadOnly(bReadOnly);
 
+  // StyleFile puts the loaded set at the front; move it to the end
+  // (the lowest priority) when asked to
+  if (bAppend) {
+    StyleList *pSL = getCreateStyleList(nScopeID);
+    if (pSL->size() > 1 && pSL->front().get() == pSet.get()) {
+      pSL->pop_front();
+      pSL->push_back(pSet);
+    }
+  }
+
   // put the style-update event to the pending list
   m_pendEvts.insert(PendEventSet::value_type(nScopeID, ""));
 
-  // Record undo/redo info (StyleFile puts the loaded set at the front)
+  // Record undo/redo info at the position the set was put to
   UndoUtil uu(nScopeID);
   if (uu.isOK()) {
     StyleCreateEditInfo *pInfo = MB_NEW StyleCreateEditInfo();
-    pInfo->setupCreate(nScopeID, pSet, 0);
+    pInfo->setupCreate(nScopeID, pSet, bAppend ? -1 : 0);
     uu.add(pInfo);
   }
 

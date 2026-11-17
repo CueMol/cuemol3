@@ -63,6 +63,9 @@ runtime_class StyleManager
   /// Load style-set from file (StyleMgrStyleImpl.cpp)
   integer loadStyleSetFromFile(integer nScopeID, string path_name, boolean bReadOnly);
 
+  /// Load style-set from file at the front, or at the end (bAppend, the lowest priority)
+  integer loadStyleSetFromFileAt(integer nScopeID, string path_name, boolean bReadOnly, boolean bAppend);
+
 
   /////////////////////////////////////////////////////////////
   // Color operation

@@ -44,10 +44,47 @@
 #include <jsbr/Interp.hpp>
 #endif
 
+#include <filesystem>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 
 using namespace qsys;
+
+namespace {
+
+  const char *const kConfDirTag = "%%CONFDIR%%";
+
+  /// If the absolute path aPath lies under the config dir (the directory of
+  /// the sysconfig file), set rRel to its path relative to the config dir
+  /// (with '/' separators) and return true.
+  bool getConfDirRelPath(const LString &aPath, LString &rRel)
+  {
+    if (aPath.isEmpty())
+      return false;
+    LString confdir = SysConfig::getInstance()->get("config_dir");
+    if (confdir.isEmpty())
+      return false;
+
+    std::error_code ec;
+    std::filesystem::path base =
+      std::filesystem::absolute(confdir.c_str(), ec).lexically_normal();
+    if (ec) return false;
+    std::filesystem::path tgt =
+      std::filesystem::absolute(aPath.c_str(), ec).lexically_normal();
+    if (ec) return false;
+
+    std::filesystem::path rel = tgt.lexically_relative(base);
+    if (rel.empty())
+      return false;
+    std::string srel = rel.generic_string();
+    if (srel == "." || srel.rfind("..", 0) == 0)
+      return false;
+
+    rRel = srel.c_str();
+    return true;
+  }
+
+}  // namespace
 namespace fs = boost::filesystem;
 
 namespace {
@@ -1717,11 +1754,31 @@ void Scene::stylesWriteTo(qlib::LDom2Node *pNode) const
     LString id = pSet->getName();
     LString src = pSet->getSource();
 
+    LString confrel;
     if ( src.isEmpty() ) {
       // Internal style description
       pSet->writeToDataNode(pChNode);
       // Reset the modified flag (because the contents was synchronized to the scene file)
       pSet->setModified(false);
+    }
+    else if (getConfDirRelPath(src, confrel)) {
+      // A style file of the application (under the config dir, e.g.
+      // data/cuemol3_look.xml): never written back to the file.
+      if (m_bStyleConfRef) {
+        // Refer to it as %%CONFDIR%%/..., which the reader of any install
+        // location resolves (no alt_src, which would be machine-specific).
+        pChNode->setStrAttr("src", LString(kConfDirTag) + "/" + confrel);
+        if (pSet->isOverrideID()) {
+          pChNode->appendStrAttr("id", id);
+        }
+        if (pSet->isReadOnly())
+          pChNode->appendStrAttr("readonly", "true");
+      }
+      else {
+        // Saved for a version that cannot expand %%CONFDIR%%: embed the
+        // contents. The set in memory keeps its source.
+        pSet->writeToDataNode(pChNode);
+      }
     }
     else {
       // External style reference is serialized as external reference node.
@@ -1849,10 +1906,17 @@ void Scene::stylesReadFrom(qlib::LDom2Node *pNode)
     //LString path = resolveBasePath(src);
     //qlib::uid_t setid = sfile.loadFile(path, getUID(), id);
 
-    LString alt_src = pNode->getStrAttr("alt_src");
-    LString base_path = getBasePath();
-    bool bAlt;
-    LString abs_path = qlib::LDataSrcContainer::selectSrcAltSrc(src, alt_src, base_path, bAlt);
+    LString abs_path;
+    if (src.startsWith(kConfDirTag)) {
+      // A style file of the application (written by stylesWriteTo)
+      abs_path = SysConfig::getInstance()->convPathName(src);
+    }
+    else {
+      LString alt_src = pNode->getStrAttr("alt_src");
+      LString base_path = getBasePath();
+      bool bAlt;
+      abs_path = qlib::LDataSrcContainer::selectSrcAltSrc(src, alt_src, base_path, bAlt);
+    }
 
     qlib::uid_t setid = sfile.loadFile(abs_path, getUID(), id);
 
@@ -2101,8 +2165,12 @@ void Scene::forceEmbed()
     return;
 
   BOOST_FOREACH(StyleList::value_type pSet, *pSL) {
-    // style set name (id)
-    LString id = pSet->getName();
+    // A style file of the application keeps its source: whether it is
+    // referred to or embedded depends on the target version only
+    // (see stylesWriteTo).
+    LString rel;
+    if (getConfDirRelPath(pSet->getSource(), rel))
+      continue;
     pSet->setSource("");
   }
 
