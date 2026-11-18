@@ -25,7 +25,7 @@ first**:
    git branch --show-current      # expect develop
    git status --short             # expect empty
    git fetch && git rev-parse HEAD origin/develop | uniq -c   # expect one line
-   gh run list --branch develop --limit 3                     # expect success
+   gh run list --branch develop --workflow build2.yml --limit 5   # latest COMPLETED run must be success (cancelled != success)
    ```
 
 2. **Settle the version.** All three files must agree:

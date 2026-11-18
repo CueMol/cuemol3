@@ -51,6 +51,18 @@ PR merge policy: merge pull requests with a merge commit (`gh pr merge --merge`)
 Never squash-merge or rebase-merge; the branch's individual commits must stay on
 `develop`.
 
+**develop の full build CI の結果は必ず確認する**: develop への merge / push で走る
+`Build and release` (`build2.yml`) / `Build (Linux)` の完了は待たずに次の作業へ進んでよいが、
+結果は必ず確認する。
+- 次に merge / push / tag する前に、`gh run list --branch develop --workflow build2.yml --limit 5`
+  で直近の**完了済み** run の conclusion を見る (最新の in_progress だけを見ない)。後続 push で
+  `cancelled` になった run は結果が出ていないだけで、成功とはみなさない
+- `failure` があれば、落ちたジョブとログ (`gh api repos/CueMol/cuemol3/actions/jobs/<job-id>/logs`)
+  で原因を確かめ、すぐユーザーに報告する。見落としたまま失敗を積み重ねない
+- tag (release) を打つのは、直近の完了済み develop build に失敗が無いと確認してから
+- 背景: Windows の UXP ビルドだけが C++17 なしで libcuemol2 のヘッダを include するため、
+  macOS のローカルビルドでは気付けない失敗が develop で数 PR 続いた
+
 ---
 
 ## libcuemol2 Build
