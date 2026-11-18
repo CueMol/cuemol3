@@ -235,8 +235,10 @@ listbox はフォームと違い**描画基盤が3種**あり単一コンポー�
 
 | 用途 | トークン |
 |---|---|
-| 背景 | `--bg-base` `--bg-surface` `--bg-elevated` `--bg-panel-header` `--bg-input` `--bg-hover` `--bg-active` `--bg-tab-active` `--bg-tab-inactive` |
-| 境界線 | `--border` `--border-subtle` |
+| 背景 | `--bg-base` `--bg-surface` `--bg-elevated` `--bg-panel-header` `--bg-pane-title` `--bg-input` `--bg-hover` `--bg-active` `--bg-tab-active` `--bg-tab-inactive` |
+| 境界線 | `--border-strong` `--border` `--border-subtle` (この順に弱い) |
+
+left panel (side panel) の pane 境界は **`--bg-pane-title` の見出し帯 + `--border-strong` の Allotment 境界線** で示す。pane 内のツールバーや区切り (`.section-header`、表の見出し) は帯にせず `--border` / `--border-subtle` に留め、pane 境界より強く見せない。見出し帯の hover は帯と見分けられるよう `--bg-active`。
 | 文字 | `--text-strong` `--text-primary` `--text-secondary` `--text-muted` `--text-disabled` (この順に暗くなる階梯。詳細は下記)。状態を伝えるインライン文 (field 下の注記、panel の警告行) は `--text-warning` / `--text-error` (`--log-warn` / `--accent-red` の alias) |
 | アクセント | `--accent` `--accent-hover` `--accent-green` `--accent-red` `--accent-yellow` `--accent-glow` `--accent-selected` `--accent-selected-glow` |
 | クローム | `--toolbar-bg` `--statusbar-bg` `--statusbar-text` `--scrollbar-thumb` `--scrollbar-thumb-hover` |
@@ -373,6 +375,8 @@ color: isDark ? Colors.BLUE5 : Colors.BLUE3
 // DO  (--accent は data-theme で自動追従するので分岐不要)
 color: 'var(--accent)'
 ```
+
+**focus 枠は 1px・widget の縁に密着 (手本は viewport の tool palette)**。Blueprint 既定の `:focus` (2px・外側 2px offset) と `.bp5-input` の focus (内側 1px + 外側 1px) は `_base.css` の全体ルールで 1px に上書き済みなので、個別コンポーネントで 2px の focus リング (`outline: 2px` / `box-shadow: 0 0 0 2px`) を書かない。1px の border を持つ textbox / select / numeric 系は **border を `--accent` にするだけ**にし、box-shadow を重ねない (重ねると 2px になる)。Blueprint の通常ボタンや `.bp5-input` のように縁を inset の影で描いている要素は、その縁を `inset 0 0 0 1px var(--accent)` で塗り替える。縁の無い要素 (minimal ボタン、セグメント、hover の塗りだけの行など) は**ボックスのすぐ外側** (`outline-offset: 0` / `box-shadow: 0 0 0 1px`) に出す。inset にすると塗りの一番外側の 1px を上書きし、枠が塗りの内側にあるように見える。枠を消したい要素は `outline: none` だけでよい (全体ルールは `outline-style` に触れないので、優先度に関係なく消える)。focus と別物の「選択中」表示 (パレットのセル、MD trajectory のブロックなど) はこの対象外。
 
 許容される例外 (新規で増やさないこと):
 - `crash/CrashOverlay.tsx` `crash/mountFallbackDom.ts` — React/テーマ崩壊時のフォールバックでトークンにアクセスできない。
