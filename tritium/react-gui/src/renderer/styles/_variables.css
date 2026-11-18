@@ -11,6 +11,9 @@
   --bg-surface: #252830;
   --bg-elevated: #2c2f3a;
   --bg-panel-header: #21232b;
+  /* Side-panel pane title band (SCENE / CAMERA ...): set off from the pane
+     body so each pane visibly starts there. */
+  --bg-pane-title: #31343e;
   --bg-input: #181a20;
   --bg-hover: #333746;
   --bg-active: #3a3f4f;
@@ -24,6 +27,9 @@
   /* Borders */
   --border: #333746;
   --border-subtle: #2a2d38;
+  /* Stronger rule for the boundaries between side-panel panes, one step above
+     --border so they outrank the rules inside a pane. */
+  --border-strong: #464b5d;
 
   /* Text.
      Four steps of one ladder, each a WCAG contrast ratio against --bg-surface:
@@ -421,6 +427,7 @@
   --bg-surface: #ffffff;
   --bg-elevated: #f7f7f8;
   --bg-panel-header: #e8e9ec;
+  --bg-pane-title: #e6e8ec;
   --bg-input: #ffffff;
   --bg-hover: #e4e5e8;
   --bg-active: #d8dae0;
@@ -434,6 +441,7 @@
   /* Borders */
   --border: #d0d1d6;
   --border-subtle: #e0e1e5;
+  --border-strong: #b6b8c0;
 
   /* Text */
   --text-primary: #1e1e1e;
