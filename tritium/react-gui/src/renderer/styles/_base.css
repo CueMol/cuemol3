@@ -120,6 +120,45 @@ body {
   background: transparent;
 }
 
+/* App-wide focus ring: 1px, flush OUTSIDE the element box (offset 0).
+ * Blueprint's own `:focus` ring is 2px with a 2px gap, which spills over
+ * neighbours in the compact rows and toolbars. An inset ring (offset -1px) is
+ * no good either on a borderless element (a minimal button, a segment): it
+ * paints over the element's own outermost pixel, so the ring reads as sitting
+ * inside the hover / fill area. Bordered fields do not use this ring -- their
+ * border turns accent instead (_form-kit.css).
+ *
+ * Only width / colour / offset are set, never outline-style: an element that
+ * opts out with `outline: none` (Blueprint's .bp5-input / .bp5-slider at the
+ * same specificity as `:focus`, or any app rule) keeps style `none` and stays
+ * ring-less regardless of rule order. Components with their own ring
+ * (form-kit inputs/buttons, switch/checkbox/radio indicators) keep their more
+ * specific rules. */
+:focus,
+.bp5-tag:focus {
+  outline-width: 1px;
+  outline-color: var(--accent);
+  outline-offset: 0;
+}
+
+/* Blueprint text inputs outside form-kit (raw InputGroup, Suggest, TagInput,
+ * FileInput) draw their edge as an inset shadow and focus as inset 1px PLUS an
+ * outer 1px halo -- a 2px ring that sits outside the box. Keep only the inset
+ * 1px accent: the same flush ring weight as form-kit and the tool palette. */
+.bp5-input:focus,
+.bp5-input.bp5-active,
+.bp5-dark .bp5-input:focus,
+.bp5-tag-input.bp5-active,
+.bp5-dark .bp5-tag-input.bp5-active,
+.bp5-tag-input.bp5-dark.bp5-active,
+.bp5-file-upload-input:focus,
+.bp5-file-upload-input.bp5-active,
+.bp5-dark .bp5-file-upload-input:focus,
+.bp5-file-input input:focus + .bp5-file-upload-input,
+.bp5-dark .bp5-file-input input:focus + .bp5-file-upload-input {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
 /* BlueprintJS overlays must stack above Allotment sashes (z-index: 35).
  * Popovers render into `.bp5-portal` (no built-in z-index) carrying a
  * `.bp5-overlay` child; bumping the portal itself catches both Popovers

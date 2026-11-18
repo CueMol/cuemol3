@@ -30,8 +30,9 @@
   min-height: 0;
   overflow: hidden;
   /* Theme the Allotment inter-pane separator (a 1px line at the top of each
-     non-first pane) so it reads as a clean VSCode-style section divider. */
-  --separator-border: var(--border);
+     non-first pane). It uses --border-strong so a pane boundary outranks the
+     --border / --border-subtle rules drawn inside a pane. */
+  --separator-border: var(--border-strong);
 }
 
 /* ─── Side-Panel Pane (each Allotment child) ─── */
@@ -42,9 +43,9 @@
   overflow: hidden;
 }
 
-/* Section header -- fixed at top of each pane (VSCode-style section title:
- * blends with the sidebar background, no bottom rule; the section divider is
- * the 1px Allotment separator drawn above each non-first pane). */
+/* Section header -- fixed at top of each pane. A tinted band
+ * (--bg-pane-title) under the --border-strong Allotment separator, so where a
+ * pane starts reads from the band, not only from a 1px line. No bottom rule. */
 .sp-section-header {
   display: flex;
   align-items: center;
@@ -59,14 +60,21 @@
   text-transform: uppercase;
   letter-spacing: var(--ls-wide);
   color: var(--text-primary);
-  background: transparent;
+  background: var(--bg-pane-title);
   user-select: none;
   flex-shrink: 0;
 }
 
-/* Subtle hover feedback for the collapsible (click-to-toggle) headers. */
+/* A toolbar / sub-section bar inside a pane (e.g. the Color pane's paint
+   list toolbar) stays untinted, so only the pane title reads as a band. */
+.sp-pane .section-header {
+  background: transparent;
+}
+
+/* Hover feedback for the collapsible (click-to-toggle) headers. One step
+   above --bg-hover: the title band is already about as light as --bg-hover. */
 .sp-section-header.collapsible:hover {
-  background: var(--bg-hover);
+  background: var(--bg-active);
 }
 
 .sp-section-header-left {
