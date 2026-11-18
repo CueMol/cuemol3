@@ -36,6 +36,10 @@ vi.mock('@renderer/state/statusMessage', async () => {
 })
 vi.mock('@renderer/hooks/useCueMolBusy', () => ({ useCueMolBusy: () => false }))
 vi.mock('@renderer/hooks/useBusyCursor', () => ({ useBusyCursor: () => undefined }))
+vi.mock('@renderer/hooks/cuemol/useLongTask', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@renderer/hooks/cuemol/useLongTask')>()),
+  useLongTask: () => null,
+}))
 // The bell reads the notification list; its own provider is not under test here.
 vi.mock('@renderer/shell/notifications', () => ({ NotificationBell: () => null, NotificationLayer: () => null }))
 vi.mock('@renderer/contexts/ActiveToolContext', () => ({

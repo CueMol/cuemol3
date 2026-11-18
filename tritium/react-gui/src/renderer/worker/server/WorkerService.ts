@@ -15,6 +15,11 @@ import type { GUIView } from '@cuemol/core/src/wrappers/GUIView';
 import type { StyleManager } from '@cuemol/core/src/wrappers/StyleManager';
 import type { WorkerContext } from '@renderer/worker/server/types/WorkerContext';
 import {
+    TASK_PROGRESS_CHANNEL,
+    type TaskProgressMessage,
+    type TaskState,
+} from '@renderer/worker/shared/taskProgress';
+import {
     handleMouseDown,
     handleMouseUp,
     handleMouseMove,
@@ -185,13 +190,25 @@ export class WorkerService {
         return this._cm.copyFromTypedArray(src);
     }
 
-    private _buildContext(): WorkerContext {
+    /**
+     * The context of one service call. Its `reportTask` pushes the task state
+     * tagged with this call's seq, so the report reaches this call even when
+     * an async service sends it after an `await` (services are not
+     * serialized: another call can run in between).
+     */
+    private _buildContext(seqno: number): WorkerContext {
         return {
             svc: this,
             sceMgr: this._sceMgr!,
             cmdMgr: this._cmdMgr!,
             strMgr: this._strMgr!,
             styleMgr: this._styleMgr!,
+            reportTask: (state: TaskState) => {
+                // Nobody waits on a fire-and-forget call, so nothing to show.
+                if (seqno === NO_REPLY_SEQ) return;
+                const msg: TaskProgressMessage = { seq: seqno, ...state };
+                this._postMessage([TASK_PROGRESS_CHANNEL, msg]);
+            },
         };
     }
 
@@ -238,7 +255,7 @@ export class WorkerService {
             }
         } else if (serviceFn) {
             Promise.resolve()
-                .then(() => serviceFn(this._buildContext(), args[0]))
+                .then(() => serviceFn(this._buildContext(seqno), args[0]))
                 .then((result) => reply([method, seqno, true, result]))
                 .catch((e) => {
                     // A service returns Result and never throws across the
@@ -288,7 +305,7 @@ export class WorkerService {
         // whatever scene is live, rather than holding one.
         this._gfx_mgr = new GfxManager(
             this._internal,
-            () => pumpAnimProgress(this._buildContext()),
+            () => pumpAnimProgress(this._buildContext(NO_REPLY_SEQ)),
         );
         this._sceMgr = this._cm.getSceneManager();
         this._cmdMgr = this._cm.getService('CmdMgr') as CmdMgr;
@@ -432,7 +449,7 @@ export class WorkerService {
         // Without knowing which scene is in front there is no "behind" to
         // pause; pausing everything could stop the one the user is watching.
         if (activeSceneUid === undefined) return;
-        pauseInactivePlayback(this._buildContext(), activeSceneUid, isSceneBeingRendered);
+        pauseInactivePlayback(this._buildContext(NO_REPLY_SEQ), activeSceneUid, isSceneBeingRendered);
     }
 
     /** Detach a view from the GfxManager (used when a scene tab closes). */

@@ -47,6 +47,7 @@ import {
     type TrajAppendTarget,
 } from './trajBlocks';
 import { COORD_BLOCK_READER_BY_TOPOLOGY } from '../trajFormats';
+import { baseName, reportTask } from '@renderer/worker/server/services/helpers/taskReport';
 
 const log = console;
 
@@ -289,7 +290,13 @@ export function attachTrajectory(
     // every block back and comes out as a Fail.
     const res = undoTxnResult(scene as unknown as Parameters<typeof undoTxnResult>[0], 'Attach MD trajectory', () => {
         const traj = isTraj ? (mol as unknown as TrajAppendTarget) : convertToTrajectory(ctx, scene, mol, noCoords);
-        for (const p of args.trajPaths) appendTrajFile(ctx, traj, p, nevery);
+        // One step per file, reported before its synchronous read (long-task
+        // indicator).
+        const total = args.trajPaths.length;
+        args.trajPaths.forEach((p, i) => {
+            reportTask(ctx, { label: 'Attaching MD trajectory', detail: baseName(p), step: i + 1, total });
+            appendTrajFile(ctx, traj, p, nevery);
+        });
         const nframe = safeRead(() => (traj as unknown as { nframe: number }).nframe) ?? 0;
         return ok({ objId: traj.uid, nframe });
     });

@@ -23,6 +23,7 @@ import { getSceneOrNull } from '@renderer/worker/server/services/helpers/sceneRe
 import { isHiddenObjWriter } from '@renderer/worker/server/services/helpers/readerFilter';
 import { safeRead } from '@renderer/worker/server/services/helpers/safeRead';
 import { makeSel } from '@renderer/worker/server/services/helpers/makeSel';
+import { baseName, reportTask } from '@renderer/worker/server/services/helpers/taskReport';
 
 // --- helpers ---
 
@@ -247,6 +248,7 @@ export function saveObjectToFile(
     if (!scene) return { ok: false };
     const obj = scene.getObject(args.objId) as CueMolObject | null;
     if (!obj) return { ok: false };
+    reportTask(ctx, { label: 'Saving object', detail: baseName(args.path) });
 
     let writer: ObjWriterLike | null;
     try {

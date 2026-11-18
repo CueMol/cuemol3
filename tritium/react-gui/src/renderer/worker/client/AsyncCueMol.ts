@@ -15,6 +15,8 @@ import type { HistoryStepResult } from '@renderer/worker/server/services/undo/hi
 import type { NewSceneInitialProps } from '@renderer/worker/shared/newSceneTypes';
 import { type InvokeOptions,
     WorkerTransport,
+    type LongTasksListener,
+    type LongTasksSnapshot,
     type StreamProgressListener,
     type RenderProgressListener,
     type AnimProgressListener,
@@ -75,6 +77,12 @@ export class AsyncCueMol {
 
     /** Subscribe to busy-state edges. Returns an unsubscribe function. */
     subscribeBusy(cb: (busy: boolean) => void): () => void { return this._transport.subscribeBusy(cb); }
+
+    /** The oldest pending call that reported a long task, and how many did. */
+    getLongTasks(): LongTasksSnapshot { return this._transport.getLongTasks(); }
+
+    /** Subscribe to long-task changes (see `WorkerTransport.subscribeLongTasks`). */
+    subscribeLongTasks(cb: LongTasksListener): () => void { return this._transport.subscribeLongTasks(cb); }
 
     /** Subscribe to `stream-progress` push messages. */
     subscribeStreamProgress(cb: StreamProgressListener): () => void {

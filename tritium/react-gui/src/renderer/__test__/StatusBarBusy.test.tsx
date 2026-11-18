@@ -28,6 +28,11 @@ vi.mock("@renderer/hooks/useCueMolBusy", async () => {
     };
 });
 vi.mock("@renderer/hooks/useBusyCursor", () => ({ useBusyCursor: () => undefined }));
+// No long task reported: the bar falls back to the plain Busy flag.
+vi.mock("@renderer/hooks/cuemol/useLongTask", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("@renderer/hooks/cuemol/useLongTask")>()),
+    useLongTask: () => null,
+}));
 // The bell reads the notification list; its own provider is not under test here.
 vi.mock("@renderer/shell/notifications", () => ({ NotificationBell: () => null, NotificationLayer: () => null }));
 vi.mock("@renderer/state/statusMessage", () => ({ useStatusMessage: () => null }));

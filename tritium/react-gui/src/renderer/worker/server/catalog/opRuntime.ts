@@ -35,6 +35,7 @@ import { validateSelection } from '@renderer/worker/server/services/select/valid
 import { asOneOp, insideOp, noteEntry, txnBegin, txnEnd, txnOpen } from '@renderer/worker/server/actions/actionLog'
 import type { ActionSource } from '@renderer/worker/server/actions/actionLog'
 import type { AnyOp, OpContext, OpOutcome } from './op'
+import { withoutTaskReport } from '@renderer/worker/server/services/helpers/taskReport'
 import type { ParamMap } from './params'
 import { recordedPath, recordedPaths, sceneNodes } from './refs'
 
@@ -104,15 +105,21 @@ function recordable(op: AnyOp, args: Record<string, unknown>, mutated: boolean):
  * transaction it ran in (`actions/actionLog.ts`); the services it calls do
  * not add themselves as well.
  *
+ * Reports to the long-task indicator are switched off for the op (see
+ * `withoutTaskReport`).
+ *
  * @param args - already read into the op's parameter types (`readToolArgs`,
  *   or a console's binder).
  */
 export async function invokeOp(
   op: AnyOp,
-  ctx: WorkerContext,
+  callCtx: WorkerContext,
   args: Record<string, unknown>,
   oc: OpContext,
 ): Promise<OpOutcome> {
+  // An op runs inside a batch (console, qax macro, agent, MCP): the services
+  // it reaches do not report to the long-task indicator (see taskReport.ts).
+  const ctx = withoutTaskReport(callCtx)
   const badSel = invalidSelection(op, ctx, args, oc.sceneId)
   if (badSel) return { ok: false, error: badSel }
   // An op run by another op is part of that one, which is what is recorded.

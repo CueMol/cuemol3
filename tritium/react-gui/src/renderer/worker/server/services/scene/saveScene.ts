@@ -3,6 +3,7 @@ import type { SceneXMLWriter } from '@cuemol/core/src/wrappers/SceneXMLWriter';
 import type { WorkerContext } from '@renderer/worker/server/types/WorkerContext';
 import { getSceneOrNull } from '@renderer/worker/server/services/helpers/sceneResolver';
 import { syncCurrentCam } from '@renderer/worker/server/services/camera/currentCam';
+import { reportTask } from '@renderer/worker/server/services/helpers/taskReport';
 
 export interface GetSceneSaveInfoArgs {
     sceneId: number;
@@ -56,6 +57,7 @@ export function getSceneSaveInfo(
 export function saveScene(ctx: WorkerContext, args: SaveSceneArgs): SaveSceneResult {
     const scene = getSceneOrNull(ctx, args.sceneId);
     if (!scene) return { ok: false };
+    reportTask(ctx, { label: 'Saving scene', detail: basename(args.filePath) });
 
     // UXP parity (qsc-io.writeSceneFile): persist the current view into the
     // "__current" camera before serialising; a failure does not stop the save.

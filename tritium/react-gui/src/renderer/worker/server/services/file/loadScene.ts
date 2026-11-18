@@ -22,6 +22,7 @@ import { resetInitialSceneProps } from '@renderer/worker/server/services/scene/c
 import { createInitialView } from '@renderer/worker/server/services/helpers/createSceneView';
 import { syncCurrentCam } from '@renderer/worker/server/services/camera/currentCam';
 import { CURRENT_CAMERA_NAME } from '@renderer/worker/shared/cameraTypes';
+import { baseName, reportTask } from '@renderer/worker/server/services/helpers/taskReport';
 
 const log = console;
 
@@ -173,6 +174,7 @@ function readSceneFile(ctx: WorkerContext, scene: Scene, filePath: string): Resu
  */
 export function loadScene(ctx: WorkerContext, args: LoadSceneArgs): LoadSceneResult {
     log.info(`[worker] loading QSC scene: ${args.filePath}`);
+    reportTask(ctx, { label: 'Opening scene', detail: baseName(args.filePath) });
     const scene = getSceneOrNull(ctx, args.sceneId);
     if (!scene) return fail(`scene ${args.sceneId} not found`, 'not-found');
 
@@ -221,6 +223,7 @@ export type OpenSceneFileResult = Result<{
  * renderer's tab is keyed on -- only ever exists for a scene that loaded.
  */
 export function openSceneFile(ctx: WorkerContext, args: OpenSceneFileArgs): OpenSceneFileResult {
+    reportTask(ctx, { label: 'Opening scene', detail: baseName(args.filePath) });
     const scene = ctx.sceMgr.createScene() as Scene | null;
     if (!scene) return fail('could not create a scene', 'native');
     const scene_uid = scene.getUID();

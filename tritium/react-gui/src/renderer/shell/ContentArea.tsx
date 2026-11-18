@@ -32,6 +32,7 @@ import { useTabDragDrop } from "@renderer/hooks/useTabDragDrop";
 import { useWorkspaceDispatch, useWorkspaceTabs } from "@renderer/state/workspace";
 import { TabBar } from "./TabBar";
 import { ContentPane } from "./ContentPane";
+import { LongTaskIndicator } from "./LongTaskIndicator";
 
 // ------------------------------------------------------------
 // Types
@@ -65,6 +66,7 @@ const ContentAreaComponent: React.FC = () => {
         tabs={tabs}
         activeTab={active}
       />
+      <LongTaskIndicator />
     </div>
   );
 };

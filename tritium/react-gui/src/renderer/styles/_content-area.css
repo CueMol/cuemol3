@@ -1,5 +1,6 @@
 /* ─── Content Area ─── */
 .content-area {
+  position: relative;  /* anchors the long-task indicator layer */
   display: flex;
   flex-direction: column;
   height: 100%;
