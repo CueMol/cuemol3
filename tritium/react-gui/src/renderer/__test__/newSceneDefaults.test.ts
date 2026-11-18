@@ -1,11 +1,8 @@
 /**
  * The New Scene defaults' two standing contracts.
  *
- *   1. The factory defaults must expand to the C++ property defaults
- *      (Scene.qif). A user who has never opened the dialog must get exactly
- *      the scene they got before the dialog existed -- and, because
- *      `applyInitialSceneProps` skips a property already holding its value,
- *      a drift here would start writing entries into every saved `.qsc`.
+ *   1. The factory defaults give a new scene High AA and Medium AO; every
+ *      other property stays at its C++ default (Scene.qif).
  *   2. A persisted preset id the axis no longer has falls back to the axis
  *      default, rather than reaching the worker as a name nothing expands
  *      (which would silently leave those properties at whatever they were).
@@ -18,23 +15,23 @@ import {
   toInitialProps,
 } from '@renderer/data/newSceneDefaults'
 
-/** The C++ defaults from src/qsys/Scene.qif. */
-const CPP_DEFAULTS = {
+/** High AA, Medium AO; the rest are the C++ defaults from src/qsys/Scene.qif. */
+const FACTORY_PROPS = {
   aa_method: 'fxaa',
-  aaJitterLevel: 0,
-  aoEnabled: false,
-  aoRadius: 4,
-  aoSteps: 3,
-  aoIntensity: 2.2,
-  aoHalfRes: false,
+  aaJitterLevel: 3,
+  aoEnabled: true,
+  aoRadius: 8,
+  aoSteps: 4,
+  aoIntensity: 1.9,
+  aoHalfRes: true,
   bgcolor: '#000000',
   use_colproof: false,
 }
 
 describe('newSceneDefaults', () => {
-  it('expands the factory defaults to the C++ property defaults', () => {
+  it('expands the factory defaults to High AA / Medium AO', () => {
     // The look is not a scene property: a new scene gets the CueMol3 look.
-    expect(toInitialProps(FACTORY_NEW_SCENE_DEFAULTS)).toEqual({ ...CPP_DEFAULTS, look: 'cuemol3' })
+    expect(toInitialProps(FACTORY_NEW_SCENE_DEFAULTS)).toEqual({ ...FACTORY_PROPS, look: 'cuemol3' })
   })
 
   it('reads a stored preference back', () => {

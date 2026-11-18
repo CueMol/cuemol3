@@ -9,10 +9,11 @@
  * `toInitialProps` is the one place that expands them, and it runs on the
  * renderer side so `data/` stays out of the worker bundle.
  *
- * `FACTORY_NEW_SCENE_DEFAULTS` must read as the C++ defaults (Scene.qif) --
- * the same contract the preset axes carry -- so that a user who has never
- * touched the dialog gets exactly the scene they got before it existed. The
- * look is not a scene property; its factory value is the CueMol3 look.
+ * `FACTORY_NEW_SCENE_DEFAULTS` is deliberately NOT the C++ defaults
+ * (Scene.qif) for AA/AO: a new scene starts at High AA and Medium AO, while
+ * the C++ defaults stay put so a `.qsc` saved without those properties still
+ * loads with the look it was saved with. The look is not a scene property;
+ * its factory value is the CueMol3 look.
  */
 
 import type { NewSceneInitialProps } from '@renderer/worker/shared/newSceneTypes'
@@ -38,35 +39,35 @@ export interface NewSceneDefaults {
   look: SceneLook
 }
 
-/** = the C++ property defaults (Scene.qif). */
+/** High AA / Medium AO; the rest = the C++ property defaults (Scene.qif). */
 export const FACTORY_NEW_SCENE_DEFAULTS: NewSceneDefaults = {
-  aaPreset: SCENE_AA_QUALITY_AXIS.defaultStep,
-  aoEnabled: false,
-  aoPreset: SCENE_AO_PRESET_AXIS.defaultStep,
+  aaPreset: 'high',
+  aoEnabled: true,
+  aoPreset: 'medium',
   bgcolor: '#000000',
   useColproof: false,
   look: DEFAULT_SCENE_LOOK,
 }
 
-function presetOr(axis: RenderQualityAxis, id: unknown): string {
-  return typeof id === 'string' && axis.steps.some((s) => s.id === id) ? id : axis.defaultStep
+function presetOr(axis: RenderQualityAxis, id: unknown, fallback: string): string {
+  return typeof id === 'string' && axis.steps.some((s) => s.id === id) ? id : fallback
 }
 
 /**
  * Read the persisted preference into a value the dialog can show.
  *
- * A preset id the axis no longer has falls back to its default step rather
+ * A preset id the axis no longer has falls back to the factory preset rather
  * than reaching the worker as a name nothing expands.
  */
 export function sanitizeNewSceneDefaults(prefs?: NewSceneDefaultsPrefs): NewSceneDefaults {
   if (!prefs) return FACTORY_NEW_SCENE_DEFAULTS
   return {
-    aaPreset: presetOr(SCENE_AA_QUALITY_AXIS, prefs.aaPreset),
+    aaPreset: presetOr(SCENE_AA_QUALITY_AXIS, prefs.aaPreset, FACTORY_NEW_SCENE_DEFAULTS.aaPreset),
     aoEnabled:
       typeof prefs.aoEnabled === 'boolean'
         ? prefs.aoEnabled
         : FACTORY_NEW_SCENE_DEFAULTS.aoEnabled,
-    aoPreset: presetOr(SCENE_AO_PRESET_AXIS, prefs.aoPreset),
+    aoPreset: presetOr(SCENE_AO_PRESET_AXIS, prefs.aoPreset, FACTORY_NEW_SCENE_DEFAULTS.aoPreset),
     bgcolor:
       typeof prefs.bgcolor === 'string' && prefs.bgcolor !== ''
         ? prefs.bgcolor
