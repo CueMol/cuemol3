@@ -12,6 +12,8 @@
  * keys and React components, so they stay in renderer/plugin-host/types.ts.
  */
 
+import type { Availability } from '../guiGate'
+
 /**
  * A plugin command id.
  *
@@ -45,6 +47,8 @@ export interface PluginMenuItem {
   accelerator?: string
   /** macOS-specific accelerator override, as in `AppMenuItem`. */
   acceleratorMac?: string
+  /** When the row is enabled, as in `AppMenuItem` (absent: a molview tab must be in front). */
+  availability?: Availability
 }
 
 /** The rows one plugin adds to one menu group. */

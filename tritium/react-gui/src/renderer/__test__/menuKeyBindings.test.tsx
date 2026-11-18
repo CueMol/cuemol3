@@ -31,6 +31,7 @@ vi.mock('@renderer/state/activeView', () => ({
 }))
 vi.mock('@renderer/state/workspace', () => ({
   useActiveScene: () => ({ activeSceneId: undefined, activeMolViewId: undefined, hasScene: live.hasScene }),
+  useGuiGate: () => ({ tab: live.hasScene ? 'molview' : 'none' }),
 }))
 vi.mock('@renderer/features/file-io/useRecentFiles', () => ({ useRecentFiles: () => [] }))
 vi.mock('@renderer/state/layout', () => ({

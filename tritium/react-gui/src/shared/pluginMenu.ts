@@ -51,6 +51,7 @@ function contributionItems(contrib: PluginMenuContribution): AppMenuItem[] {
     }
     if (item.accelerator) row.accelerator = item.accelerator
     if (item.acceleratorMac) row.acceleratorMac = item.acceleratorMac
+    if (item.availability) row.availability = item.availability
     block.push(row)
   }
   return block

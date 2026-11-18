@@ -25,6 +25,7 @@ vi.mock('@renderer/state/activeView', () => ({
 }))
 vi.mock('@renderer/state/workspace', () => ({
   useActiveScene: () => ({ activeSceneId: undefined, activeMolViewId: undefined, hasScene: menuState.hasScene }),
+  useGuiGate: () => ({ tab: menuState.hasScene ? 'molview' : 'none' }),
 }))
 vi.mock('@renderer/features/file-io/useRecentFiles', () => ({ useRecentFiles: () => menuState.recentFiles }))
 vi.mock('@renderer/state/layout', () => ({
@@ -180,7 +181,7 @@ describe('MenuBar', () => {
   })
 
   it('checks Perspective when the active view is perspective', () => {
-    const { container, unmount } = render(true)
+    const { container, unmount } = render(true, null, [], true)
     const viewItem = Array.from(container.querySelectorAll('.menubar__item')).find(
       (el) => el.textContent?.includes('View'),
     ) as HTMLElement
@@ -268,7 +269,7 @@ describe('MenuBar', () => {
   })
 
   it('checks the active center mark radio item', () => {
-    const { container, unmount } = render(true, 'axis')
+    const { container, unmount } = render(true, 'axis', [], true)
     const viewItem = Array.from(container.querySelectorAll('.menubar__item')).find(
       (el) => el.textContent?.includes('View'),
     ) as HTMLElement

@@ -46,7 +46,7 @@ export const mdtoolsManifest: PluginManifest = {
         // Where the built-in row used to sit, right after Open File.
         after: 'open-file',
         items: [
-          { id: 'open-traj', label: 'Open MD Trajectory...', command: OPEN_MD_TRAJ_COMMAND },
+          { id: 'open-traj', label: 'Open MD Trajectory...', command: OPEN_MD_TRAJ_COMMAND, availability: 'loadIntoScene' },
         ],
       },
     ],
@@ -57,6 +57,7 @@ export const mdtoolsManifest: PluginManifest = {
         icon: 'panel.trajectory',
         // Where the built-in tab used to sit, after Animation.
         after: 'animation',
+        requiresMolView: true,
       },
     ],
   },

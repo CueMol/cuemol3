@@ -27,7 +27,10 @@ vi.mock('@cuemol/core/src/BaseWrapper', () => ({ BaseWrapper: class {} }))
 vi.mock('@renderer/state/activeView', () => ({
   useActiveViewValues: () => ({ viewProjection: null, viewCenterMark: null, sceneBgColor: null, exportAvailable: null }),
 }))
-vi.mock('@renderer/state/workspace', () => ({ useActiveScene: () => ({ activeSceneId: undefined, activeMolViewId: undefined, hasScene: false }) }))
+vi.mock('@renderer/state/workspace', () => ({
+  useActiveScene: () => ({ activeSceneId: undefined, activeMolViewId: undefined, hasScene: false }),
+  useGuiGate: () => ({ tab: 'none' }),
+}))
 vi.mock('@renderer/features/file-io/useRecentFiles', () => ({ useRecentFiles: () => [] }))
 vi.mock('@renderer/state/layout', () => ({
   useLayout: () => ({ toolPaletteCollapsed: false }),

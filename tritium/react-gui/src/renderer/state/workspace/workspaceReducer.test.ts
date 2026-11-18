@@ -24,7 +24,7 @@ const open = (s: WorkspaceState, viewId: number, sceneId = 100, title = `Scene:$
 
 describe('workspaceReducer', () => {
   it('starts with no tabs and no active tab (the WelcomePane empty state)', () => {
-    expect(INITIAL_WORKSPACE).toEqual({ tabs: [], activeTabId: '' })
+    expect(INITIAL_WORKSPACE).toEqual({ tabs: [], activeTabId: '', lastMolViewTabId: '' })
   })
 
   it('opening a molview adds its tab and makes it active; both ids ride the record', () => {
@@ -77,7 +77,7 @@ describe('workspaceReducer', () => {
     s = reduce(s, { type: 'close', id: molViewTabId(10) })
     expect(s.activeTabId).toBe(molViewTabId(20))
     s = reduce(s, { type: 'close', id: molViewTabId(20) })
-    expect(s).toEqual({ tabs: [], activeTabId: '' })
+    expect(s).toEqual({ tabs: [], activeTabId: '', lastMolViewTabId: '' })
   })
 
   it('closing an inactive tab leaves the active one alone', () => {
@@ -125,5 +125,22 @@ describe('workspaceReducer', () => {
     expect(reduce(s, { type: 'close', id: 'nope' })).toBe(s)
     s = reduce(s, { type: 'openSettings' })
     expect(reduce(s, { type: 'openSettings' })).toBe(s)
+  })
+
+  it('lastMolViewTabId follows the molview in front, also one that close brings forward', () => {
+    // A, B, Settings with A used last: closing Settings brings B to the
+    // front, and B -- not A -- is where an external command should go.
+    let s = open(INITIAL_WORKSPACE, 10)
+    s = open(s, 20)
+    s = reduce(s, { type: 'openSettings' })
+    s = reduce(s, { type: 'activate', id: molViewTabId(10) })
+    s = reduce(s, { type: 'openSettings' })
+    expect(s.lastMolViewTabId).toBe(molViewTabId(10))
+    s = reduce(s, { type: 'close', id: SETTINGS_TAB_ID })
+    expect(s.lastMolViewTabId).toBe(molViewTabId(20))
+    // Never names a tab that is gone.
+    s = reduce(s, { type: 'openSettings' })
+    s = reduce(s, { type: 'close', id: molViewTabId(20) })
+    expect(s.lastMolViewTabId).toBe('')
   })
 })

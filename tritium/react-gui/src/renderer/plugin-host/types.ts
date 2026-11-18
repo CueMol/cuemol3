@@ -13,6 +13,7 @@ import type React from 'react'
 import type { AppIconKey } from '@renderer/h3-kit/primitives'
 import type { AsyncCueMol } from '@renderer/worker/client/AsyncCueMol'
 import type { PluginCommandId, PluginMenuContribution } from '@shared/types/pluginContrib'
+import type { Availability } from '@shared/guiGate'
 import type { PluginPrefValue } from '@shared/types/uiPrefs'
 import type { LocalApiEndpoint } from '@shared/types/localApi'
 import type {
@@ -39,8 +40,8 @@ export interface PluginToolbarItem {
   icon: AppIconKey
   text: string
   command: PluginCommandId
-  /** Disable the button while no molview tab is active. */
-  requiresScene?: boolean
+  /** When the button is enabled (shared/guiGate.ts); absent: a molview tab must be in front. */
+  availability?: Availability
 }
 
 /**
@@ -81,6 +82,12 @@ export interface PluginBottomTab {
    * first); appended when absent. Takes precedence over `after`.
    */
   before?: string
+  /**
+   * The tab works on the front scene: while no molview tab is in front it is
+   * replaced by a notice to switch to one. A tab without it (Output) stays
+   * usable.
+   */
+  requiresMolView?: boolean
 }
 
 /**

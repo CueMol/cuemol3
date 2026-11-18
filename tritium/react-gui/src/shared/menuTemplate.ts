@@ -5,6 +5,7 @@
 
 import { IPC } from './ipcChannels'
 import { APP_PRODUCT_NAME } from './appInfo'
+import type { Availability } from './guiGate'
 
 export type AppMenuRole =
   | 'cut' | 'copy' | 'paste' | 'selectAll'
@@ -34,6 +35,12 @@ export interface AppMenuItem {
    */
   swatch?: string
   submenu?: AppMenuItem[]
+  /**
+   * What the item needs to be enabled (see shared/guiGate.ts). Applies to
+   * items with an `ipcChannel` only; a pure role item (Quit, Hide...) is
+   * Electron's and never gated. Absent means a molview tab must be in front.
+   */
+  availability?: Availability
   /** If true, only include in the native menu on macOS (React menu bar never shows these). */
   darwinOnly?: boolean
   /** If true, only include in the native menu on non-macOS platforms. */
@@ -61,10 +68,10 @@ export function macAppMenuGroup(appName: string): AppMenuGroup {
   return {
     label: appName,
     submenu: [
-      { id: 'about-mac', label: `About ${appName}`, ipcChannel: IPC.MENU_ABOUT },
-      { id: 'check-updates-mac', label: 'Check for Updates...', ipcChannel: IPC.MENU_CHECK_UPDATES },
+      { id: 'about-mac', label: `About ${appName}`, ipcChannel: IPC.MENU_ABOUT, availability: 'always' },
+      { id: 'check-updates-mac', label: 'Check for Updates...', ipcChannel: IPC.MENU_CHECK_UPDATES, availability: 'always' },
       { type: 'separator' },
-      { id: 'mac-prefs', label: 'Preferences...', accelerator: 'Cmd+,', ipcChannel: IPC.MENU_OPTIONS },
+      { id: 'mac-prefs', label: 'Preferences...', accelerator: 'Cmd+,', ipcChannel: IPC.MENU_OPTIONS, availability: 'always' },
       { type: 'separator' },
       { role: 'services' },
       { type: 'separator' },
@@ -103,22 +110,22 @@ export const APP_MENU: AppMenuGroup[] = [
       // New Window intentionally omitted: Electron cannot host multiple OS
       // windows against a single shared libcuemol2 backend, so the UXP
       // multi-window model is not carried forward (use New Tab instead).
-      { id: 'new-tab',     label: 'New Tab',           accelerator: 'CmdOrCtrl+T',       ipcChannel: IPC.MENU_NEW_TAB },
+      { id: 'new-tab',     label: 'New Tab',           accelerator: 'CmdOrCtrl+T',       ipcChannel: IPC.MENU_NEW_TAB, availability: 'always' },
       { type: 'separator' },
-      { id: 'open-file',   label: 'Open File...',      accelerator: 'CmdOrCtrl+O',       ipcChannel: IPC.MENU_OPEN_FILE },
+      { id: 'open-file',   label: 'Open File...',      accelerator: 'CmdOrCtrl+O',       ipcChannel: IPC.MENU_OPEN_FILE, availability: 'loadIntoScene' },
       {
         id: 'open-recent', label: 'Open Recent',
         submenu: [
-          { id: 'clear-recent', label: 'Clear Menu', ipcChannel: IPC.MENU_CLEAR_RECENT },
+          { id: 'clear-recent', label: 'Clear Menu', ipcChannel: IPC.MENU_CLEAR_RECENT, availability: 'always' },
         ],
       },
       { type: 'separator' },
       { id: 'save-file-as',     label: 'Save File As...',      ipcChannel: IPC.MENU_SAVE_FILE_AS },
       { id: 'save-current-view', label: 'Save current view...', ipcChannel: IPC.MENU_SAVE_CURRENT_VIEW },
       { type: 'separator' },
-      { id: 'close-tab',   label: 'Close Tab',         accelerator: 'CmdOrCtrl+W',       ipcChannel: IPC.MENU_CLOSE_TAB },
+      { id: 'close-tab',   label: 'Close Tab',         accelerator: 'CmdOrCtrl+W',       ipcChannel: IPC.MENU_CLOSE_TAB, availability: 'always' },
       { type: 'separator' },
-      { id: 'open-scene',  label: 'Open Scene...',     accelerator: 'CmdOrCtrl+Shift+O', ipcChannel: IPC.MENU_OPEN_SCENE },
+      { id: 'open-scene',  label: 'Open Scene...',     accelerator: 'CmdOrCtrl+Shift+O', ipcChannel: IPC.MENU_OPEN_SCENE, availability: 'always' },
       { id: 'reload-scene', label: 'Reload Scene',     accelerator: 'CmdOrCtrl+R',       ipcChannel: IPC.MENU_RELOAD_SCENE },
       { id: 'save-scene',  label: 'Save Scene',        accelerator: 'CmdOrCtrl+S',       ipcChannel: IPC.MENU_SAVE },
       { id: 'save-scene-as', label: 'Save Scene As...', accelerator: 'CmdOrCtrl+Shift+S', ipcChannel: IPC.MENU_SAVE_SCENE_AS },
@@ -145,14 +152,14 @@ export const APP_MENU: AppMenuGroup[] = [
       // native menu, on Windows / Linux the renderer (Blink consumes
       // Ctrl+X/C/V/A itself there, so a menu accelerator never fires) -- see
       // TEXT_EDIT_MENU_IDS below and renderer/shell/keybindings.
-      { id: 'cut',   label: 'Cut',   accelerator: 'CmdOrCtrl+X', ipcChannel: IPC.MENU_EDIT_CUT },
-      { id: 'copy',  label: 'Copy',  accelerator: 'CmdOrCtrl+C', ipcChannel: IPC.MENU_EDIT_COPY },
-      { id: 'paste', label: 'Paste', accelerator: 'CmdOrCtrl+V', ipcChannel: IPC.MENU_EDIT_PASTE },
+      { id: 'cut',   label: 'Cut',   accelerator: 'CmdOrCtrl+X', ipcChannel: IPC.MENU_EDIT_CUT, availability: 'always' },
+      { id: 'copy',  label: 'Copy',  accelerator: 'CmdOrCtrl+C', ipcChannel: IPC.MENU_EDIT_COPY, availability: 'always' },
+      { id: 'paste', label: 'Paste', accelerator: 'CmdOrCtrl+V', ipcChannel: IPC.MENU_EDIT_PASTE, availability: 'always' },
       // Select All is NOT a native role: Electron's selectAll selects the whole
       // document (every GUI text node) when focus is not in an editable field.
       // Route it through the renderer (selectAllInScope) so it targets only the
       // focused field or the active selectable region (e.g. the log panel).
-      { id: 'select-all', label: 'Select All', accelerator: 'CmdOrCtrl+A', ipcChannel: IPC.MENU_SELECT_ALL },
+      { id: 'select-all', label: 'Select All', accelerator: 'CmdOrCtrl+A', ipcChannel: IPC.MENU_SELECT_ALL, availability: 'always' },
       { type: 'separator' },
       { id: 'clear-undo', label: 'Clear undo data', ipcChannel: IPC.MENU_CLEAR_UNDO },
       { type: 'separator' },
@@ -161,7 +168,7 @@ export const APP_MENU: AppMenuGroup[] = [
       { id: 'change-chain-id', label: 'Change chain ID...',     ipcChannel: IPC.MENU_CHANGE_CHAIN_ID },
       { id: 'change-resid-num', label: 'Change residue number...', ipcChannel: IPC.MENU_CHANGE_RESID_NUM },
       { type: 'separator' },
-      { id: 'options', label: 'Options', accelerator: 'CmdOrCtrl+K', ipcChannel: IPC.MENU_OPTIONS, othersOnly: true },
+      { id: 'options', label: 'Options', accelerator: 'CmdOrCtrl+K', ipcChannel: IPC.MENU_OPTIONS, othersOnly: true, availability: 'always' },
     ],
   },
 
@@ -222,7 +229,7 @@ export const APP_MENU: AppMenuGroup[] = [
       { type: 'separator' },
       // Folds / unfolds the floating viewport tool palette (renderer layout
       // state); the palette's own cap toggles the same flag.
-      { id: 'view-tool-palette', label: 'Tool palette', type: 'checkbox', checked: true, accelerator: 'CmdOrCtrl+Shift+P', ipcChannel: IPC.MENU_TOOL_PALETTE },
+      { id: 'view-tool-palette', label: 'Tool palette', type: 'checkbox', checked: true, accelerator: 'CmdOrCtrl+Shift+P', ipcChannel: IPC.MENU_TOOL_PALETTE, availability: 'always' },
       { type: 'separator' },
       { id: 'view-props', label: 'View property...', ipcChannel: IPC.MENU_VIEW_PROPS },
       { type: 'separator' },
@@ -257,8 +264,8 @@ export const APP_MENU: AppMenuGroup[] = [
   {
     label: 'Window',
     submenu: [
-      { id: 'window-main',   label: 'Main Window',      ipcChannel: IPC.MENU_WINDOW_MAIN },
-      { id: 'window-render', label: 'Rendering Window', ipcChannel: IPC.MENU_WINDOW_RENDER },
+      { id: 'window-main',   label: 'Main Window',      ipcChannel: IPC.MENU_WINDOW_MAIN, availability: 'always' },
+      { id: 'window-render', label: 'Rendering Window', ipcChannel: IPC.MENU_WINDOW_RENDER, availability: 'always' },
     ],
   },
 
@@ -271,8 +278,8 @@ export const APP_MENU: AppMenuGroup[] = [
   {
     label: 'Help',
     submenu: [
-      { id: 'about', label: `About ${APP_PRODUCT_NAME}`, ipcChannel: IPC.MENU_ABOUT, othersOnly: true },
-      { id: 'check-updates', label: 'Check for Updates...', ipcChannel: IPC.MENU_CHECK_UPDATES, othersOnly: true },
+      { id: 'about', label: `About ${APP_PRODUCT_NAME}`, ipcChannel: IPC.MENU_ABOUT, othersOnly: true, availability: 'always' },
+      { id: 'check-updates', label: 'Check for Updates...', ipcChannel: IPC.MENU_CHECK_UPDATES, othersOnly: true, availability: 'always' },
     ],
   },
 ]

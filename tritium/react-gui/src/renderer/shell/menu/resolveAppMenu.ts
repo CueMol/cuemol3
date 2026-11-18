@@ -5,8 +5,8 @@
  *
  * All live item state is derived here at build time -- View-menu radio state
  * (projection / center mark / background color) from the current view props,
- * the Tool palette check from the layout, scene-operation gating from
- * `hasScene`, export-item filtering from the
+ * the Tool palette check from the layout, GUI gating (`isAvailable` against
+ * the `GuiGate`, also per Open Recent row), export-item filtering from the
  * available exporter list, and the dynamic "Open Recent" MRU expansion --
  * so the rendering side (`MenuPanel`) stays purely presentational.
  */
@@ -14,7 +14,8 @@ import { getRoleLabel, isExportItemUnavailable } from '@shared/menuTemplate'
 import type { AppMenuItem } from '@shared/menuTemplate'
 import type { RecentFileEntry } from '@shared/types/recent'
 import type { SceneBgColor, ViewCenterMark } from '@shared/types/menuState'
-import { SCENE_REQUIRING_MENU_IDS } from '@shared/menuStateApply'
+import { isAvailable, recentAvailability } from '@shared/guiGate'
+import type { GuiGate } from '@shared/guiGate'
 import type { MenuNode } from '@shared/menuNodes'
 
 /** Action payload resolved when a menu bar dropdown row is picked. */
@@ -29,7 +30,8 @@ export interface MenuBarStateContext {
   sceneBgColor?: SceneBgColor | null
   /** View > Tool palette check; the palette is folded to its cap when false. */
   toolPaletteVisible?: boolean
-  hasScene?: boolean
+  /** The GUI state gated items are decided by; nothing is gated when absent. */
+  gate?: GuiGate
   exportAvailable?: string[] | null
   recentFiles?: RecentFileEntry[]
 }
@@ -52,7 +54,7 @@ function getItemLabel(item: AppMenuItem): string {
  * Menu. Mirrors the native menu build in main/menu.ts so both UI paths
  * render the same structure.
  */
-function buildRecentSubmenu(recents: RecentFileEntry[]): MenuNode<MenuBarPick>[] {
+function buildRecentSubmenu(recents: RecentFileEntry[], gate: GuiGate | undefined): MenuNode<MenuBarPick>[] {
   // Routed through the normal item pick path so the existing
   // 'menu:clear-recent' ipcChannel dispatch keeps working.
   const clearNode: MenuNode<MenuBarPick> = {
@@ -65,6 +67,7 @@ function buildRecentSubmenu(recents: RecentFileEntry[]): MenuNode<MenuBarPick>[]
   }
   const items: MenuNode<MenuBarPick>[] = recents.map((entry) => ({
     label: basename(entry.path),
+    enabled: !gate || isAvailable(recentAvailability(entry), gate),
     action: { kind: 'recent', entry },
   }))
   items.push({ type: 'separator' })
@@ -73,13 +76,12 @@ function buildRecentSubmenu(recents: RecentFileEntry[]): MenuNode<MenuBarPick>[]
 }
 
 /**
- * Enabled state for a scene-operation item (Save / Export / tools, ...), or
- * null if `item` is not one. Disabled when no molview tab is active,
- * mirroring the native menu's `sceneOps` gate.
+ * Whether the GUI gate lets `item` run. Only items that run an app command
+ * (`ipcChannel`) are gated, as in the native menu; a pure role item is not.
  */
-function getSceneOpsState(item: AppMenuItem, hasScene: boolean | undefined): { enabled: boolean } | null {
-  if (!item.id || !SCENE_REQUIRING_MENU_IDS.includes(item.id)) return null
-  return { enabled: hasScene === true }
+function passesGate(item: AppMenuItem, gate: GuiGate | undefined): boolean {
+  if (!item.ipcChannel || !gate) return true
+  return isAvailable(item.availability, gate)
 }
 
 /**
@@ -155,14 +157,13 @@ function resolveItem(item: AppMenuItem, ctx: MenuBarStateContext): MenuNode<Menu
   const centerMarkState = getViewCenterMarkState(item, ctx.viewCenterMark)
   const bgColorState = getSceneBgColorState(item, ctx.sceneBgColor)
   const toolPaletteChecked = getToolPaletteChecked(item, ctx.toolPaletteVisible)
-  const sceneOpsState = getSceneOpsState(item, ctx.hasScene)
-  const enabled =
+  const ownEnabled =
     projectionState?.enabled ??
     centerMarkState?.enabled ??
     bgColorState?.enabled ??
-    sceneOpsState?.enabled ??
     item.enabled ??
     true
+  const enabled = ownEnabled && passesGate(item, ctx.gate)
   const checked =
     projectionState?.checked ??
     centerMarkState?.checked ??
@@ -175,7 +176,7 @@ function resolveItem(item: AppMenuItem, ctx: MenuBarStateContext): MenuNode<Menu
   // drop scene-export items whose exporter is not built into libcuemol2.
   let submenu: MenuNode<MenuBarPick>[] | undefined
   if (item.id === 'open-recent') {
-    submenu = buildRecentSubmenu(ctx.recentFiles ?? [])
+    submenu = buildRecentSubmenu(ctx.recentFiles ?? [], ctx.gate)
   } else if (item.submenu) {
     submenu = item.submenu
       .filter((sub) => !isExportItemUnavailable(sub, ctx.exportAvailable ?? null))

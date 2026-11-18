@@ -21,6 +21,8 @@ import {
 import type { RecentFileEntry } from '@shared/types/recent'
 import type { MenuState } from '@shared/types/menuState'
 import { applyMenuStateTo, mergeMenuState } from '@shared/menuStateApply'
+import type { GatedMenuItem } from '@shared/menuStateApply'
+import { recentAvailability } from '@shared/guiGate'
 import { getExistingRecents, refreshRecentsExistence } from './recentFiles'
 import { getRenderWindow } from './windows/renderWindow'
 import { menuSwatch } from './menuSwatches'
@@ -54,6 +56,7 @@ const isMac = process.platform === 'darwin'
 function buildRecentSubmenu(
   mainWindow: BrowserWindow,
   recents: RecentFileEntry[],
+  gated: Map<string, GatedMenuItem>,
 ): MenuItemConstructorOptions[] {
   const clearItem: MenuItemConstructorOptions = {
     id: 'clear-recent',
@@ -68,16 +71,23 @@ function buildRecentSubmenu(
       clearItem,
     ]
   }
-  const items: MenuItemConstructorOptions[] = recents.map((entry) => ({
-    label: path.basename(entry.path),
-    toolTip: entry.path,
-    click: () =>
-      mainWindow.webContents.send(IPC.MENU_OPEN_RECENT, {
-        path: entry.path,
-        ftype: entry.ftype,
-        readerName: entry.readerName,
-      }),
-  }))
+  // Each row is gated by its own file type. The id lets applyMenuStateTo
+  // re-decide it on every gate change, not just when the menu is built.
+  const items: MenuItemConstructorOptions[] = recents.map((entry, i) => {
+    const id = `recent-${i}`
+    gated.set(id, { availability: recentAvailability(entry), enabled: true })
+    return {
+      id,
+      label: path.basename(entry.path),
+      toolTip: entry.path,
+      click: () =>
+        mainWindow.webContents.send(IPC.MENU_OPEN_RECENT, {
+          path: entry.path,
+          ftype: entry.ftype,
+          readerName: entry.readerName,
+        }),
+    }
+  })
   items.push({ type: 'separator' })
   items.push(clearItem)
   return items
@@ -173,6 +183,7 @@ function buildItem(
   item: AppMenuItem,
   specificHandlers: Record<string, () => void>,
   mainWindow: BrowserWindow,
+  gated: Map<string, GatedMenuItem>,
 ): MenuItemConstructorOptions | null {
   if (item.darwinOnly && !isMac) return null
   if (item.othersOnly && isMac) return null
@@ -207,6 +218,12 @@ function buildItem(
     if (acc) result.accelerator = acc
   }
 
+  // Only items that run an app command are gated; a pure role item returned
+  // above (Quit, Hide, Services...) belongs to Electron.
+  if (item.ipcChannel && item.id) {
+    gated.set(item.id, { availability: item.availability, enabled: item.enabled ?? true })
+  }
+
   if (item.ipcChannel) {
     if (specificHandlers[item.ipcChannel]) {
       result.click = specificHandlers[item.ipcChannel]
@@ -227,13 +244,13 @@ function buildItem(
   // The static template carries only a placeholder Clear Menu under
   // `open-recent`; replace its submenu with the dynamic MRU listing.
   if (item.id === 'open-recent') {
-    result.submenu = buildRecentSubmenu(mainWindow, getExistingRecents())
+    result.submenu = buildRecentSubmenu(mainWindow, getExistingRecents(), gated)
     return result
   }
 
   if (item.submenu) {
     result.submenu = item.submenu.flatMap((i) => {
-      const built = buildItem(i, specificHandlers, mainWindow)
+      const built = buildItem(i, specificHandlers, mainWindow, gated)
       return built ? [built] : []
     })
   }
@@ -246,11 +263,12 @@ function buildGroup(
   group: AppMenuGroup,
   specificHandlers: Record<string, () => void>,
   mainWindow: BrowserWindow,
+  gated: Map<string, GatedMenuItem>,
 ): MenuItemConstructorOptions {
   return {
     label: group.label,
     submenu: group.submenu.flatMap((item) => {
-      const built = buildItem(item, specificHandlers, mainWindow)
+      const built = buildItem(item, specificHandlers, mainWindow, gated)
       return built ? [built] : []
     }),
   }
@@ -266,6 +284,10 @@ let pendingRebuild = false
 // Center mark / Scene > Background entries silently return to their
 // static `enabled: false` template defaults after any RECENT_ADD.
 let lastMenuState: MenuState | null = null
+
+// The gated items of the installed menu, by id: rebuilt with the menu (the
+// Open Recent rows change with it) and handed to every applyMenuStateTo.
+let gatedItems = new Map<string, GatedMenuItem>()
 
 // Menu rows contributed by the plugins the renderer currently has enabled.
 // Empty until the renderer reports in, so the menu built at window creation
@@ -287,13 +309,15 @@ function buildAndSetMenu(mainWindow: BrowserWindow): void {
     ...buildAppMenu(pluginMenuContributions).filter((g) => !g.darwinOnly),
   ]
 
+  const gated = new Map<string, GatedMenuItem>()
   const template: MenuItemConstructorOptions[] = groups
-    .map((g) => buildGroup(g, specificHandlers, mainWindow))
+    .map((g) => buildGroup(g, specificHandlers, mainWindow, gated))
     // Drop groups that build to an empty submenu (e.g. Help on macOS, whose
     // only item -- About -- is othersOnly and lives in the App menu instead).
     .filter((g) => !Array.isArray(g.submenu) || g.submenu.length > 0)
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+  gatedItems = gated
 
   // The fresh menu starts at the static template defaults; restore the
   // last view/scene state cached from earlier updateMenuState pushes so
@@ -301,7 +325,7 @@ function buildAndSetMenu(mainWindow: BrowserWindow): void {
   // gray out across an MRU-triggered rebuild.
   if (lastMenuState) {
     const menu = Menu.getApplicationMenu()
-    if (menu) applyMenuStateTo(menu, lastMenuState)
+    if (menu) applyMenuStateTo(menu, lastMenuState, gatedItems)
   }
 }
 
@@ -321,7 +345,7 @@ function flushPendingRebuild(): void {
   // (updateMenuState merges it and skips the live write). Apply it now.
   if (!lastMenuState) return
   const menu = Menu.getApplicationMenu()
-  if (menu) applyMenuStateTo(menu, lastMenuState)
+  if (menu) applyMenuStateTo(menu, lastMenuState, gatedItems)
 }
 
 // Wire the unblock callback at module load rather than from createMenu: it also
@@ -378,6 +402,7 @@ export function _resetMenuBlockForTest(): void {
   mainWindowRef = null
   pendingRebuild = false
   lastMenuState = null
+  gatedItems = new Map()
   pluginMenuContributions = []
   // The menuBlock reset drops the injected callback; restore the production
   // wiring so a test does not silently run without the unblock hook.
@@ -404,5 +429,5 @@ export function updateMenuState(state: MenuState): void {
 
   const menu = Menu.getApplicationMenu()
   if (!menu) return
-  applyMenuStateTo(menu, lastMenuState)
+  applyMenuStateTo(menu, lastMenuState, gatedItems)
 }

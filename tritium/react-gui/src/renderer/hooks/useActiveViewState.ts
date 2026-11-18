@@ -75,8 +75,6 @@ export function useActiveViewState({
     centerMark?: ViewCenterMark | null;
     bgColor?: SceneBgColor | null;
     colorProof?: boolean | null;
-    /** Enable/disable scene-operation menu items (Save / Export / tools, ...). */
-    sceneEnabled?: boolean;
   }) => {
     window.electronAPI?.invoke(IPC.MENU_UPDATE_STATE, {
       ...(state.perspective !== undefined
@@ -90,9 +88,6 @@ export function useActiveViewState({
         : {}),
       ...(state.colorProof !== undefined
         ? { sceneColorProof: { enabled: state.colorProof !== null, checked: state.colorProof === true } }
-        : {}),
-      ...(state.sceneEnabled !== undefined
-        ? { sceneOps: { enabled: state.sceneEnabled } }
         : {}),
     }).catch((err: unknown) => {
       console.warn('update menu state failed:', err);
@@ -131,12 +126,9 @@ export function useActiveViewState({
       setViewCenterMark(null);
       setSceneBgColor(null);
       setSceneColorProof(null);
-      // No active molview tab -> disable both the view-property items and the
-      // scene-operation items (Save / Export / tools, ...).
-      syncNativeViewMenu({
-        perspective: null, centerMark: null, bgColor: null, colorProof: null,
-        sceneEnabled: false,
-      });
+      // No active molview tab -> disable the view-property items. The other
+      // scene items follow the GUI gate (useGuiGateMenuSync).
+      syncNativeViewMenu({ perspective: null, centerMark: null, bgColor: null, colorProof: null });
       return;
     }
     try {
@@ -156,7 +148,7 @@ export function useActiveViewState({
       setViewCenterMark(centerMark);
       setSceneBgColor(bgColor);
       setSceneColorProof(colorProof);
-      syncNativeViewMenu({ perspective, centerMark, bgColor, colorProof, sceneEnabled: true });
+      syncNativeViewMenu({ perspective, centerMark, bgColor, colorProof });
     } catch (err: unknown) {
       if (scopeRef.current.activeMolViewId !== viewId) return;
       console.warn('get view state failed:', err);
@@ -164,12 +156,7 @@ export function useActiveViewState({
       setViewCenterMark(null);
       setSceneBgColor(null);
       setSceneColorProof(null);
-      // A molview tab is still active (only the property fetch failed), so
-      // scene-operation items stay enabled.
-      syncNativeViewMenu({
-        perspective: null, centerMark: null, bgColor: null, colorProof: null,
-        sceneEnabled: true,
-      });
+      syncNativeViewMenu({ perspective: null, centerMark: null, bgColor: null, colorProof: null });
     }
   }, [scopeRef, syncNativeViewMenu]);
 

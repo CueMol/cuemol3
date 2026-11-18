@@ -17,6 +17,7 @@ import { WelcomePane } from '@renderer/shell/WelcomePane'
 import { APP_PRODUCT_NAME } from '@shared/appInfo'
 import { findMenuItemById } from '@shared/menuTemplate'
 import { formatAccelerator } from '@shared/menuAccel'
+import { isAvailable } from '@shared/guiGate'
 
 ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -49,8 +50,7 @@ afterEach(() => {
 const rows = (c: HTMLElement) =>
   Array.from(c.querySelectorAll('.shortcut-item')).map((el) => ({
     accel: el.querySelector('.shortcut-key')?.textContent ?? '',
-    // Direct child only: Blueprint's Tag nests its own span inside .shortcut-key.
-    label: el.querySelector(':scope > span:not(.shortcut-key)')?.textContent ?? '',
+    label: el.querySelector('.shortcut-label')?.textContent ?? '',
   }))
 
 describe('WelcomePane', () => {
@@ -70,18 +70,21 @@ describe('WelcomePane', () => {
     expect(img?.getAttribute('aria-hidden')).toBe('true')
   })
 
-  it('every shortcut it advertises is really bound in the app menu', () => {
+  it('every shortcut it advertises is bound in the app menu and usable with no tab', () => {
     const c = render('win32')
     const shown = rows(c)
     expect(shown.length).toBeGreaterThan(0)
     for (const row of shown) {
-      // Label must be a real menu item, matched by label since that is what
-      // the user sees; its accelerator must be the one the menu declares.
+      // Label must be a real menu item (shown without its trailing "..."),
+      // matched by label since that is what the user sees; its accelerator
+      // must be the one the menu declares, and the GUI gate must let it run
+      // on the empty screen this pane is.
       const item = ['new-tab', 'open-file', 'open-scene', 'save-scene']
         .map((id) => findMenuItemById(id))
-        .find((i) => i?.label === row.label)
+        .find((i) => i?.label?.replace(/\.\.\.$/, '') === row.label)
       expect(item, `no menu item labelled "${row.label}"`).toBeTruthy()
       expect(row.accel).toBe(formatAccelerator(item!.accelerator!, false))
+      expect(isAvailable(item!.availability, { tab: 'none' })).toBe(true)
     }
   })
 

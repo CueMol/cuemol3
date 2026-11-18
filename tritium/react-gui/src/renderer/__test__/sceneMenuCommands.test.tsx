@@ -56,6 +56,8 @@ function mountWith(
       showSceneProperty,
       newScene: vi.fn(() => Promise.resolve(NEW_SCENE)) as never,
       openSceneFile: vi.fn(() => Promise.resolve({ ok: true, ...NEW_SCENE })) as never,
+      resolveMolView: () => undefined,
+      activateMolView: () => Promise.resolve(),
     })
     return useCommands()
   }, Wrapper)

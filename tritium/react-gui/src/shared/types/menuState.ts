@@ -6,6 +6,8 @@
  * Types only: nothing in shared/types/ may import main/ or renderer/ code.
  */
 
+import type { GuiGate } from '../guiGate'
+
 export type ViewCenterMark = 'none' | 'crosshair' | 'axis'
 
 export type SceneBgColor = 'white' | 'black' | 'other'
@@ -47,13 +49,10 @@ export interface MenuState {
     enabled: boolean
   }
   /**
-   * Enablement of menu items that act on an existing scene (Save / Save As /
-   * Export / Reload / molecule tools, ...). Disabled when no molview tab is
-   * active so they read as unavailable instead of silently doing nothing.
+   * The GUI state every gated item is decided by (see shared/guiGate.ts).
+   * Built by the renderer's `useGuiGate` and replaced as a whole.
    */
-  sceneOps?: {
-    enabled: boolean
-  }
+  guiGate?: GuiGate
   /**
    * Scene-exporter availability for the running libcuemol2 build: the set of
    * exporter nicknames registered in category 2. Export menu items whose

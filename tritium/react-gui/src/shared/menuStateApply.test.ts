@@ -23,7 +23,7 @@ import type { MenuState } from './types/menuState'
 import {
     applyMenuStateTo,
     mergeMenuState,
-    SCENE_REQUIRING_MENU_IDS,
+    type GatedMenuItem,
     type MenuItemLike,
     type MenuLike,
 } from '@shared/menuStateApply'
@@ -47,7 +47,11 @@ function makeFakeMenu(): MenuLike & { items: Map<string, FakeMenuItem> } {
         'view-tool-palette',
         'undo',
         'redo',
-        ...SCENE_REQUIRING_MENU_IDS,
+        'save-scene',
+        'open-file',
+        'new-tab',
+        'recent-0',
+        'recent-1',
     ]) {
         items.set(id, new FakeMenuItem(id))
     }
@@ -106,12 +110,12 @@ describe('mergeMenuState', () => {
         expect(merged.redo).toEqual({ enabled: false })
     })
 
-    it('carries the sceneOps slice across an unrelated update', () => {
-        const cache: MenuState = { sceneOps: { enabled: false } }
+    it('carries the guiGate slice across an unrelated update', () => {
+        const cache: MenuState = { guiGate: { tab: 'other' } }
         const merged = mergeMenuState(cache, {
             viewProjection: { enabled: true, perspective: true },
         })
-        expect(merged.sceneOps).toEqual({ enabled: false })
+        expect(merged.guiGate).toEqual({ tab: 'other' })
     })
 })
 
@@ -180,24 +184,41 @@ describe('applyMenuStateTo — sets enabled/checked correctly', () => {
         expect(menu.items.get('redo')!.enabled).toBe(false)
     })
 
-    it('sceneOps: disables every scene-requiring item when enabled=false', () => {
+    it('guiGate: re-decides every gated item on each apply, Open Recent rows by file type', () => {
+        // What main/menu.ts registers while building: template items with
+        // their declaration, and the Open Recent rows by `ftype`.
+        const gated = new Map<string, GatedMenuItem>([
+            ['save-scene', { enabled: true }],
+            ['open-file', { availability: 'loadIntoScene', enabled: true }],
+            ['new-tab', { availability: 'always', enabled: true }],
+            ['recent-0', { availability: 'loadIntoScene', enabled: true }],
+            ['recent-1', { availability: 'always', enabled: true }],
+            ['undo', { enabled: true }],
+        ])
         const menu = makeFakeMenu()
-        // Pre-enable them to prove the apply turns them off.
-        for (const id of SCENE_REQUIRING_MENU_IDS) menu.items.get(id)!.enabled = true
-        applyMenuStateTo(menu, { sceneOps: { enabled: false } })
-        for (const id of SCENE_REQUIRING_MENU_IDS) {
-            expect(menu.items.get(id)!.enabled).toBe(false)
-        }
-    })
+        const enabled = () => Object.fromEntries(
+            [...gated.keys()].map((id) => [id, menu.items.get(id)!.enabled]),
+        )
+        let cache = mergeMenuState(null, { undo: { enabled: true }, guiGate: { tab: 'molview' } })
+        applyMenuStateTo(menu, cache, gated)
+        expect(Object.values(enabled()).every(Boolean)).toBe(true)
 
-    it('sceneOps: enables every scene-requiring item when enabled=true', () => {
-        const menu = makeFakeMenu()
-        applyMenuStateTo(menu, { sceneOps: { enabled: true } })
-        for (const id of SCENE_REQUIRING_MENU_IDS) {
-            expect(menu.items.get(id)!.enabled).toBe(true)
-        }
-        // An unrelated item (no sceneOps gate) is untouched.
-        expect(menu.items.get('bg-white')!.enabled).toBe(false)
+        // Settings in front: only the 'always' items and scene recents stay.
+        cache = mergeMenuState(cache, { guiGate: { tab: 'other' } })
+        applyMenuStateTo(menu, cache, gated)
+        expect(enabled()).toEqual({
+            'save-scene': false, 'open-file': false, 'new-tab': true,
+            'recent-0': false, 'recent-1': true, undo: false,
+        })
+
+        // Back to a molview: the gate gives every item back, but an item's
+        // own state still holds it off (nothing to undo).
+        cache = mergeMenuState(cache, { guiGate: { tab: 'molview' }, undo: { enabled: false } })
+        applyMenuStateTo(menu, cache, gated)
+        expect(enabled()).toEqual({
+            'save-scene': true, 'open-file': true, 'new-tab': true,
+            'recent-0': true, 'recent-1': true, undo: false,
+        })
     })
 
     it('does not touch items belonging to unset slices', () => {
