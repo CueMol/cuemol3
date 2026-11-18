@@ -401,3 +401,9 @@ architecture, it belongs here.
   pane / dialog を開いて dark/light × 複数サイズのスクリーンショットと DOM レイアウト監査
   (文字の切れ・はみ出し・重なり・サイズ token 不一致) を出す。dev ビルド限定の `window.__cuemolE2E`
   ブリッジ (`CUEMOL_E2E=1` -> `?e2e=1`)、監査の種類と除外 (`data-audit-ignore`)。
+
+- [時間がかかる処理の表示 (長い処理インジケータ)](long-task-indicator.md) (日本語) --
+  GUI から直接呼んだ重い処理 (シーンの保存・読み込み、ファイルを開く、表面生成、MD trajectory など) が
+  0.8 s を超えたら、文言・経過秒数・バーのカードをどのタブでも見える位置に出す (入力は止めない)。
+  service が呼び出しごとの `ctx.reportTask` で名乗る opt-in 方式、`invokeOp` / console の `runCommand` では名乗らない理由、
+  transport の `subscribeLongTasks`、保存時間の大半が xz 圧縮という計測。

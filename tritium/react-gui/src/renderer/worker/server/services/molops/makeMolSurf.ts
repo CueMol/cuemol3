@@ -30,6 +30,7 @@ import { makeSel } from '@renderer/worker/server/services/helpers/makeSel';
 import { uniqName } from '@renderer/worker/server/services/helpers/uniqName';
 import { withUndoTxn } from '../withUndoTxn';
 import { recordOp } from '@renderer/worker/server/actions/serviceOps';
+import { reportTask } from '@renderer/worker/server/services/helpers/taskReport';
 
 export interface MakeMolSurfArgs {
     sceneId: number;
@@ -113,6 +114,8 @@ export function makeMolSurf(
             ? args.surfName.trim()
             : uniqName(`sf_${molName}`, (n) => !!scene.getObjectByName(n));
     const rendName = uniqName('molsurf', (n) => !!scene.getRendByName(n));
+    // Before the surface computation (long-task indicator).
+    reportTask(ctx, { label: 'Generating surface', detail: surfName });
 
     let newObjId = -1;
     let newObjName = '';

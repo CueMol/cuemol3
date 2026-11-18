@@ -125,6 +125,26 @@ describe('loadTrajectory — block-centric assembly', () => {
         expect(setupRenderer).toHaveBeenCalledTimes(1)
     })
 
+    it('reports each file as a step before its synchronous read (long-task indicator)', () => {
+        const { ctx, calls } = makeFixture()
+        const report = (s: { detail?: string; step?: number; total?: number }) =>
+            calls.push(`report(${s.detail} ${s.step}/${s.total})`)
+        const reporting = { ...ctx, reportTask: report } as WorkerContext
+        mdtoolsServices.loadTrajectory(reporting, {
+            sceneId: 1,
+            topologyPath: '/p/system.gro',
+            trajPaths: ['/p/a.dcd', '/p/b.xtc'],
+            renderer,
+        })
+
+        const seen = calls.filter((c) => c.startsWith('report') || c.endsWith('.read'))
+        expect(seen).toEqual([
+            'report(system.gro 1/3)', 'gro.read',
+            'report(a.dcd 2/3)', 'dcdtraj.read',
+            'report(b.xtc 3/3)', 'xtctraj.read',
+        ])
+    })
+
     it('maps .trr to the trrtraj reader', () => {
         const { ctx, calls } = makeFixture()
         mdtoolsServices.loadTrajectory(ctx, {

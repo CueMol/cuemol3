@@ -28,6 +28,11 @@ import { APBS_PROGRESS_CHANNEL } from '@renderer/worker/shared/apbsTypes';
 import type { AnimProgressUpdate } from '@renderer/worker/shared/animTypes';
 import { ANIM_PROGRESS_CHANNEL } from '@renderer/worker/shared/animTypes';
 import { isPluginChannel, pluginServiceName } from '@renderer/worker/shared/pluginCalls';
+import {
+    TASK_PROGRESS_CHANNEL,
+    type TaskProgressMessage,
+    type TaskState,
+} from '@renderer/worker/shared/taskProgress';
 import type { CrashSource } from '@shared/types/crash';
 import { report as reportCrash } from '@renderer/crash/CrashReporter';
 
@@ -68,6 +73,28 @@ export type ApbsProgressListener = (update: ApbsUpdate) => void;
  * `definePluginChannel<T>` puts the type back on at the subscribing end.
  */
 export type PluginChannelListener = (payload: unknown) => void;
+
+/**
+ * A pending tracked call that has named its long task (`ctx.reportTask` on
+ * the worker side). `startedAt` is when the call was sent (renderer clock).
+ */
+export interface LongTask extends TaskState {
+    seq: number;
+    /** Service / method name of the call. */
+    name: string;
+    /** `performance.now()` when the call was sent. */
+    startedAt: number;
+}
+
+/** What `subscribeLongTasks` reports: the oldest reported task and how many there are. */
+export interface LongTasksSnapshot {
+    /** The oldest pending call that has reported, or null when none has. */
+    current: LongTask | null;
+    /** Pending calls that have reported (including `current`). */
+    count: number;
+}
+
+export type LongTasksListener = (snapshot: LongTasksSnapshot) => void;
 
 /**
  * A call waiting for its reply.
@@ -134,6 +161,13 @@ export class WorkerTransport {
     };
     private _pendingCount: number = 0;
     private _busyListeners: Set<(busy: boolean) => void> = new Set();
+    /**
+     * Tracked calls in flight, by seq (Map keeps insertion = send order). A
+     * call gets its task state once the worker reports one; only those are
+     * long tasks.
+     */
+    private _tracked = new Map<number, { seq: number; name: string; startedAt: number; state: TaskState | null }>();
+    private _longTasksListeners: Set<LongTasksListener> = new Set();
     private _onEventNotify: (args: EventNotifyArgs) => void;
     private _streamProgressListeners: Set<StreamProgressListener> = new Set();
     private _animProgressListeners = new Set<AnimProgressListener>();
@@ -255,6 +289,13 @@ export class WorkerTransport {
                 for (const cb of this._apbsProgressListeners) {
                     try { cb(update); } catch (e) { log.warn('apbs-progress listener:', e); }
                 }
+                return;
+            }
+
+            if (method === TASK_PROGRESS_CHANNEL) {
+                // event.data shape: ['task-progress', TaskProgressMessage]
+                const [msg] = event.data.slice(1) as [TaskProgressMessage];
+                this._onTaskProgress(msg);
                 return;
             }
 
@@ -480,6 +521,57 @@ export class WorkerTransport {
         }
     }
 
+    /**
+     * Merge a worker task report into its call. A report for a call that is
+     * not tracked (quiet) or already replied is dropped.
+     */
+    private _onTaskProgress(msg: TaskProgressMessage): void {
+        const call = this._tracked.get(msg.seq);
+        if (!call) return;
+        const { seq: _seq, ...state } = msg;
+        call.state = { ...(call.state ?? {}), ...state };
+        this._notifyLongTasks();
+    }
+
+    /** Forget a finished tracked call; tell listeners if it was a long task. */
+    private _endTracked(seq: number): void {
+        const call = this._tracked.get(seq);
+        if (!call) return;
+        this._tracked.delete(seq);
+        if (call.state) this._notifyLongTasks();
+    }
+
+    /** The oldest reported task and the number of reported tasks. */
+    getLongTasks(): LongTasksSnapshot {
+        let current: LongTask | null = null;
+        let count = 0;
+        for (const call of this._tracked.values()) {
+            if (!call.state) continue;
+            count++;
+            if (!current) current = { ...call.state, seq: call.seq, name: call.name, startedAt: call.startedAt };
+        }
+        return { current, count };
+    }
+
+    private _notifyLongTasks(): void {
+        if (this._longTasksListeners.size === 0) return;
+        const snap = this.getLongTasks();
+        for (const cb of this._longTasksListeners) {
+            try { cb(snap); } catch (e) { log.warn('long-tasks listener error:', e); }
+        }
+    }
+
+    /**
+     * Subscribe to long-task changes: a call reporting its task state, a
+     * report changing it, or a reported call ending.
+     *
+     * @returns An unsubscribe function.
+     */
+    subscribeLongTasks(cb: LongTasksListener): () => void {
+        this._longTasksListeners.add(cb);
+        return () => { this._longTasksListeners.delete(cb); };
+    }
+
     /** Whether at least one tracked call is currently in flight. */
     isBusy(): boolean { return this._pendingCount > 0; }
 
@@ -527,14 +619,20 @@ export class WorkerTransport {
             return Promise.reject(new Error('Worker has crashed; ' + method + ' call rejected'));
         }
         const cur_seq = this.getSeqNo();
-        if (opts.tracked) this._incPending();
+        if (opts.tracked) {
+            this._incPending();
+            this._tracked.set(cur_seq, { seq: cur_seq, name: method, startedAt: performance.now(), state: null });
+        }
         const promise = new Promise<any[]>((resolve, reject) => {
             this.addListener(method, cur_seq, (result: boolean, ...msgargs: any[]): void => {
                 try {
                     if (result) resolve(msgargs);
                     else reject(msgargs[0]);
                 } finally {
-                    if (opts.tracked) this._decPending();
+                    if (opts.tracked) {
+                        this._decPending();
+                        this._endTracked(cur_seq);
+                    }
                 }
             });
         });

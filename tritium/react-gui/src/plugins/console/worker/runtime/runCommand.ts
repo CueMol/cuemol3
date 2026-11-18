@@ -44,6 +44,7 @@ import { NATIVE_META, scriptOwner } from '../../shared/dialectMeta'
 import { resolvePath } from './paths'
 import { beginRun, endRun, isStopped, noteRunStream } from './runControl'
 import { writeLog } from './commandLog'
+import { withoutTaskReport } from '@renderer/worker/server/services/helpers/taskReport'
 import { isQaxPath, readQaxFile, runQaxItems } from './runQax'
 import type { QaxRunner } from './runQax'
 import type { CmdContext, CmdOutcome, ConsoleCommand, ConsoleDialect, DialectLine } from './types'
@@ -607,11 +608,16 @@ async function runScriptPath(
  *
  * Async because `fetch` downloads and a script reads its file; everything
  * else resolves immediately.
+ *
+ * A submission runs several commands in this one call, so the services they
+ * reach do not report to the long-task indicator: a report would outlive its
+ * command (until the submission replies) and time the whole submission.
  */
 export async function runCommand(
-  ctx: WorkerContext,
+  callCtx: WorkerContext,
   args: RunCommandArgs,
 ): Promise<RunCommandResult> {
+  const ctx = withoutTaskReport(callCtx)
   const dialect = dialectOf(args.dialect)
   if (args.scriptPath !== undefined) return runScriptPath(dialect, ctx, args, args.scriptPath)
   return runText(dialect, ctx, args)

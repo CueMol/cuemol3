@@ -4,6 +4,7 @@ import { useActiveToolDef } from '@renderer/contexts/ActiveToolContext';
 import { useStatusMessage } from '@renderer/state/statusMessage';
 import { useCueMolBusy } from '@renderer/hooks/useCueMolBusy';
 import { useBusyCursor } from '@renderer/hooks/useBusyCursor';
+import { longTaskTitle, useLongTask } from '@renderer/hooks/cuemol/useLongTask';
 import { usePluginContributions } from '@renderer/plugin-host';
 import { NotificationBell } from './notifications';
 
@@ -15,6 +16,9 @@ const StatusBarComponent: React.FC = () => {
   // The same flag drives a global wait cursor, so the busy state is visible
   // wherever the pointer is -- not only here.
   useBusyCursor(busy);
+  // A reported long task names itself here too (the card is LongTaskIndicator).
+  const longTask = useLongTask();
+  const longTitle = longTask ? longTaskTitle(longTask.task) : null;
   const { statusBar: pluginItems } = usePluginContributions();
   const { label: activeToolLabel, shortcut: activeToolShortcut, icon: activeToolIcon } = activeDef;
   return (
@@ -39,7 +43,13 @@ const StatusBarComponent: React.FC = () => {
       </div>
       <div className="status-right">
         {pluginItems.map(({ key, Component }) => <Component key={key} />)}
-        {busy ? (
+        {longTask && longTitle ? (
+          <span className="status-item status-busy" title={longTitle}>
+            <AppIcon name="ui.refresh" size={10} className="status-spinner" aria-hidden />
+            <span className="status-busy-task">{longTitle}</span>
+            <span>{`${longTask.elapsedSec} s`}</span>
+          </span>
+        ) : busy ? (
           <span className="status-item status-busy" title="Worker is processing">
             <AppIcon name="ui.refresh" size={10} className="status-spinner" aria-hidden />
             Busy

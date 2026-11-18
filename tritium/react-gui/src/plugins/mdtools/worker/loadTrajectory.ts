@@ -33,6 +33,7 @@ import { OBJREADER_CATEGORY } from '@renderer/worker/server/services/helpers/pic
 import { fail, ok, type Result } from '@renderer/worker/shared/result';
 import { appendTrajFile, fileExt, unsupportedTrajFormat } from './trajBlocks';
 import { TOPOLOGY_READER_BY_EXT } from '../trajFormats';
+import { baseName, reportTask } from '@renderer/worker/server/services/helpers/taskReport';
 
 const log = console;
 
@@ -114,6 +115,10 @@ export function loadTrajectory(
             topologyReader, OBJREADER_CATEGORY,
         ) as unknown as ObjReaderHandle | null;
         if (!topoReader) return fail(`topology reader "${topologyReader}" not available`, 'unsupported');
+        // One step per file, each reported before its synchronous read
+        // (long-task indicator): the topology, then every trajectory file.
+        const total = 1 + args.trajPaths.length;
+        reportTask(ctx, { label: 'Loading MD trajectory', detail: baseName(args.topologyPath), step: 1, total });
         topoReader.setPath(args.topologyPath);
         topoReader.attach(traj);
         topoReader.read();
@@ -123,9 +128,10 @@ export function loadTrajectory(
         (scene as unknown as SceneHandle).addObject(traj);
 
         // 3. Trajectory files -> TrajBlocks appended in order.
-        for (const trajPath of args.trajPaths) {
+        args.trajPaths.forEach((trajPath, i) => {
+            reportTask(ctx, { detail: baseName(trajPath), step: 2 + i, total });
             appendTrajFile(ctx, traj, trajPath, nevery);
-        }
+        });
 
         // 4. Initial renderer (Trajectory is MolCoord-derived; reused as-is).
         setupRenderer(ctx, traj, args.renderer, true);

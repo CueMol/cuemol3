@@ -32,6 +32,7 @@ import { applyMapTypeChoice, applyMapCenterPolicy } from '@renderer/worker/serve
 import { fail, failFrom, ok, type Result } from '@renderer/worker/shared/result';
 import { getSceneOrNull } from '@renderer/worker/server/services/helpers/sceneResolver';
 import { hasNoCoords } from '@renderer/worker/server/services/helpers/hasNoCoords';
+import { baseName, reportTask } from '@renderer/worker/server/services/helpers/taskReport';
 
 const log = console;
 
@@ -69,6 +70,8 @@ export type LoadObjectResult = Result<{ objId: number; noCoords?: { natoms: numb
 
 export function loadObject(ctx: WorkerContext, args: LoadObjectArgs): LoadObjectResult {
     log.info(`[worker] loading object file: ${args.filePath} (contentFirst=${args.contentFirst})`);
+    // Before the content sniff and the read (long-task indicator).
+    reportTask(ctx, { label: 'Opening file', detail: baseName(args.filePath) });
 
     const nickname = args.readerName ?? pickReaderName(ctx, args.filePath, args.contentFirst, args.maxSniffBytes);
     if (!nickname) {

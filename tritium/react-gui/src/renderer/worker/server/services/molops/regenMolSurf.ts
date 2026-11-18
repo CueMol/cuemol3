@@ -27,6 +27,7 @@ import { safeRead } from '@renderer/worker/server/services/helpers/safeRead';
 import { undoTxnResult } from '../withUndoTxn';
 import { recordOp } from '@renderer/worker/server/actions/serviceOps';
 import { ok, fail, type Result } from '@renderer/worker/shared/result';
+import { reportTask } from '@renderer/worker/server/services/helpers/taskReport';
 
 export interface GetMolSurfRegenInfoArgs {
     sceneId: number;
@@ -160,6 +161,10 @@ export function regenMolSurf(
     }
 
     const density = coerceDensity(args.density);
+    reportTask(ctx, {
+        label: 'Regenerating surface',
+        detail: safeRead(() => (obj as unknown as { name: string }).name) ?? undefined,
+    });
     return undoTxnResult(scene, 'Regenerate mol surface', () => {
         recordOp(ctx, scene.uid, 'recalc_surface', {
             surfId: args.objId,
