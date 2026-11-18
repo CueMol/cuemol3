@@ -1,8 +1,8 @@
 /**
  * @file plugins/catalog/renderer/CatalogPane2.tsx
  * @description Component catalog (2/3): aligned FieldGrid, shared widgets
- * (MolSelList / SliderField), Listbox rows, the segmented control and
- * form buttons.
+ * (MolSelList / SliderField), Listbox rows, the segmented control,
+ * form buttons and the level-on-histogram field.
  *
  * A showcase, not a feature pane. Sizing comes entirely from the catalog
  * (`styles/_form-kit.css`); this file sets no control sizes itself.
@@ -26,13 +26,27 @@ import {
   RadioField,
   ColorField,
   SliderField,
+  NumericField,
 } from "@renderer/h3-kit/form";
+import { LevelHistogramField, type GradientHistogram, type ValueDomain } from "@renderer/h3-kit/gradient";
 import { Listbox, ListRow, ListboxTree } from "@renderer/h3-kit/list";
 import { MolSelList } from "@renderer/h3-kit/MolSelList";
 import { useActiveScene } from '@renderer/state/workspace';
 
 /** Sample rows for the Listbox showcase. */
 const LISTBOX_ITEMS = ["1CRN", "3J3Q", "Water", "Ligand"];
+
+/** Sample distribution for the level histogram: a background peak plus a tail. */
+const SAMPLE_DOMAIN: ValueDomain = { min: -1, max: 3 };
+const SAMPLE_HISTOGRAM: GradientHistogram = {
+  bins: Array.from({ length: 80 }, (_, i) => {
+    const v = SAMPLE_DOMAIN.min + ((i + 0.5) / 80) * (SAMPLE_DOMAIN.max - SAMPLE_DOMAIN.min);
+    return Math.round(1e5 * Math.exp(-(v * v) / 0.08) + 300 * Math.exp(-((v - 1) * (v - 1)) / 0.6));
+  }),
+  nmax: 1e5,
+  globalNmax: 1e5,
+  domain: SAMPLE_DOMAIN,
+};
 
 /* --- Props --- */
 
@@ -55,6 +69,9 @@ export const CatalogPane2: PaneComponent = ({
   const [seg, setSeg] = useState("all");
   const [radio, setRadio] = useState("temp");
   const [color, setColor] = useState("#3b82f6");
+  const [level, setLevel] = useState(1.2);
+  const [levelDraft, setLevelDraft] = useState<number | null>(null);
+  const [levelDomain, setLevelDomain] = useState<ValueDomain>(SAMPLE_DOMAIN);
 
   return (
     <div className="sp-pane">
@@ -192,6 +209,35 @@ export const CatalogPane2: PaneComponent = ({
                   ]}
                 />
               </Field>
+            </FieldGroup>
+
+            <FieldGroup title="Level on histogram">
+              <FieldGrid>
+                <LevelHistogramField
+                  label="Level"
+                  valueField={
+                    <NumericField
+                      slider={false}
+                      value={levelDraft ?? level}
+                      decimals={3}
+                      onChange={setLevelDraft}
+                      onRelease={(v) => { setLevelDraft(null); setLevel(v); }}
+                      min={SAMPLE_DOMAIN.min}
+                      max={SAMPLE_DOMAIN.max}
+                      step={0.01}
+                    />
+                  }
+                  value={level}
+                  hint="= 0.42 (other unit)"
+                  histogram={SAMPLE_HISTOGRAM}
+                  domain={levelDomain}
+                  onPreview={setLevel}
+                  onCommit={(v) => setLevel(v)}
+                  onAbort={(orig) => setLevel(orig)}
+                  onDomainChange={setLevelDomain}
+                  onFit={() => setLevelDomain(SAMPLE_DOMAIN)}
+                />
+              </FieldGrid>
             </FieldGroup>
 
             <FieldGroup title="Buttons">

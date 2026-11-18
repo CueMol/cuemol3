@@ -153,7 +153,7 @@ function buttonByText(container: HTMLElement, text: string): HTMLButtonElement {
 }
 
 function mutationCalls(cm: MockCm): Array<[string, unknown]> {
-    const reads = new Set(['listMapRenderers', 'getMapRendererState'])
+    const reads = new Set(['listMapRenderers', 'getMapRendererState', 'getMapHistogramInfo', 'getMapHistogram'])
     return cm.invokeService.mock.calls.filter(
         (c) => !reads.has(c[0] as string),
     ) as Array<[string, unknown]>

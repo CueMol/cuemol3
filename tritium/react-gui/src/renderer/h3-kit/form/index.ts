@@ -16,7 +16,7 @@ export { FieldGroup } from './FieldGroup';
 export type { FieldGroupProps } from './FieldGroup';
 export { FieldSection } from './FieldSection';
 export type { FieldSectionProps } from './FieldSection';
-export { FieldGrid, FieldGridRadioHeading, FieldGridRow } from './FieldGrid';
+export { FieldGrid, FieldGridRadioHeading, FieldGridRow, FieldGridSpan } from './FieldGrid';
 export type {
     FieldGridProps,
     FieldGridRadioHeadingProps,
@@ -61,3 +61,4 @@ export { ButtonRow, FormButton } from './ButtonRow';
 export type { ButtonRowProps } from './ButtonRow';
 export { SegmentField } from './SegmentField';
 export type { SegmentFieldProps, SegmentFieldOption } from './SegmentField';
+export { decimalsOf } from './numericMath';

@@ -46,6 +46,20 @@ export const FieldGridRow: React.FC<FieldGridRowProps> = ({ label, children }) =
     </div>
 );
 
+export interface FieldGridSpanProps {
+    children: React.ReactNode;
+}
+
+/**
+ * A full-width row inside a `FieldGrid`: spans both columns, for a control
+ * that belongs between two rows but needs the whole width (e.g. the level
+ * histogram above the Level row). The rows around it keep the shared label
+ * column.
+ */
+export const FieldGridSpan: React.FC<FieldGridSpanProps> = ({ children }) => (
+    <div className="h3-form-grid-span">{children}</div>
+);
+
 export interface FieldGridRadioHeadingProps {
     /** Radio label. */
     label: string;

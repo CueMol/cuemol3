@@ -14,10 +14,18 @@
  *   - Redraw button (`redrawMapCenter`) and Cell button (reuses
  *     `showUnitCellRenderer` from the symmetry panel).
  *   - Solid color swatch + a "Solid color" item in the dropdown menu.
- *   - Transparency / Level / Extent sliders. The Level slider writes
- *     `siglevel` in the native unit, or `level` in absolute mode (C++
+ *   - Transparency / Extent sliders and the Level entry. The Level entry
+ *     writes `siglevel` in the native unit, or `level` in absolute mode (C++
  *     converts through the map kind), instead of UXP's inline
  *     sigma-to-absolute scaling.
+ *   - The Level row is a typed entry (native unit, or absolute in absolute
+ *     mode) above the map's density histogram, which shows the level as a
+ *     draggable marker (ChimeraX volume viewer style; not in UXP). The
+ *     marker always writes `level` (absolute) and previews into the renderer
+ *     while dragged; the typed entry and its caption follow through the
+ *     refetched state -- C++ owns the conversion between the absolute level
+ *     and the native unit (sigma, or the top percent of grid points, which
+ *     depends on the map's distribution).
  *
  * @remarks Coloring here is deliberately the *simple* half only: the solid
  * color. Everything richer -- switching to multi-gradient, editing the
@@ -47,7 +55,9 @@ import { PaneSectionHeader } from '@renderer/shell/PaneSectionHeader'
 import { DragRow, type MapPropWriteOpts } from '@renderer/features/density/densityMap/DragRow'
 import { useDensityMapPanel } from './useDensityMapPanel'
 import { levelControlFor } from './levelControl'
-import { FieldGrid } from '@renderer/h3-kit/form'
+import { FieldGrid, NumericField, decimalsOf } from '@renderer/h3-kit/form'
+import { LevelHistogramField } from '@renderer/h3-kit/gradient'
+import { useLevelHistogram } from './useLevelHistogram'
 import type {
     MapRendererEntry,
     MapRendererPropName,
@@ -224,6 +234,52 @@ export const DensityMapPane: React.FC<DensityMapPaneProps> = ({ collapsed, onTog
     // --- Level field: prop / unit / range / caption by mode ---
     const levelCtl = useMemo(() => levelControlFor(state), [state])
 
+    // Typed Level entry: the keystrokes stay local (NumericField commits the
+    // last parsed value on Enter / blur), shown one decimal finer than the
+    // field's step -- the same display precision as the drag fields.
+    const [levelDraft, setLevelDraft] = useState<number | null>(null)
+    useEffect(() => { setLevelDraft(null) }, [selectedRendId, levelCtl.prop])
+    const levelDecimals = decimalsOf(levelCtl.step / 10)
+
+    // --- Level histogram (absolute units; writes `level`) ---
+    const [levelDragging, setLevelDragging] = useState(false)
+    const levelHisto = useLevelHistogram({
+        cm,
+        sceneId: activeSceneId,
+        rendId: selectedRendId,
+        state,
+        dragging: levelDragging,
+    })
+    // The default flag the undo step has to put back, frozen when the gesture
+    // starts (a preview frame already clears it).
+    const levelWasDefaultRef = useRef(false)
+    const onLevelDragStart = useCallback(() => {
+        levelWasDefaultRef.current = state?.defaults.siglevel ?? false
+        setLevelDragging(true)
+    }, [state])
+    const onLevelPreview = useCallback(
+        (v: number) => setProp('level', v, { mode: 'preview' }),
+        [setProp],
+    )
+    const onLevelCommit = useCallback(
+        (v: number, original: number) => {
+            // A click commits without a drag: its default flag is the live one.
+            const wasDefault = levelDragging
+                ? levelWasDefaultRef.current
+                : state?.defaults.siglevel ?? false
+            setLevelDragging(false)
+            setProp('level', v, { mode: 'commit', originalValue: original, originalWasDefault: wasDefault })
+        },
+        [setProp, levelDragging, state],
+    )
+    const onLevelAbort = useCallback(
+        (original: number) => {
+            setLevelDragging(false)
+            setProp('level', original, { mode: 'abort', originalWasDefault: levelWasDefaultRef.current })
+        },
+        [setProp],
+    )
+
     const modeMenu = (
         <Menu>
             <MenuItem
@@ -347,18 +403,6 @@ export const DensityMapPane: React.FC<DensityMapPaneProps> = ({ collapsed, onTog
                             onWrite={(v, opts) => setProp('alpha', v, opts)}
                             disabled={disabled}
                         />
-                        <DragRow
-                            label="Level"
-                            value={levelCtl.value}
-                            min={levelCtl.min}
-                            max={levelCtl.max}
-                            step={levelCtl.step}
-                            unit={levelCtl.unit || undefined}
-                            hint={levelCtl.hint || undefined}
-                            committedIsDefault={state?.defaults.siglevel}
-                            onWrite={(v, opts) => setProp(levelCtl.prop, v, opts)}
-                            disabled={disabled}
-                        />
                         {/* Extent only shapes the box region; in the full
                           * region (cryo-EM maps) the whole map is marched. */}
                         <DragRow
@@ -371,6 +415,38 @@ export const DensityMapPane: React.FC<DensityMapPaneProps> = ({ collapsed, onTog
                             committedIsDefault={state?.defaults.extent}
                             onWrite={(v, opts) => setProp('extent', v, opts)}
                             disabled={disabled || state?.regionResolved === 'full'}
+                        />
+                        <LevelHistogramField
+                            label="Level"
+                            valueField={
+                                <NumericField
+                                    slider={false}
+                                    value={levelDraft ?? levelCtl.value}
+                                    decimals={levelDecimals}
+                                    onChange={setLevelDraft}
+                                    onRelease={(v) => {
+                                        setLevelDraft(null)
+                                        if (v !== levelCtl.value) setProp(levelCtl.prop, v)
+                                    }}
+                                    min={levelCtl.min}
+                                    max={levelCtl.max}
+                                    step={levelCtl.step}
+                                    unit={levelCtl.unit || undefined}
+                                    disabled={disabled}
+                                />
+                            }
+                            hint={levelCtl.hint || undefined}
+                            value={state?.level ?? 0}
+                            histogram={levelHisto.histogram}
+                            domain={levelHisto.domain ?? { min: 0, max: 1 }}
+                            disabled={disabled || levelHisto.domain === null}
+                            onDragStart={onLevelDragStart}
+                            onPreview={onLevelPreview}
+                            onCommit={onLevelCommit}
+                            onAbort={onLevelAbort}
+                            onDomainChange={levelHisto.setDomain}
+                            onWidthChange={levelHisto.setWidthPx}
+                            onFit={levelHisto.fit}
                         />
                     </FieldGrid>
                 </div>
