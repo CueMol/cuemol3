@@ -17,40 +17,17 @@
 
 import type { MenuState } from './types/menuState'
 import { SCENE_EXPORT_MENU_EXPORTERS } from './menuTemplate'
+import { isAvailable } from './guiGate'
+import type { Availability } from './guiGate'
 
 /**
- * Menu item ids (from `menuTemplate.ts`) of implemented actions that operate on
- * an existing scene and therefore must be disabled when no molview tab is
- * active. Kept here (shared) so main and renderer agree on the set.
- *
- * Excludes items already gated by their own state slice (background colour,
- * colour proofing, perspective / orthographic, center mark) and the
- * not-yet-ported placeholders (scene-props, image-render, ...), whose
- * disabled-ness is a separate concern.
+ * A menu item the GUI gate applies to: what it declares, and the enabled flag
+ * it has when its own state says nothing (the template's `enabled`, else true).
  */
-export const SCENE_REQUIRING_MENU_IDS: readonly string[] = [
-    // File
-    'save-file-as',
-    'save-current-view',
-    'reload-scene',
-    'save-scene',
-    'save-scene-as',
-    // Edit (molecule operations)
-    'merge-mol',
-    'delete-mol-atoms',
-    'change-chain-id',
-    'change-resid-num',
-    // Rendering
-    'export-scene',
-    // View
-    'view-props',
-    // Tools (molecule operations)
-    'mol-superpose',
-    'interaction',
-    'reassign-2ndry',
-    'mol-surf',
-    'surf-cutter',
-]
+export interface GatedMenuItem {
+    availability?: Availability
+    enabled: boolean
+}
 
 /** Minimal MenuItem surface that the apply helper mutates. */
 export interface MenuItemLike {
@@ -83,7 +60,7 @@ export function mergeMenuState(
         toolPalette: update.toolPalette ?? current?.toolPalette,
         undo: update.undo ?? current?.undo,
         redo: update.redo ?? current?.redo,
-        sceneOps: update.sceneOps ?? current?.sceneOps,
+        guiGate: update.guiGate ?? current?.guiGate,
         exportCaps: update.exportCaps ?? current?.exportCaps,
     }
 }
@@ -93,20 +70,31 @@ export function mergeMenuState(
  * Items that the menu doesn't have are skipped silently -- callers
  * may pass a state slice for a menu that was just rebuilt and is
  * still missing the right ids.
+ *
+ * An item's `enabled` is its own state (a slice below, else its
+ * `GatedMenuItem.enabled` default) AND the GUI gate. Both are recomputed on
+ * every call, so the gate turning back on re-enables an item it had disabled.
+ *
+ * @param gated - every gated item in `menu`, by id (static items and the
+ *   dynamic Open Recent rows alike). Items absent from it are never gated.
  */
-export function applyMenuStateTo(menu: MenuLike, state: MenuState): void {
+export function applyMenuStateTo(
+    menu: MenuLike,
+    state: MenuState,
+    gated: ReadonlyMap<string, GatedMenuItem> = new Map(),
+): void {
+    // The enabled flag each item's own state asks for; written out at the end
+    // together with the gate.
+    const own = new Map<string, boolean>()
+
     if (state.viewProjection) {
         const { enabled, perspective } = state.viewProjection
         const perspectiveItem = menu.getMenuItemById('view-perspective')
         const orthographicItem = menu.getMenuItemById('view-orthographic')
-        if (perspectiveItem) {
-            perspectiveItem.enabled = enabled
-            perspectiveItem.checked = enabled && perspective === true
-        }
-        if (orthographicItem) {
-            orthographicItem.enabled = enabled
-            orthographicItem.checked = enabled && perspective === false
-        }
+        own.set('view-perspective', enabled)
+        own.set('view-orthographic', enabled)
+        if (perspectiveItem) perspectiveItem.checked = enabled && perspective === true
+        if (orthographicItem) orthographicItem.checked = enabled && perspective === false
     }
 
     if (state.viewCenterMark) {
@@ -117,21 +105,17 @@ export function applyMenuStateTo(menu: MenuLike, state: MenuState): void {
             { id: 'center-mark-axis', value: 'axis' as const },
         ]
         for (const { id, value } of markItems) {
+            own.set(id, enabled)
             const item = menu.getMenuItemById(id)
-            if (item) {
-                item.enabled = enabled
-                item.checked = enabled && centerMark === value
-            }
+            if (item) item.checked = enabled && centerMark === value
         }
     }
 
     if (state.sceneColorProof) {
         const { enabled, checked } = state.sceneColorProof
+        own.set('color-proof', enabled)
         const item = menu.getMenuItemById('color-proof')
-        if (item) {
-            item.enabled = enabled
-            item.checked = enabled && checked
-        }
+        if (item) item.checked = enabled && checked
     }
 
     if (state.toolPalette) {
@@ -146,29 +130,24 @@ export function applyMenuStateTo(menu: MenuLike, state: MenuState): void {
             { id: 'bg-black', value: 'black' as const },
         ]
         for (const { id, value } of bgItems) {
+            own.set(id, enabled)
             const item = menu.getMenuItemById(id)
-            if (item) {
-                item.enabled = enabled
-                item.checked = enabled && bgColor === value
-            }
+            if (item) item.checked = enabled && bgColor === value
         }
     }
 
-    if (state.undo) {
-        const item = menu.getMenuItemById('undo')
-        if (item) item.enabled = state.undo.enabled
-    }
+    if (state.undo) own.set('undo', state.undo.enabled)
+    if (state.redo) own.set('redo', state.redo.enabled)
 
-    if (state.redo) {
-        const item = menu.getMenuItemById('redo')
-        if (item) item.enabled = state.redo.enabled
-    }
-
-    if (state.sceneOps) {
-        for (const id of SCENE_REQUIRING_MENU_IDS) {
-            const item = menu.getMenuItemById(id)
-            if (item) item.enabled = state.sceneOps.enabled
-        }
+    // Until the renderer reports a gate, nothing is gated: the menu built at
+    // window creation predates the renderer.
+    const gate = state.guiGate
+    for (const id of new Set([...own.keys(), ...gated.keys()])) {
+        const item = menu.getMenuItemById(id)
+        if (!item) continue
+        const entry = gated.get(id)
+        const ownEnabled = own.get(id) ?? entry?.enabled ?? true
+        item.enabled = ownEnabled && (!entry || !gate || isAvailable(entry.availability, gate))
     }
 
     // Hide scene-export menu items whose exporter is not registered in this

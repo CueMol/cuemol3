@@ -17,7 +17,8 @@ import { addRecent } from './addRecent'
 import { useShowFileOpenOptionDialog } from '@renderer/dialogs/fopen-opt-dlgs/FileOpenOptionDialogProvider'
 import { useShowErrorAlert } from '@renderer/dialogs/ErrorAlertDialogProvider'
 import { fetchPresetTypes } from '@renderer/features/file-io/fetchPresetTypes'
-import { makeResolveOpenTarget } from '@renderer/hooks/useEnsureActiveScene'
+import { makeIsSceneJustCreated, makeResolveOpenTarget } from '@renderer/hooks/useEnsureActiveScene'
+import type { OpenTargetDeps } from '@renderer/hooks/useEnsureActiveScene'
 import type { NewSceneAction, OpenSceneFileAction } from '@renderer/hooks/useNewSceneAction'
 import type { FileOpenedData } from '@shared/types/fileEvents'
 import type { OpenResult } from './CommandMap'
@@ -99,6 +100,9 @@ interface UseSceneCommandsOptions {
     newScene: NewSceneAction
     /** Open a scene file in its own tab (created only once it has loaded). */
     openSceneFile: OpenSceneFileAction
+    /** Where an open goes while a non-molview tab is in front (see makeResolveOpenTarget). */
+    resolveMolView: OpenTargetDeps['resolveMolView']
+    activateMolView: OpenTargetDeps['activateMolView']
 }
 
 export function useSceneCommands({
@@ -109,6 +113,8 @@ export function useSceneCommands({
     showSceneProperty,
     newScene,
     openSceneFile,
+    resolveMolView,
+    activateMolView,
 }: UseSceneCommandsOptions): void {
     // Only to tell the user whether the MD trajectory flow is reachable;
     // see MDTOOLS_PLUGIN_ID.
@@ -169,12 +175,11 @@ export function useSceneCommands({
     // a cancelled option dialog leaves no tab behind -- see
     // hooks/useEnsureActiveScene.ts.
     const resolveOpenTarget = useMemo(
-        () => makeResolveOpenTarget(getActiveSceneInfo, newScene, async (sceneId) => {
-            if (!cm) return false
-            const res = await cm.invokeService('isSceneJustCreated', { sceneId })
-            return res?.justCreated === true
+        () => makeResolveOpenTarget({
+            getActiveSceneInfo, resolveMolView, activateMolView, newScene,
+            isSceneJustCreated: makeIsSceneJustCreated(cm),
         }),
-        [cm, getActiveSceneInfo, newScene],
+        [cm, getActiveSceneInfo, resolveMolView, activateMolView, newScene],
     )
 
     const setSceneBgColor = useCallback(async (colorName: 'white' | 'black'): Promise<void> => {

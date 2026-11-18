@@ -119,5 +119,7 @@ scene 未検出時に bare prefix を返す (= 空の新シーンで正しい名
   将来複数選択を足すなら、各パスが個別の push で届くため `useOpenFilePaths` を経由させないと
   バッチ共有が効かない。
 - Get PDB プラグインと agent プラグインは従来どおり `useEnsureActiveScene` のまま
-  (アプリ内操作 / 作業中シーンの継続なので決定 2 と同じ扱い)。この据え置きを安全にするため、
-  `makeResolveOpenTarget` は既存関数を書き換えず**追加**してある。
+  (アプリ内操作 / 作業中シーンの継続なので決定 2 と同じ扱い)。`useEnsureActiveScene` は
+  `makeResolveOpenTarget` の `'active'` を即座に commit する wrapper なので、`'new'` の
+  再利用規則には巻き込まれない。Settings が前面のときの `'active'` の解決 (直前の molview に
+  戻す) は [gui-gate.md](gui-gate.md) を参照。

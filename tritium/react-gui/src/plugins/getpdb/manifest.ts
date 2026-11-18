@@ -30,7 +30,9 @@ export const getPdbManifest: PluginManifest = {
         // there too and is registered later, so with both on the order is
         // Open File / Open MD Trajectory / Get PDB, as it always was.
         after: 'open-file',
-        items: [{ id: 'get-pdb', label: 'Get PDB...', command: GET_PDB_COMMAND }],
+        items: [
+          { id: 'get-pdb', label: 'Get PDB...', command: GET_PDB_COMMAND, availability: 'loadIntoScene' },
+        ],
       },
     ],
     toolbar: [
@@ -44,6 +46,7 @@ export const getPdbManifest: PluginManifest = {
             icon: 'toolbar.getPdb',
             text: 'Get PDB',
             command: GET_PDB_COMMAND,
+            availability: 'loadIntoScene',
           },
         ],
       },

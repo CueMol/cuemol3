@@ -12,7 +12,9 @@
 import React, { useMemo, useRef } from "react";
 import { Button, Divider, Navbar, Alignment } from "@blueprintjs/core";
 import { useUndoRedo } from '@renderer/state/undoRedo';
-import { useActiveScene } from '@renderer/state/workspace';
+import { useGuiGate } from '@renderer/state/workspace';
+import { isAvailable } from '@shared/guiGate';
+import type { Availability } from '@shared/guiGate';
 
 import { useCommands } from "@renderer/commands/CommandRegistry";
 import type { CommandKey } from "@renderer/commands/CommandMap";
@@ -32,23 +34,24 @@ type ToolbarItem =
       text: string;
       /** A built-in command id, or a plugin one for a contributed button. */
       cmd: CommandKey | string;
-      requiresScene?: boolean;
+      /** When the button is enabled (shared/guiGate.ts); absent: a molview tab must be in front. */
+      availability?: Availability;
     }
   | { kind: "divider"; id: string }
   | { kind: "undo"; id: string }
   | { kind: "redo"; id: string };
 
 const TOOLBAR_ITEMS: ToolbarItem[] = [
-  { kind: "cmd", id: "new-tab", icon: "toolbar.newTab", text: "New Tab", cmd: CmdId.TabNew },
+  { kind: "cmd", id: "new-tab", icon: "toolbar.newTab", text: "New Tab", cmd: CmdId.TabNew, availability: "always" },
   { kind: "divider", id: "d1" },
-  { kind: "cmd", id: "open-file", icon: "toolbar.openFile", text: "Open File", cmd: CmdId.UiOpenObjDialog },
-  { kind: "cmd", id: "save-as", icon: "toolbar.saveAs", text: "Save File As", cmd: CmdId.ObjectSaveAs, requiresScene: true },
+  { kind: "cmd", id: "open-file", icon: "toolbar.openFile", text: "Open File", cmd: CmdId.UiOpenObjDialog, availability: "loadIntoScene" },
+  { kind: "cmd", id: "save-as", icon: "toolbar.saveAs", text: "Save File As", cmd: CmdId.ObjectSaveAs },
   { kind: "divider", id: "d2" },
-  { kind: "cmd", id: "open-scene", icon: "toolbar.openScene", text: "Open Scene", cmd: CmdId.UiOpenSceneDialog },
-  { kind: "cmd", id: "reload-scene", icon: "toolbar.reloadScene", text: "Reload Scene", cmd: CmdId.SceneReload, requiresScene: true },
-  { kind: "cmd", id: "save-scene", icon: "toolbar.saveScene", text: "Save Scene", cmd: CmdId.FileSave, requiresScene: true },
+  { kind: "cmd", id: "open-scene", icon: "toolbar.openScene", text: "Open Scene", cmd: CmdId.UiOpenSceneDialog, availability: "always" },
+  { kind: "cmd", id: "reload-scene", icon: "toolbar.reloadScene", text: "Reload Scene", cmd: CmdId.SceneReload },
+  { kind: "cmd", id: "save-scene", icon: "toolbar.saveScene", text: "Save Scene", cmd: CmdId.FileSave },
   { kind: "divider", id: "d4" },
-  { kind: "cmd", id: "render", icon: "toolbar.render", text: "Render", cmd: CmdId.UiRenderWindow, requiresScene: true },
+  { kind: "cmd", id: "render", icon: "toolbar.render", text: "Render", cmd: CmdId.UiRenderWindow },
   { kind: "divider", id: "d5" },
   { kind: "undo", id: "undo" },
   { kind: "redo", id: "redo" },
@@ -75,7 +78,7 @@ export function buildToolbarItems(
         icon: item.icon,
         text: item.text,
         cmd: item.command,
-        requiresScene: item.requiresScene,
+        availability: item.availability,
       })),
     ];
     const at = contrib.after ? items.findIndex((i) => i.id === contrib.after) : -1;
@@ -88,7 +91,7 @@ export function buildToolbarItems(
 
 const ToolbarComponent: React.FC = () => {
   const undoRedo = useUndoRedo();
-  const { hasScene } = useActiveScene();
+  const gate = useGuiGate();
   const { dispatchAny } = useCommands();
   const { toolbar } = usePluginContributions();
   const items = useMemo(() => buildToolbarItems(TOOLBAR_ITEMS, toolbar), [toolbar]);
@@ -131,7 +134,7 @@ const ToolbarComponent: React.FC = () => {
           <Tooltip key={item.id} content={collapsed ? item.text : ""}>
             <Button
               minimal
-              disabled={item.requiresScene === true && !hasScene}
+              disabled={!isAvailable(item.availability, gate)}
               icon={<AppIcon name={item.icon} size={16} aria-hidden />}
               text={item.text}
               onClick={() =>

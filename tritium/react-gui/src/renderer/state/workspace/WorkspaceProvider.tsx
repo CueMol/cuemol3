@@ -37,6 +37,7 @@ import React, {
   useRef,
 } from 'react'
 import type { TabData } from '@renderer/types'
+import type { GuiGate } from '@shared/guiGate'
 import { useCueMol } from '@renderer/hooks/cuemol/useCueMol'
 import { useMolViewTabTitleSync } from '@renderer/hooks/useMolViewTabTitleSync'
 import { useConfirmCloseTab } from './useConfirmCloseTab'
@@ -72,6 +73,18 @@ export interface WorkspaceDispatch {
   getActiveTabId: () => string
   getActiveViewId: () => number | undefined
   getActiveSceneInfo: () => { scene_uid: number; view_id: number } | undefined
+  /**
+   * The molview an input that bypasses the GUI runs in, without switching to
+   * it: the one in front, else the one most recently in front, else the first
+   * in the strip. Undefined when no molview tab is open.
+   */
+  resolveMolView: () => { scene_uid: number; view_id: number } | undefined
+  /**
+   * Bring the tab showing `viewId` to the front and resolve once the worker
+   * has activated the view, so a call sent after it runs against that view.
+   * Rejects when no tab shows the view or the activation fails.
+   */
+  activateMolView: (viewId: number) => Promise<void>
   tabsRef: React.RefObject<TabData[]>
 }
 
@@ -115,6 +128,20 @@ export function useWorkspaceTabs(): WorkspaceTabs {
 }
 export function useActiveScene(): ActiveScene {
   return required(useContext(ActiveSceneContext), 'useActiveScene')
+}
+
+/**
+ * The GUI gate (shared/guiGate.ts): the one place it is built. Every gated
+ * surface -- menus, toolbar, bottom panel -- reads it from here and passes it
+ * to `isAvailable`, never testing the front tab itself.
+ *
+ * @returns a gate whose identity changes only when its contents do.
+ */
+export function useGuiGate(): GuiGate {
+  const { activeTab } = useWorkspaceTabs()
+  const tab: GuiGate['tab'] =
+    activeTab === undefined ? 'none' : activeTab.type === 'molview' ? 'molview' : 'other'
+  return useMemo(() => ({ tab }), [tab])
 }
 
 // --- Provider ---
@@ -162,6 +189,18 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
     return true
   }, [])
 
+  const activateMolView = useCallback(async (viewId: number): Promise<void> => {
+    const shown = stateRef.current.tabs.some((t) => t.type === 'molview' && t.viewId === viewId)
+    if (!shown) throw new Error(`no tab shows view ${viewId}`)
+    const c = cmRef.current
+    if (!c) throw new Error('CueMol is not ready')
+    dispatch({ type: 'activateView', viewId })
+    // Sent here as well as from the activation effect below: the worker's
+    // activateView is idempotent, and awaiting our own call is what orders
+    // the caller's next call after it. Worker calls run in the order sent.
+    await c.activateView(viewId)
+  }, [])
+
   const dispatchValue = useMemo<WorkspaceDispatch>(
     () => ({
       openMolViewTab: (title, viewId, sceneId) =>
@@ -179,9 +218,20 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
         const active = activeMolViewOf(stateRef.current)
         return active ? { scene_uid: active.sceneId, view_id: active.viewId } : undefined
       },
+      resolveMolView: () => {
+        const st = stateRef.current
+        const molviews = molViewTabsOf(st.tabs)
+        const tab =
+          molviews.find((t) => t.id === st.activeTabId) ??
+          molviews.find((t) => t.id === st.lastMolViewTabId) ??
+          molviews[0]
+        if (tab?.viewId === undefined || tab.sceneId === undefined) return undefined
+        return { scene_uid: tab.sceneId, view_id: tab.viewId }
+      },
+      activateMolView,
       tabsRef,
     }),
-    [closeTab],
+    [closeTab, activateMolView],
   )
 
   const tabsValue = useMemo<WorkspaceTabs>(

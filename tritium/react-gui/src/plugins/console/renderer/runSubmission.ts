@@ -18,7 +18,7 @@ import { doSceneRequest } from './sceneRequest'
 
 export interface SubmissionDeps {
   cm: AsyncCueMol
-  /** The active scene and view, making them when there is none. */
+  /** The scene and view to run in: the front molview, else the last one in front, else a new one. */
   ensureActiveScene: () => Promise<{ scene_uid: number; view_id: number } | undefined>
   tabs: SceneTabs
   /** Open a scene file the way File > Open does (`load x.qsc`); false when it failed. */
@@ -78,10 +78,12 @@ export async function runSubmission(deps: SubmissionDeps, args: SubmissionArgs):
 
   let text = args.text
   for (;;) {
-    // With no tab open, the worker is asked first without a scene: a tab
-    // command (list_scenes) runs without one, and only a command that needs
-    // a scene gets one made for it.
-    let res = (await deps.tabs.list()).length === 0 ? await run({ scene_uid: 0, view_id: 0 }, text) : null
+    // With no molview in front (no tab, or Settings), the worker is asked
+    // first without a scene: a tab command (list_scenes) runs without one and
+    // leaves the strip alone, and only a command that needs a scene gets one
+    // resolved -- the molview last in front, or a new one.
+    const noActive = !(await deps.tabs.list()).some((sc) => sc.active)
+    let res = noActive ? await run({ scene_uid: 0, view_id: 0 }, text) : null
     if (res === null || (!res.ok && res.code === 'not-found')) {
       const target = await deps.ensureActiveScene()
       if (!target) return failed('Error: no scene to run against')

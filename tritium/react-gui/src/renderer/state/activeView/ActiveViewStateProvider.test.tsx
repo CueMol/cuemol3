@@ -82,12 +82,11 @@ describe('ActiveViewStateProvider', () => {
       viewCenterMark: { enabled: false, centerMark: null },
       sceneBgColor: { enabled: false, bgColor: null },
       sceneColorProof: { enabled: false, checked: false },
-      sceneOps: { enabled: false },
     })
     unmount()
   })
 
-  it('with a molview in front, the fetched values are mirrored and scene items enabled', async () => {
+  it('with a molview in front, the fetched values are mirrored', async () => {
     scene.activeMolViewId = 7
     scene.activeSceneId = 100
     const { live, unmount } = mount()
@@ -104,7 +103,6 @@ describe('ActiveViewStateProvider', () => {
       viewCenterMark: { enabled: true, centerMark: 'axis' },
       sceneBgColor: { enabled: true, bgColor: 'black' },
       sceneColorProof: { enabled: true, checked: true },
-      sceneOps: { enabled: true },
     })
     unmount()
   })

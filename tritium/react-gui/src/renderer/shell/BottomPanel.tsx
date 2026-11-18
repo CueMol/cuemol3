@@ -12,9 +12,16 @@
  * contributed tab gets the same scene / view props a built-in one does.
  * The leftmost tab (the Console, when its plugin is on) is in front until
  * the user picks another.
+ *
+ * A tab that works on the front scene declares `requiresMolView`. While the
+ * GUI gate says no molview tab is in front, it shows a notice to switch to
+ * one in place of its content. The tab buttons stay usable. Nothing a panel
+ * keeps is lost: the console transcript lives in its session store, so a CLI
+ * run meanwhile is there when a molview tab comes back.
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { AppIcon } from "@renderer/h3-kit/primitives";
 import type { AppIconKey } from "@renderer/h3-kit/primitives";
 import { PanelTabButton } from "./PanelTabButton";
 import { LogPanel } from "@renderer/features/log/LogPanel";
@@ -24,7 +31,8 @@ import type { ResolvedPluginBottomTab } from "@renderer/plugin-host";
 import { useLogActions, useLogContents } from "@renderer/contexts/LogContext";
 import { IPC } from "@shared/ipcChannels";
 import { useCueMol } from "@renderer/hooks/cuemol/useCueMol";
-import { useActiveScene } from "@renderer/state/workspace";
+import { useActiveScene, useGuiGate } from "@renderer/state/workspace";
+import { isAvailable } from "@shared/guiGate";
 
 // ---------------------------------------------
 // Types
@@ -41,12 +49,14 @@ interface BottomTabDef {
   id: BottomTabType;
   label: string;
   icon: AppIconKey;
+  /** Content works on the front scene; disabled while no molview tab is in front. */
+  requiresMolView?: boolean;
 }
 
 /** The tabs the application itself owns, in left-to-right order. */
 const BUILTIN_BOTTOM_TABS: readonly BottomTabDef[] = [
   { id: "output", label: "Output", icon: "panel.output" },
-  { id: "animation", label: "Animation", icon: "panel.animation" },
+  { id: "animation", label: "Animation", icon: "panel.animation", requiresMolView: true },
 ];
 
 /** The tab strip for the enabled plugins: built-ins with the contributions spliced in. */
@@ -95,6 +105,12 @@ const BottomPanelComponent: React.FC = () => {
   // A tab brought to the front from elsewhere (revealBottomTab) counts as
   // picked; an id with no tab falls back like a switched-off plugin's.
   useEffect(() => onRevealBottomTab(setActiveTab), []);
+
+  // `requiresMolView` means "needs a molview tab in front", which is the
+  // gate's default (undeclared) availability.
+  const gate = useGuiGate();
+  const activeDef = tabs.find((t) => t.id === activeTab);
+  const disabled = activeDef?.requiresMolView === true && !isAvailable(undefined, gate);
 
   // The log buffer lives in LogProvider (so renderer-side code can append via
   // useLogPanel() and it survives tab switches); the Output-tab UI state stays
@@ -169,7 +185,16 @@ const BottomPanelComponent: React.FC = () => {
           />
         ))}
       </div>
-      <div className="bottom-panel-content">{renderContent()}</div>
+      <div className="bottom-panel-content">
+        {disabled && activeDef ? (
+          <div className="bottom-panel-placeholder">
+            <AppIcon name={activeDef.icon} size={48} className="placeholder-icon" aria-hidden />
+            <div>Switch to a molecule view tab to use this panel.</div>
+          </div>
+        ) : (
+          renderContent()
+        )}
+      </div>
     </div>
   );
 };

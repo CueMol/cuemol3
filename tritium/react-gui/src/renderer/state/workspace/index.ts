@@ -8,6 +8,7 @@ export {
   useWorkspaceDispatch,
   useWorkspaceTabs,
   useActiveScene,
+  useGuiGate,
 } from './WorkspaceProvider'
 export type { WorkspaceDispatch, WorkspaceTabs, ActiveScene, MolViewEntry } from './WorkspaceProvider'
 export {

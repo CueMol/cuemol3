@@ -20,6 +20,7 @@ void React
 
 vi.mock('@renderer/state/workspace', () => ({
   useActiveScene: () => ({ activeSceneId: undefined, activeMolViewId: undefined }),
+  useGuiGate: () => ({ tab: 'none' }),
 }))
 vi.mock('@renderer/contexts/FileOpenPrefsContext', () => ({
   useFileOpenPrefs: () => ({

@@ -30,6 +30,7 @@ const toolbarState = vi.hoisted(() => ({
 vi.mock('@renderer/state/undoRedo', () => ({ useUndoRedo: () => toolbarState.undoRedo }))
 vi.mock('@renderer/state/workspace', () => ({
   useActiveScene: () => ({ activeSceneId: undefined, activeMolViewId: undefined, hasScene: toolbarState.hasScene }),
+  useGuiGate: () => ({ tab: toolbarState.hasScene ? 'molview' : 'none' }),
 }))
 
 // The plugin registry: empty unless a test contributes a button.

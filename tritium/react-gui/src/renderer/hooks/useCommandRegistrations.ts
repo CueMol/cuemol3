@@ -33,8 +33,10 @@ import { useElectronIpc } from './useElectronIpc';
 
 export function useCommandRegistrations(): void {
   const { cm } = useCueMol();
-  const { getActiveSceneInfo, getActiveTabId, closeTab, openSettingsTab, getActiveViewId } =
-    useWorkspaceDispatch();
+  const {
+    getActiveSceneInfo, getActiveTabId, closeTab, openSettingsTab, getActiveViewId,
+    resolveMolView, activateMolView,
+  } = useWorkspaceDispatch();
   const { onProjectionChanged, onCenterMarkChanged, onBgColorChanged, onColorProofingChanged } =
     useActiveViewDispatch();
   const {
@@ -50,7 +52,7 @@ export function useCommandRegistrations(): void {
 
   useSceneCommands({
     cm, getActiveSceneInfo, onBgColorChanged, onColorProofingChanged,
-    showSceneProperty, newScene, openSceneFile,
+    showSceneProperty, newScene, openSceneFile, resolveMolView, activateMolView,
   });
   useUiDialogCommands({ cm });
   useTabCommands({ closeTab, openSettingsTab, getActiveTabId });

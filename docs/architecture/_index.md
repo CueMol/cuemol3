@@ -402,6 +402,12 @@ architecture, it belongs here.
   (文字の切れ・はみ出し・重なり・サイズ token 不一致) を出す。dev ビルド限定の `window.__cuemolE2E`
   ブリッジ (`CUEMOL_E2E=1` -> `?e2e=1`)、監査の種類と除外 (`data-audit-ignore`)。
 
+- [前面の tab による GUI の有効・無効と、scene の解決 (GUI gate)](gui-gate.md) (日本語) --
+  前面の tab の種類 (molview / Settings / なし) だけで、メニュー・ツールバー・bottom panel・ドロップの有効・無効を
+  決める。項目ごとの `availability` 宣言と、`shared/guiGate.ts` の唯一の判定関数 `isAvailable`、native menu の
+  Open Recent を gate の変化ごとに判定し直す仕組み、CLI / MCP / agent / shell open を直前の molview
+  (`lastMolViewTabId`) に戻して実行する resolver (`makeResolveOpenTarget` に一本化)、welcome 画面。
+
 - [時間がかかる処理の表示 (長い処理インジケータ)](long-task-indicator.md) (日本語) --
   GUI から直接呼んだ重い処理 (シーンの保存・読み込み、ファイルを開く、表面生成、MD trajectory など) が
   0.8 s を超えたら、文言・経過秒数・バーのカードをどのタブでも見える位置に出す (入力は止めない)。

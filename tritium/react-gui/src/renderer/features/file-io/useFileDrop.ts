@@ -14,6 +14,10 @@
  * so a bubble-phase window listener would never see a drop landing on a tab.
  * Capture-phase interception is scoped to drags carrying 'Files'; internal
  * drags (text/plain, scene-node MIME) pass through untouched.
+ *
+ * A drop loads into the front scene, so it follows the GUI gate as Open File
+ * does (`'loadIntoScene'`): with a non-molview tab (Settings) in front the
+ * drag shows the no-drop cursor and a drop does nothing.
  */
 
 import { useEffect, useRef, useState } from 'react'
@@ -21,6 +25,9 @@ import type { AsyncCueMol } from '@renderer/worker/client/AsyncCueMol'
 import { dragItemsMayContainOpenable } from '@renderer/utils/classifyDropFile'
 import { useOpenFilePaths } from './useOpenFilePaths'
 import { useFileOpenPrefs } from '@renderer/contexts/FileOpenPrefsContext'
+import { useGuiGate } from '@renderer/state/workspace'
+import { isAvailable } from '@shared/guiGate'
+import { useLatestRef } from '@renderer/hooks/react/useLatestRef'
 
 /** True when the drag carries OS files (not an in-app DnD payload). */
 function hasFiles(e: DragEvent): boolean {
@@ -54,6 +61,8 @@ export function useFileDrop({ cm }: { cm: AsyncCueMol | null }): { isDragActive:
   // preferences have loaded (the shell path, which races them, awaits instead).
   const { dropTarget } = useFileOpenPrefs()
   const [isDragActive, setDragActive] = useState(false)
+  const gate = useGuiGate()
+  const allowedRef = useLatestRef(isAvailable('loadIntoScene', gate))
 
   // dragenter/dragleave fire in pairs on every child-element transition, so
   // hover state is a depth counter, not a boolean.
@@ -83,7 +92,7 @@ export function useFileDrop({ cm }: { cm: AsyncCueMol | null }): { isDragActive:
     // enter/leave use the same predicate, and a drag's item types cannot
     // change mid-gesture, so the depth counter stays balanced.
     const onDragEnter = (e: DragEvent) => {
-      if (!isAcceptableDrag(e)) return
+      if (!isAcceptableDrag(e) || !allowedRef.current) return
       depthRef.current += 1
       setDragActive(true)
     }
@@ -99,7 +108,9 @@ export function useFileDrop({ cm }: { cm: AsyncCueMol | null }): { isDragActive:
       // to file://).
       e.preventDefault()
       e.stopPropagation()
-      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
+      // Still prevented while the gate is closed, or the drop would navigate;
+      // 'none' gives the no-drop cursor and cancels the drop instead.
+      if (e.dataTransfer) e.dataTransfer.dropEffect = allowedRef.current ? 'copy' : 'none'
     }
     const onDrop = (e: DragEvent) => {
       // Guarded on hasFiles, not isAcceptableDrag: a rejected drag never
@@ -110,6 +121,7 @@ export function useFileDrop({ cm }: { cm: AsyncCueMol | null }): { isDragActive:
       e.stopPropagation()
       depthRef.current = 0
       setDragActive(false)
+      if (!allowedRef.current) return
       const files = e.dataTransfer ? Array.from(e.dataTransfer.files) : []
       if (files.length > 0) void handleFilesRef.current(files)
     }
@@ -132,7 +144,7 @@ export function useFileDrop({ cm }: { cm: AsyncCueMol | null }): { isDragActive:
       window.removeEventListener('drop', onDrop, true)
       window.removeEventListener('dragend', onDragEnd, true)
     }
-  }, [])
+  }, [allowedRef])
 
   return { isDragActive }
 }

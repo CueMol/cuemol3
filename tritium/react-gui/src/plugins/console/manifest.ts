@@ -49,6 +49,7 @@ export const consoleManifest: PluginManifest = {
         // First, and so in front by default: the console is where most text
         // work happens now, ahead of the Output log.
         before: 'output',
+        requiresMolView: true,
       },
     ],
   },

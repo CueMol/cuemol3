@@ -32,6 +32,7 @@ export const sequencePlugin = /* @__PURE__ */ definePlugin({
           icon: 'panel.sequence',
           // Where the built-in tab used to sit, between Output and Animation.
           after: 'output',
+          requiresMolView: true,
         },
       ],
     },

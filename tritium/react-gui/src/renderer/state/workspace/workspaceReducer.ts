@@ -21,9 +21,15 @@ export interface WorkspaceState {
   tabs: TabData[]
   /** Id of the visible tab; '' when no tab is open. */
   activeTabId: string
+  /**
+   * The molview tab most recently in front; '' when none is open. An input
+   * that bypasses the GUI (CLI, MCP, agent, shell open) runs there while a
+   * non-molview tab (Settings) is in front. Kept by `withLastMolView`.
+   */
+  lastMolViewTabId: string
 }
 
-export const INITIAL_WORKSPACE: WorkspaceState = { tabs: [], activeTabId: '' }
+export const INITIAL_WORKSPACE: WorkspaceState = { tabs: [], activeTabId: '', lastMolViewTabId: '' }
 
 export type WorkspaceAction =
   | { type: 'openMolView'; title: string; viewId: number; sceneId: number }
@@ -39,7 +45,24 @@ export function molViewTabId(viewId: number): string {
   return `molview-${viewId}`
 }
 
+/**
+ * Apply an action, then update `lastMolViewTabId` in this one place: record
+ * the front tab when it is a molview, and drop the record when its tab is
+ * gone. Doing it at the exit rather than per action also catches the tab
+ * `close` brings to the front, and any action added later.
+ */
 export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction): WorkspaceState {
+  return withLastMolView(reduceTabs(state, action))
+}
+
+function withLastMolView(state: WorkspaceState): WorkspaceState {
+  let last = state.lastMolViewTabId
+  if (activeTabOf(state)?.type === 'molview') last = state.activeTabId
+  else if (last !== '' && !state.tabs.some((t) => t.id === last)) last = ''
+  return last === state.lastMolViewTabId ? state : { ...state, lastMolViewTabId: last }
+}
+
+function reduceTabs(state: WorkspaceState, action: WorkspaceAction): WorkspaceState {
   switch (action.type) {
     case 'openMolView': {
       const id = molViewTabId(action.viewId)
@@ -54,7 +77,7 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
         viewId: action.viewId,
         sceneId: action.sceneId,
       }
-      return { tabs: [...state.tabs, tab], activeTabId: id }
+      return { ...state, tabs: [...state.tabs, tab], activeTabId: id }
     }
 
     case 'openSettings': {
@@ -69,7 +92,7 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
         icon: 'file.settings',
         type: 'settings',
       }
-      return { tabs: [...state.tabs, tab], activeTabId: SETTINGS_TAB_ID }
+      return { ...state, tabs: [...state.tabs, tab], activeTabId: SETTINGS_TAB_ID }
     }
 
     case 'activate': {
@@ -96,7 +119,7 @@ export function workspaceReducer(state: WorkspaceState, action: WorkspaceAction)
             ? tabs[tabs.length - 1].id
             : ''
           : state.activeTabId
-      return { tabs, activeTabId }
+      return { ...state, tabs, activeTabId }
     }
 
     case 'reorder': {

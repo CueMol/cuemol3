@@ -66,6 +66,8 @@ function mountWith(
       getActiveSceneInfo,
       newScene,
       openSceneFile: openSceneFile as never,
+      resolveMolView: () => undefined,
+      activateMolView: () => Promise.resolve(),
     })
     return useCommands()
   }, Wrapper)

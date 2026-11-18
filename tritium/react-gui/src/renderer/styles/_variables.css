@@ -292,8 +292,11 @@
      (CARET_PX mirrors this); consumers never pick it. */
   --icon-caret: 16px;
   /* App icon drawn as the hero element on the welcome screen. Scales with the
-     UI like the type around it; the asset is 256px so this downscales. */
+     UI like the type around it; the asset is larger, so this downscales. */
   --icon-hero: calc(64px * var(--ui-scale));
+  /* The welcome-screen icon is drawn for the dark theme; the light theme
+     inverts it. */
+  --welcome-icon-filter: none;
 
   /* Shadow of a chip floating over the 3D view (tool palette, hover label,
      the hidden-palette edge tab). One value for both themes. */
@@ -472,6 +475,7 @@
   --accent-selected: #e6a800;
   --accent-selected-glow: rgba(230, 168, 0, 0.4);
   --accent-placeholder-opacity: 0.3;
+  --welcome-icon-filter: invert(1);
 
   /* Slider handle */
   --slider-handle: #5a5d65;

@@ -201,12 +201,13 @@
   margin-bottom: var(--space-2);
 }
 
-/* Welcome-screen app icon. Full-colour artwork, so unlike .placeholder-icon it
-   takes no accent tint -- only the size and the shared bottom margin. */
+/* Welcome-screen icon. Finished artwork, so unlike .placeholder-icon it takes
+   no accent tint -- only the size and the shared bottom margin. */
 .placeholder-app-icon {
   width: var(--icon-hero);
   height: var(--icon-hero);
   margin-bottom: var(--space-2);
+  filter: var(--welcome-icon-filter);
 }
 
 .placeholder-title {
@@ -223,15 +224,26 @@
 }
 
 .shortcut-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+  /* Three columns shared by every row: icon | command | shortcut. Rows use
+     display: contents so their cells line up across rows. */
+  display: grid;
+  grid-template-columns: auto auto auto;
+  align-items: center;
+  column-gap: var(--space-5);
+  row-gap: var(--space-3);
 }
 
 .shortcut-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
+  display: contents;
+  font-size: var(--fs-lg);
+  color: var(--text-muted);
+}
+
+.shortcut-icon {
+  color: var(--text-muted);
+}
+
+.shortcut-label {
   font-size: var(--fs-lg);
   color: var(--text-muted);
 }
