@@ -307,6 +307,10 @@ architecture, it belongs here.
   `MapRenderer.region_mode` (box / full) の 2 層モデル、PBC 適格条件の一本化、MRC2014 ORIGIN、
   full モードの budget 由来 stride (ChimeraX `limit_voxels` 流) とノード整列、却下案とロードマップ
   (chunk メモリ、reader streaming、zoom 連動 refine)。
+- [Density map pane の Level ヒストグラム](density-level-histogram.md) (日本語) --
+  Level の入力欄と、密度ヒストグラム上の level の縦線 (ChimeraX Volume Viewer 風)。操作 (ドラッグ / Shift /
+  クリックで移す / ズーム・Fit)、`level` を絶対値で書く理由、入力欄と縦線が renderer の state を経路に
+  追従する仕組み、multigrad と共有する部品 (`HistogramStrip` / `useRebinnedHistogram` / `helpers/mapHistogram`)。
 - [Get PDB の cryo-EM (EMDB) 対応](get-pdb-emdb.md) (日本語) --
   Get PDB で PDB ID / EMDB ID を受け、RCSB GraphQL と EMDB API で entry を照会して map セクションを
   結晶 (2Fo-Fc / Fo-Fc) と cryo-EM (EMDB map) に出し分ける。map 種類の判定と推奨 contour level の
