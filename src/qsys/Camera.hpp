@@ -45,7 +45,7 @@ namespace qsys {
 
   /// Name of the scene's live view-point camera. It always exists, holds the
   /// view state only (no visibility flags), and is not part of the undo history.
-  inline constexpr const char *CURRENT_CAMERA_NAME = "__current";
+  constexpr const char *CURRENT_CAMERA_NAME = "__current";
 
   //////////////////////////////////////////////////////////////////
   // Camera object
