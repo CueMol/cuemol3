@@ -12,6 +12,10 @@
  */
 
 export { GradientStopBar } from './GradientStopBar';
+export { HistogramStrip, HISTO_HEIGHT_PX } from './HistogramStrip';
+export { LevelHistogramField } from './LevelHistogramField';
+export { useRebinnedHistogram } from './useRebinnedHistogram';
+export type { RebinnedHistogramData, UseRebinnedHistogramOptions } from './useRebinnedHistogram';
 export type { GradientCommitGesture } from './GradientStopBar';
 export {
     DRAG_THRESHOLD_PX,

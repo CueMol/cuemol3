@@ -98,6 +98,12 @@
   text-overflow: ellipsis;
 }
 
+/* Full-width row (FieldGridSpan): both columns, may shrink with the grid. */
+.h3-form-grid-span {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
 /* A group heading inside the grid (FieldGridRadioHeading): spans both columns.
    One heading following rows gets the section gap on top of the row gap, so
    groups read apart exactly as sibling FieldSections do. */

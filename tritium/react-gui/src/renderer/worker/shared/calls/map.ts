@@ -8,6 +8,10 @@
  */
 
 import type {
+  GetMapHistogramArgs,
+  GetMapHistogramInfoArgs,
+  GetMapHistogramInfoResult,
+  GetMapHistogramResult,
   GetMapRendererStateArgs,
   GetMapRendererStateResult,
   ListMapRenderersArgs,
@@ -23,6 +27,8 @@ export interface MapCalls {
   getMapRendererState:        { args: GetMapRendererStateArgs; result: GetMapRendererStateResult }
   setMapRendererProp:         { args: SetMapRendererPropArgs; result: SetMapRendererPropResult }
   redrawMapCenter:            { args: RedrawMapCenterArgs; result: RedrawMapCenterResult }
+  getMapHistogram:            { args: GetMapHistogramArgs; result: GetMapHistogramResult }
+  getMapHistogramInfo:        { args: GetMapHistogramInfoArgs; result: GetMapHistogramInfoResult }
 }
 
 export const MAP_KEYS = [
@@ -30,4 +36,6 @@ export const MAP_KEYS = [
   'getMapRendererState',
   'setMapRendererProp',
   'redrawMapCenter',
+  'getMapHistogram',
+  'getMapHistogramInfo',
 ] as const satisfies readonly (keyof MapCalls)[]

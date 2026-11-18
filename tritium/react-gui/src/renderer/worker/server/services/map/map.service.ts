@@ -19,6 +19,7 @@ import { setMapRendererProp, redrawMapCenter } from './props';
 import { probeMapHeader } from './probeHeader';
 import { streamLoadDensityMap } from './streamLoad';
 import { getMtzColumnInfo } from './mtzColumns';
+import { getMapHistogram, getMapHistogramInfo } from './histogram';
 export const services = {
     listMapRenderers,
     getMapRendererState,
@@ -27,6 +28,8 @@ export const services = {
     probeMapHeader,
     streamLoadDensityMap,
     getMtzColumnInfo,
+    getMapHistogram,
+    getMapHistogramInfo,
 };
 
 export type * from './types';

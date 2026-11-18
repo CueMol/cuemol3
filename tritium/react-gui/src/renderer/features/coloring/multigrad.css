@@ -21,6 +21,8 @@
 }
 
 .mg-histo {
+  /* Anchor for overlays drawn on the strip (the level marker). */
+  position: relative;
   height: 48px;
   background: var(--bg-input);
   border: 1px solid var(--border-subtle);
@@ -153,4 +155,81 @@
 .mg-guide-note {
   color: var(--text-secondary);
   margin: 0;
+}
+
+/* -- Level on histogram (LevelHistogramField) -- */
+/* Value input, then the view-range buttons pushed to the right. */
+.mg-level-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+/* Strip + min/max. The grid's row gap is tight (--form-row-gap), so the
+   strip takes its own clearance from the Level row above. */
+.mg-level {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+  user-select: none;
+}
+
+.mg-level.is-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* Clicking empty strip space picks a value, dragging it pans the view. */
+.mg-level .mg-histo {
+  cursor: crosshair;
+}
+
+.mg-level .mg-histo.is-panning {
+  cursor: grabbing;
+}
+
+/* Grab area around the 1px line, wider than the line so it is easy to hit. */
+.mg-level-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: var(--space-4);
+  transform: translateX(-50%);
+  display: flex;
+  justify-content: center;
+  cursor: ew-resize;
+}
+
+.mg-level-marker-line {
+  width: 1px;
+  height: 100%;
+  background: var(--accent);
+  box-shadow: 0 0 0 1px var(--bg-input);
+}
+
+.mg-level-marker:hover .mg-level-marker-line,
+.mg-level-marker.is-dragging .mg-level-marker-line {
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+/* Value outside the view range: pinned at the edge, drawn as a hint. */
+.mg-level-marker.is-outside .mg-level-marker-line {
+  opacity: 0.4;
+}
+
+/* Caption between the min / max labels; gives way (ellipsis) before they do. */
+.mg-level .mg-minmax-row {
+  gap: var(--space-3);
+}
+
+.mg-level-hint {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-primary);
 }

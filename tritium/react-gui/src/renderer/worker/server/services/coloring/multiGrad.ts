@@ -21,6 +21,13 @@ import { undoTxnResult, withUndoTxn } from '@renderer/worker/server/services/wit
 import { recordOp } from '@renderer/worker/server/actions/serviceOps';
 import { ok, fail, failFrom } from '@renderer/worker/shared/result';
 import { getMultiGradOrNull, resolveMultiGrad } from './colorTargets';
+import {
+    readHistogramFloorStats,
+    readHistogramWithGlobalMax,
+    readMapStats,
+} from '@renderer/worker/server/services/helpers/mapHistogram';
+
+export { readMapStats };
 import type {
     GetMultiGradStateArgs,
     GetMultiGradStateResult,
@@ -131,31 +138,6 @@ export function getColorMapObjOrNull(rend: Renderer): CueObject | null {
     }
 }
 
-function safeReadNumber(obj: unknown, prop: string): number | null {
-    try {
-        const v = (obj as Record<string, unknown>)[prop];
-        return typeof v === 'number' ? v : null;
-    } catch {
-        return null;
-    }
-}
-
-/** Read the den_* stats off a scalar map; null when any is unreadable. */
-export function readMapStats(obj: CueObject): MultiGradMapStats | null {
-    const min = safeReadNumber(obj, 'den_min');
-    const max = safeReadNumber(obj, 'den_max');
-    const mean = safeReadNumber(obj, 'den_mean');
-    const sigma = safeReadNumber(obj, 'den_sigma');
-    if (min === null || max === null || mean === null || sigma === null) {
-        return null;
-    }
-    // Unlike the four stats above, a missing quant step is non-fatal:
-    // it only relaxes a bin-width floor, so it degrades to 0
-    // (continuous) instead of failing the whole read.
-    const quantStep = safeReadNumber(obj, 'den_quant_step') ?? 0;
-    return { min, max, mean, sigma, quantStep };
-}
-
 function safeReadString(obj: unknown, prop: string): string {
     try {
         const v = (obj as Record<string, unknown>)[prop];
@@ -163,35 +145,6 @@ function safeReadString(obj: unknown, prop: string): string {
     } catch {
         return '';
     }
-}
-
-/**
- * Read a rebinned histogram off the color-map object; null when the
- * object lacks `getHistogramJSON` or the payload is malformed.
- */
-function readHistogramRange(
-    mapObj: CueObject,
-    min: number,
-    max: number,
-    nbins: number,
-): { histo: number[]; nmax: number } | null {
-    const getHisto = (mapObj as unknown as {
-        getHistogramJSON?: (min: number, max: number, nbins: number) => string;
-    }).getHistogramJSON;
-    if (typeof getHisto !== 'function') return null;
-    let parsed: { histo?: unknown; nmax?: unknown };
-    try {
-        parsed = JSON.parse(getHisto.call(mapObj, min, max, nbins));
-    } catch {
-        return null;
-    }
-    if (!Array.isArray(parsed.histo)) return null;
-    return {
-        histo: parsed.histo.filter(
-            (v): v is number => typeof v === 'number',
-        ),
-        nmax: typeof parsed.nmax === 'number' ? parsed.nmax : 0,
-    };
 }
 
 /**
@@ -334,24 +287,16 @@ export function getMultiGradState(
         };
     }
     const mapObj = getColorMapObjOrNull(rend);
-    const mapStats = mapObj ? readMapStats(mapObj) : null;
-    let mapPercentiles: MultiGradPercentiles | null = null;
-    let mapVoxelCount: number | null = null;
-    let mapPeakCount: number | null = null;
-    if (mapObj && mapStats && mapStats.max > mapStats.min) {
-        const h = readHistogramRange(
-            mapObj, mapStats.min, mapStats.max, PERCENTILE_NBINS,
-        );
-        if (h) {
-            mapPercentiles = histogramPercentileRange(
-                h.histo, mapStats.min, mapStats.max, 0.025, 0.975,
-            );
-            // Same full-range pass also yields the totals that bound how
-            // fine the display bins can usefully get.
-            mapVoxelCount = h.histo.reduce((a, b) => a + b, 0);
-            mapPeakCount = h.nmax;
-        }
-    }
+    // One full-range pass yields the percentiles and the totals that bound
+    // how fine the display bins can usefully get.
+    const floor = mapObj ? readHistogramFloorStats(mapObj) : null;
+    const mapStats = floor?.stats ?? null;
+    const mapVoxelCount = floor?.voxelCount ?? null;
+    const mapPeakCount = floor?.peakCount ?? null;
+    const mapPercentiles: MultiGradPercentiles | null =
+        floor?.fullHisto && mapStats
+            ? histogramPercentileRange(floor.fullHisto, mapStats.min, mapStats.max, 0.025, 0.975)
+            : null;
     return {
         ok: true,
         capable: true,
@@ -402,27 +347,9 @@ export function getMultiGradHistogram(
     }
     const mapObj = getColorMapObjOrNull(target.host);
     if (!mapObj) return fail;
-    const h = readHistogramRange(mapObj, args.min, args.max, args.nbins);
+    const h = readHistogramWithGlobalMax(mapObj, args.min, args.max, args.nbins);
     if (!h) return fail;
-
-    // Global normalization factor: rebin the map's full density range on
-    // the SAME grid (bin width + origin-0 alignment) and take its max.
-    // The base histogram is cached C++-side, so this is one cheap rebin.
-    let globalNmax: number | null = null;
-    const binWidth = (args.max - args.min) / args.nbins;
-    const stats = readMapStats(mapObj);
-    if (stats && stats.max > stats.min && binWidth > 0) {
-        const i0 = Math.floor(stats.min / binWidth + 1e-9);
-        const i1 = Math.ceil(stats.max / binWidth - 1e-9);
-        const nbinsFull = i1 - i0;
-        if (nbinsFull > 0 && nbinsFull <= GLOBAL_NMAX_BIN_CAP) {
-            const full = readHistogramRange(
-                mapObj, i0 * binWidth, i1 * binWidth, nbinsFull,
-            );
-            if (full) globalNmax = full.nmax;
-        }
-    }
-    return { ok: true, histo: h.histo, nmax: h.nmax, globalNmax };
+    return { ok: true, histo: h.histo, nmax: h.nmax, globalNmax: h.globalNmax };
 }
 
 /** Gradient nodes as `set_multigrad_nodes` takes them: `value colour; value colour; ...`. */

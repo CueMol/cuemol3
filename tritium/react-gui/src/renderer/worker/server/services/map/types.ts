@@ -4,6 +4,7 @@
  * types count as map renderers.
  */
 import { type Result } from '@renderer/worker/shared/result';
+import type { MultiGradMapStats } from '@renderer/worker/server/services/coloring/types';
 /** Renderer type names the panel exposes (UXP ObjMenuList filter). */
 export const MAP_RENDERER_TYPES = new Set<string>([
     'contour',
@@ -161,3 +162,35 @@ export interface RedrawMapCenterArgs {
     rendId: number;
     viewId: number;
 }
+
+export interface GetMapHistogramArgs {
+    sceneId: number;
+    /** A map renderer; the histogram is of its parent map (client object). */
+    rendId: number;
+    /** Requested window in absolute density units, already on the bin grid. */
+    min: number;
+    max: number;
+    nbins: number;
+}
+
+/** Window bins plus the full-range max on the same grid (fixed y-scale). */
+export type GetMapHistogramResult = Result<{
+    histo: number[];
+    nmax: number;
+    globalNmax: number | null;
+}>;
+
+export interface GetMapHistogramInfoArgs {
+    sceneId: number;
+    rendId: number;
+}
+
+/**
+ * The per-map statistics the panel turns into a bin-width floor
+ * (`minHistogramBinWidth`): constant for a map, so fetched once per renderer.
+ */
+export type GetMapHistogramInfoResult = Result<{
+    stats: MultiGradMapStats | null;
+    voxelCount: number | null;
+    peakCount: number | null;
+}>;

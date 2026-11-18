@@ -25,7 +25,7 @@ label+control の UI (フォーム行・テキスト入力・select・numeric・
 | `h3-kit/primitives` | `AppIcon` / アイコン登録表 / `DisclosureCaret` (開閉 caret) / `Tooltip` / `useDarkPortalClass` |
 | `h3-kit/form` | 下表の label+control カタログ。**サイズの単一ソース** |
 | `h3-kit/list` | `Listbox` / `ListRow` / `ListboxTree` (Blueprint `Tree` の kit 版) / `TruncatedText` (省略される 1 行ラベルと hover の全文表示) / `useListKeyNav` |
-| `h3-kit/gradient` | `GradientStopBar` + gradient の値/ピクセル幾何 |
+| `h3-kit/gradient` | `GradientStopBar`、`LevelHistogramField` (ヒストグラム上で閾値を選ぶ)、共有の `HistogramStrip` / `useRebinnedHistogram` + gradient の値/ピクセル幾何 |
 | `h3-kit/colorpicker` | 色ポップオーバーと `CueColorField` |
 | `h3-kit/MolSelList` / `h3-kit/selection` | 分子選択のピッカーと式ビルダ |
 
@@ -48,6 +48,7 @@ Blueprint の portal (popover / dialog) に dark テーマを効かせる `porta
 | `FieldSection` | **pane 内の最上位グループ** (`title` = グループ見出し + 任意の中身) | title は `.type-group-label` role, section 間 gap は親 container の `gap: --form-section-gap` |
 | `Field` | label + control の1行 (stack / `inline` / `inline controlFirst` / `inline fill`) — **下位ラベル**。`inline fill` は control がラベルの右の残り幅を全部使う (SliderField の行と同じ並び。slider 行と並ぶ `DragNumericField` など) | 行 padding `--field-row-pad`, label↔control gap `--field-label-gap`, label は `.type-label` |
 | `FieldGrid` / `FieldGridRow` | ラベル列を共有する 2 列の行 (ラベル左・control 右で、全行の control の左端が揃う)。`FieldSection` の直下に置くと見出しが 1 行分の高さになり、見出し -> 1 行目も行の間隔と同じになる。switch の行も text / select の行と同じ高さ | `.h3-form-grid*` (`_form-kit.css`), 行間 `--form-row-gap` |
+| `FieldGridSpan` | `FieldGrid` の中で **2 列にまたがる行** (行と行の間に置く、幅いっぱいが要る control。例: Level のヒストグラム)。前後の行はラベル列を共有したまま | `.h3-form-grid-span` (`_form-kit.css`) |
 | `FieldGridRadioHeading` | grid の中の、**それ自体がラジオの選択肢であるグループ見出し** (New Tab の New Scene / New View)。下の行はその選択肢のオプションで、ラベルはラジオの文字の位置まで字下げされる。複数グループが 1 つのラベル列を共有するので control が揃う。2 つ目以降の見出しの上は section gap | `.h3-form-grid-radio-heading` (`_form-kit.css`), 高 `--field-h` |
 | `FieldGroup` | Field の縦スタック / セクション (任意で `title` → 重い `SectionHeader` バー) | 行間 `--form-row-gap`, section 間 `--form-section-gap` |
 | `SectionHeader` | サブセクション見出し**バー** (背景tint+下線, 大文字) | `.section-header` role (高 `--ctrl-h-md`) |
@@ -55,7 +56,7 @@ Blueprint の portal (popover / dialog) に dark テーマを効かせる `porta
 | `TextAreaField` | 複数行テキスト入力。**行数で伸びる** (`minRows` 既定 1 / `maxRows` 既定 6、超えたらスクロール)。チャット composer や自由記述はこれ。伸びる高さ以外にサイズの選択肢は無い。**送信は `onSubmit` を渡す** (`onKeyDown` で自前に `key === 'Enter'` を見ない)。送信キーは `submitKey`: 既定 `'modifier-enter'` (Enter = 改行、Cmd/Ctrl+Enter = 送信)、`'enter'` で Slack 既定 (Enter = 送信、Shift+Enter = 改行)。どちらでも IME 変換確定の Enter は除外される。`ref` は forward されるので、値を差し替えた後にキャレットを動かす用途 (入力履歴の呼び戻し等) に使える | `.h3-form-textarea` (`_form-kit.css`) |
 | `SelectField` | ドロップダウン (`<option>` を children に)。**選択肢が閉じている**ときだけ | 高 `--field-h` (22px) |
 | `ComboBoxField` | 編集可能な入力 + 候補ドロップダウン。**選択肢が閉じていない**とき (履歴、モデル id 等)。候補は `string[]` か、値だけでは意味が分からないなら `{ value, label }[]` (label は右側に説明として出る) | `.h3-form-combobox` (`_form-kit.css`) |
-| `NumericField` | 数値 + 明示 slider (`slider` 既定 true)。**ネイティブ stepper は既定で非表示** (compact 用)。任意で `unit` | 入力高 `--field-h-sm` (20px) |
+| `NumericField` | 数値 + 明示 slider (`slider` 既定 true)。**ネイティブ stepper は既定で非表示** (compact 用)。任意で `unit`、表示桁の `decimals` (計算で出た値の長い小数を出さない)。確定値は `onChange` で親が更新した `value` なので、`onRelease` だけ使う場合も親で draft を持つ | 入力高 `--field-h-sm` (20px) |
 | `SliderField` | label + slider + 数値 + **custom ステッパー (up/down)** + 任意 `unit`。**ステッパー付き数値ボックスはこれ**。`slider={false}` で slider 無しの数値+ステッパーだけにできる (count/stride 等) | `.h3-form-sliderfield*` (`_form-kit.css`) |
 | `DragNumericField` | 数値 (Blender風 drag number button)。**UXP の numslider の移植先**。renderer property 等のドラッグ可能な数値はこれを使う (`NumericField` ではない)。**ドラッグ感度は `min`/`max` と widget 幅から自動で決まる** (幅の 3/4 を drag すると全レンジを移動)。レンジに対して drag 量が釣り合うので、consumer は `pxPerStep` を指定しない — 指定するのは「レンジを掃くのが目的ではない」場合だけ (無限レンジ、UXP の 1 unit/px を再現する ViewPane 等) | サイズは `.h3-form-drag*` (`_form-kit.css`) |
 | `TimeField` | 時間 (ms) のセグメント化 timecode `H:MM:SS.mmm` (Blender / After Effects 流)。**UXP の timeedit の移植先**。独立 widget (`h3-kit/form/TimeField/`): クリックでセグメント選択、セグメント上の drag scrub (Shift = 精密, Ctrl/Cmd = ×10)、↑↓ で active segment を step (押しっぱなしは 1 interaction)、数字で上書き (carry あり)、hover で ▲▼、Ctrl+wheel、Enter / ダブルクリック / `+` `-` で打ち込み (`250ms` / `1.5s` / `+2s` の相対も可)。lifecycle は `DragNumericField` と同一なので `useRealtimeDragProp` をそのまま spread できる | `.h3-form-time*` (`_form-kit.css`) |

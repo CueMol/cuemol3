@@ -33,6 +33,12 @@ export interface NumericFieldProps {
     slider?: boolean;
     /** Optional unit suffix shown after the numeric input (e.g. "Å", "%"). */
     unit?: string;
+    /**
+     * Fixed display precision while not editing (e.g. 2 -> "7.99"). Omitted,
+     * the value shows as is, which for a computed value can be a long tail
+     * of digits.
+     */
+    decimals?: number;
     disabled?: boolean;
     /**
      * Fired when an interaction commits a value: slider release, numeric-input
@@ -51,6 +57,7 @@ export const NumericField: React.FC<NumericFieldProps> = ({
     step = 1,
     slider = true,
     unit,
+    decimals,
     disabled,
     onRelease,
 }) => {
@@ -108,7 +115,7 @@ export const NumericField: React.FC<NumericFieldProps> = ({
                 min={min}
                 max={max}
                 step={step}
-                value={editText ?? String(value)}
+                value={editText ?? (decimals !== undefined && Number.isFinite(value) ? value.toFixed(decimals) : String(value))}
                 disabled={disabled}
                 onChange={handleNumericChange}
                 onBlur={commit}

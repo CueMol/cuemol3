@@ -20,7 +20,7 @@
  * ride through onPreview / onCommit untouched. Only newly added stops are
  * bare { value, hex }.
  *
- * When `onDomainChange` is given, the histogram strip supports view-range
+ * When `onDomainChange` is given, the histogram strip (HistogramStrip) supports view-range
  * gestures: trackpad pinch (a ctrlKey wheel in Chromium) zooms anchored
  * at the cursor, dragging pans with a grab cursor, and a horizontal
  * two-finger scroll (wheel deltaX) pans. The histogram bins carry the
@@ -36,7 +36,6 @@ import {
     type GradientStop,
     type ValueDomain,
     gradientCssStops,
-    histogramBarFraction,
     hitTestStop,
     interpolateHexAt,
     keepRatioRescale,
@@ -44,6 +43,7 @@ import {
     valueToX,
     xToValue,
 } from './gradientGeometry'
+import { HistogramStrip } from './HistogramStrip'
 
 /** Gesture kind reported by onCommit. */
 export type GradientCommitGesture = 'move' | 'add' | 'delete'
@@ -86,42 +86,6 @@ interface GradientStopBarProps {
     onWidthChange?: (widthPx: number) => void
 }
 
-const HISTO_HEIGHT_PX = 48
-
-/** exp() scale per wheel deltaY unit for the pinch zoom. */
-const PINCH_ZOOM_K = 0.01
-
-/**
- * Size a canvas's backing store for the devicePixelRatio (local copy of the
- * SequencePanel helper; see that file for the reallocation-guard rationale).
- */
-function setupHiDpiCanvas(
-    canvas: HTMLCanvasElement,
-    cssWidth: number,
-    cssHeight: number,
-): CanvasRenderingContext2D | null {
-    const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1
-    const wantW = Math.max(1, Math.floor(cssWidth * dpr))
-    const wantH = Math.max(1, Math.floor(cssHeight * dpr))
-    if (canvas.width !== wantW) canvas.width = wantW
-    if (canvas.height !== wantH) canvas.height = wantH
-    canvas.style.width = `${cssWidth}px`
-    canvas.style.height = `${cssHeight}px`
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return null
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    return ctx
-}
-
-/** Resolve a :root CSS custom property with a non-DOM fallback. */
-function readCssVar(name: string, fallback: string): string {
-    if (typeof document === 'undefined') return fallback
-    const v = getComputedStyle(document.documentElement)
-        .getPropertyValue(name)
-        .trim()
-    return v || fallback
-}
-
 /** Live drag bookkeeping (kept in a ref; renders go through props). */
 interface DragState {
     index: number
@@ -159,21 +123,9 @@ export const GradientStopBar: React.FC<GradientStopBarProps> = ({
 }) => {
     const rootRef = useRef<HTMLDivElement | null>(null)
     const laneRef = useRef<HTMLDivElement | null>(null)
-    const histoBoxRef = useRef<HTMLDivElement | null>(null)
-    const histoRef = useRef<HTMLCanvasElement | null>(null)
     const dragRef = useRef<DragState | null>(null)
-    const [histoWidth, setHistoWidth] = useState(0)
     /** Marker index currently ghosted by a delete-armed drag. */
     const [ghostIndex, setGhostIndex] = useState<number | null>(null)
-    /** True while a histogram pan drag is active (grabbing cursor). */
-    const [panning, setPanning] = useState(false)
-
-    // Latest domain / gesture callback for the natively-attached wheel
-    // handler (kept in refs so the listener attaches once per strip).
-    const domainRef = useRef(domain)
-    domainRef.current = domain
-    const onDomainChangeRef = useRef(onDomainChange)
-    onDomainChangeRef.current = onDomainChange
     const onWidthChangeRef = useRef(onWidthChange)
     onWidthChangeRef.current = onWidthChange
 
@@ -189,125 +141,6 @@ export const GradientStopBar: React.FC<GradientStopBarProps> = ({
         report()
         return () => ro.disconnect()
     }, [])
-
-    // --- histogram strip ---
-
-    useEffect(() => {
-        const canvas = histoRef.current
-        if (!canvas || histogram === null) return
-        const parent = canvas.parentElement
-        if (!parent) return
-        const ro = new ResizeObserver(() => {
-            setHistoWidth(parent.clientWidth)
-        })
-        ro.observe(parent)
-        setHistoWidth(parent.clientWidth)
-        return () => ro.disconnect()
-    }, [histogram === null])
-
-    useEffect(() => {
-        const canvas = histoRef.current
-        if (!canvas || histogram === null || histoWidth <= 0) return
-        const ctx = setupHiDpiCanvas(canvas, histoWidth, HISTO_HEIGHT_PX)
-        if (!ctx) return
-        ctx.clearRect(0, 0, histoWidth, HISTO_HEIGHT_PX)
-        const { bins, nmax, globalNmax, domain: fetched } = histogram
-        // Fixed LOG y-scale: bar heights are log(1+n) normalized against
-        // the map-wide max on the same grid, so a dominant bin (e.g. the
-        // zero peak of a solvent-flattened map) cannot flatten the rest
-        // and panning does not rescale the bars. Falls back to the window
-        // max when the map-wide max is unavailable.
-        const yMax = globalNmax !== null && globalNmax > 0 ? globalNmax : nmax
-        if (bins.length === 0 || yMax <= 0) return
-        const fspan = fetched.max - fetched.min
-        const vspan = domain.max - domain.min
-        if (!(fspan > 0) || !(vspan > 0)) return
-        ctx.fillStyle = readCssVar('--text-muted', '#939ba6')
-        // Bars are mapped from the domain they were FETCHED for onto the
-        // CURRENT view domain, so pan/zoom gestures move the existing bars
-        // immediately; the debounced refetch then replaces the data.
-        const binw = fspan / bins.length
-        for (let i = 0; i < bins.length; ++i) {
-            const frac = histogramBarFraction(bins[i], yMax)
-            if (frac <= 0) continue
-            const v0 = fetched.min + i * binw
-            const x0 = ((v0 - domain.min) / vspan) * histoWidth
-            const x1 = ((v0 + binw - domain.min) / vspan) * histoWidth
-            if (x1 < 0 || x0 > histoWidth) continue
-            const h = frac * HISTO_HEIGHT_PX
-            ctx.fillRect(x0, HISTO_HEIGHT_PX - h, Math.max(1, x1 - x0), h)
-        }
-    }, [histogram, histoWidth, domain])
-
-    // --- histogram view-range gestures ---
-
-    // Pinch zoom (Chromium delivers a trackpad pinch as a ctrlKey wheel)
-    // anchored at the cursor, and horizontal two-finger scroll as a pan.
-    // Attached natively (passive: false) because React's synthetic wheel
-    // cannot preventDefault the browser page-zoom.
-    useEffect(() => {
-        const el = histoBoxRef.current
-        if (!el || histogram === null) return
-        const onWheel = (e: WheelEvent): void => {
-            const cb = onDomainChangeRef.current
-            if (!cb) return
-            const d = domainRef.current
-            const rect = el.getBoundingClientRect()
-            const span = d.max - d.min
-            if (!(span > 0) || rect.width <= 0) return
-            if (e.ctrlKey) {
-                e.preventDefault()
-                const t = Math.min(
-                    1, Math.max(0, (e.clientX - rect.left) / rect.width),
-                )
-                const anchor = d.min + t * span
-                const factor = Math.exp(e.deltaY * PINCH_ZOOM_K)
-                const next = {
-                    min: anchor - (anchor - d.min) * factor,
-                    max: anchor + (d.max - anchor) * factor,
-                }
-                if (next.max - next.min > 0) cb(next)
-            } else if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
-                e.preventDefault()
-                // max from min + span: wheel pans accumulate, and shifting
-                // both ends independently would drift the span.
-                const min = d.min + (e.deltaX / rect.width) * span
-                cb({ min, max: min + span })
-            }
-        }
-        el.addEventListener('wheel', onWheel, { passive: false })
-        return () => el.removeEventListener('wheel', onWheel)
-    }, [histogram === null])
-
-    /** Hand-drag pan: the content follows the pointer (grab semantics). */
-    const handleHistoMouseDown = useCallback(
-        (e: React.MouseEvent) => {
-            if (e.button !== 0 || disabled) return
-            if (!onDomainChangeRef.current) return
-            const el = histoBoxRef.current
-            if (!el) return
-            e.preventDefault()
-            const rect = el.getBoundingClientRect()
-            const startX = e.clientX
-            const start = domainRef.current
-            const span = start.max - start.min
-            if (!(span > 0) || rect.width <= 0) return
-            setPanning(true)
-            const onMove = (ev: MouseEvent): void => {
-                const shift = (-(ev.clientX - startX) / rect.width) * span
-                const min = start.min + shift
-                onDomainChangeRef.current?.({ min, max: min + span })
-            }
-            const onUp = (): void => {
-                document.removeEventListener('mousemove', onMove)
-                document.removeEventListener('mouseup', onUp)
-                setPanning(false)
-            }
-            document.addEventListener('mousemove', onMove)
-            document.addEventListener('mouseup', onUp)
-        },
-        [disabled],
-    )
 
     // --- drag lifecycle ---
 
@@ -516,17 +349,12 @@ export const GradientStopBar: React.FC<GradientStopBarProps> = ({
             className={`mg-stopbar${disabled ? ' is-disabled' : ''}`}
         >
             {histogram !== null && (
-                <div
-                    ref={histoBoxRef}
-                    className={
-                        'mg-histo' +
-                        (onDomainChange ? ' is-pannable' : '') +
-                        (panning ? ' is-panning' : '')
-                    }
-                    onMouseDown={handleHistoMouseDown}
-                >
-                    <canvas ref={histoRef} className="mg-histo-canvas" />
-                </div>
+                <HistogramStrip
+                    histogram={histogram}
+                    domain={domain}
+                    disabled={disabled}
+                    onDomainChange={onDomainChange}
+                />
             )}
             <div className="mg-gradient-bar" style={{ background: gradientCss }} />
             <div
