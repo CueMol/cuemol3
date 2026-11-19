@@ -80,6 +80,12 @@ namespace molstr {
 
     MolCoordPtr getClientMol() const;
 
+    /// Occluder spheres for the ambient probes: the selected atoms with a
+    /// nominal 1.8 A radius. The GPU probe bake draws the real geometry and
+    /// uses these only for the grid bounds and change detection; renderers
+    /// that draw atom spheres override with their radii.
+    void collectOcclusionSpheres(std::vector<qlib::Vector4D> &out) const override;
+
     /// make hittestresult JSON string for atom aid
     static LString interpHitAidImpl(MolAtomPtr pAtom);
 

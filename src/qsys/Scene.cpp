@@ -164,6 +164,20 @@ Scene::Scene()
   m_nAOSlices = 9;
   m_nAOSteps = 3;
   m_bAOHalfRes = false;
+  m_nAOMethod = 0;
+  m_fAOThicknessNear = 3.0;
+  m_fAOBounce = 0.0;
+  m_bAOSpecOcclusion = true;
+  m_bAOProbe = true;
+  m_nAOProbeDirs = 32;
+  m_nAOProbeTile = 128;
+  m_fAOProbeSpacing = 3.0;
+  m_fAOProbeStrength = 1.0;
+  m_fLightAmbient = 0.4;
+  m_fLightDiffuse = 0.8;
+  m_fLightSpecular = 0.16;
+  m_nAODebugView = AODV_OFF;
+  m_bRenderTiming = false;
   m_nAAMethod = AA_FXAA;
   m_nAAJitterLevel = 0;
   m_fAASmaaThreshold = 0.05;
@@ -677,6 +691,8 @@ void Scene::display(DisplayContext *pdc)
   // Scoped push of this scene's style context: a renderer throwing mid-display
   // must not leave the scene ID on the StyleMgr context stack.
   AutoStyleCtxt style_ctxt(getUID());
+  pdc->setLightIntensities(float(m_fLightAmbient), float(m_fLightDiffuse),
+                           float(m_fLightSpecular));
   pdc->startRender();
 
   std::vector<RendererPtr> transps;

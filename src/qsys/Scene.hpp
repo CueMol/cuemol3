@@ -124,6 +124,26 @@ namespace qsys {
     /// Compute the GTAO term at half resolution (edge-aware upsample on composite)
     bool m_bAOHalfRes;
 
+    /// AO integration method and bitmask thickness (see Scene.qif; not saved)
+    int m_nAOMethod;
+    double m_fAOThicknessNear;
+    double m_fAOBounce;
+    bool m_bAOSpecOcclusion;
+    bool m_bAOProbe;
+    int m_nAOProbeDirs;
+    int m_nAOProbeTile;
+    double m_fAOProbeSpacing;
+    double m_fAOProbeStrength;
+    double m_fLightAmbient;
+    double m_fLightDiffuse;
+    double m_fLightSpecular;
+
+    /// AO debug view (see AODebugView; not saved)
+    int m_nAODebugView;
+
+    /// Log per-pass frame pipeline times (not saved)
+    bool m_bRenderTiming;
+
     /// Post-process anti-aliasing method (see AAMethod enum below)
     int m_nAAMethod;
 
@@ -244,6 +264,70 @@ namespace qsys {
     void setAOHalfRes(bool v) {
       setUpdateFlag();
       m_bAOHalfRes = v;
+    }
+
+    /// AO debug view values (match the aoDebugView enumdef).
+    enum AODebugView {
+      AODV_OFF = 0,
+      AODV_AO = 1,
+      AODV_NORMAL = 2,
+      AODV_DEPTH = 3,
+    };
+
+    /// AO integration method: 0 = GTAO, 1 = visibility bitmask (see Scene.qif)
+    int getAOMethod() const { return m_nAOMethod; }
+    void setAOMethod(int v) {
+      if (m_nAOMethod == v) return;
+      m_nAOMethod = v;
+      setUpdateFlag();
+    }
+    double getLightAmbient() const { return m_fLightAmbient; }
+    void setLightAmbient(double v) { m_fLightAmbient = v; setUpdateFlag(); }
+    double getLightDiffuse() const { return m_fLightDiffuse; }
+    void setLightDiffuse(double v) { m_fLightDiffuse = v; setUpdateFlag(); }
+    double getLightSpecular() const { return m_fLightSpecular; }
+    void setLightSpecular(double v) { m_fLightSpecular = v; setUpdateFlag(); }
+    int getAOProbeDirs() const { return m_nAOProbeDirs; }
+    void setAOProbeDirs(int v) { m_nAOProbeDirs = v; setUpdateFlag(); }
+    int getAOProbeTile() const { return m_nAOProbeTile; }
+    void setAOProbeTile(int v) { m_nAOProbeTile = v; setUpdateFlag(); }
+    bool isAOProbe() const { return m_bAOProbe; }
+    void setAOProbe(bool v) { m_bAOProbe = v; setUpdateFlag(); }
+    double getAOProbeStrength() const { return m_fAOProbeStrength; }
+    void setAOProbeStrength(double v) { m_fAOProbeStrength = v; setUpdateFlag(); }
+    double getAOProbeSpacing() const { return m_fAOProbeSpacing; }
+    void setAOProbeSpacing(double v) { m_fAOProbeSpacing = v; setUpdateFlag(); }
+    bool isAOSpecOcclusion() const { return m_bAOSpecOcclusion; }
+    void setAOSpecOcclusion(bool b) {
+      if (m_bAOSpecOcclusion == b) return;
+      m_bAOSpecOcclusion = b;
+      setUpdateFlag();
+    }
+    double getAOBounce() const { return m_fAOBounce; }
+    void setAOBounce(double v) {
+      if (m_fAOBounce == v) return;
+      m_fAOBounce = v;
+      setUpdateFlag();
+    }
+    double getAOThicknessNear() const { return m_fAOThicknessNear; }
+    void setAOThicknessNear(double v) {
+      if (m_fAOThicknessNear == v) return;
+      m_fAOThicknessNear = v;
+      setUpdateFlag();
+    }
+
+    /// Debug view of the AO stage (not saved)
+    int getAODebugView() const { return m_nAODebugView; }
+    void setAODebugView(int v) {
+      setUpdateFlag();
+      m_nAODebugView = v;
+    }
+
+    /// Log per-pass frame pipeline times (not saved)
+    bool isRenderTiming() const { return m_bRenderTiming; }
+    void setRenderTiming(bool v) {
+      setUpdateFlag();
+      m_bRenderTiming = v;
     }
 
     /// Post-process anti-aliasing method values (match the aa_method enumdef).

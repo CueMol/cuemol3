@@ -26,10 +26,36 @@ uniform int u_debugMode;                // 0 = AO, 1 = normal, 2 = linear depth
 uniform float u_aoNoiseOffset;          // per-sample noise rotation (temporal SS)
 uniform float u_maxScreenspaceRadius;   // horizon search radius cap (pass pixels)
 uniform int u_isOrtho;                  // 1 = orthographic projection, 0 = perspective
+uniform int u_method;                   // 0 = GTAO, 1 = visibility bitmask (EEVEE Next)
+uniform float u_thicknessNear;          // bitmask: constant minimum thickness (view units)
+uniform vec2 u_fullPixelSize;          // (1/width, 1/height) of the full-res output
+// Bitmask: baked world-space ambient probes (qsys::AmbientProbeVolume), the
+// counterpart of EEVEE's volume light probes. RGBA = (m0, m1.xyz): mean
+// visibility and mean visibility-weighted direction over the sphere.
+// The probe grid is a 2D atlas, z slices side by side (x + z * nx, y).
+uniform int u_hasProbe;                 // 1 = probes bound
+uniform sampler2D u_probeAtlas;
+uniform ivec3 u_probeDim;
+uniform float u_probeSpacing;
+uniform mat4 u_viewToWorld;             // GTAO view space -> world
+uniform vec3 u_probeOrigin;
+uniform float u_probeBias;              // lookup offset along the normal
+uniform float u_probeStrength;          // probe visibility = mix(1, probe, strength)
+
+// Bitmask: near-field indirect diffuse light (EEVEE horizon scan radiance).
+// The lit scene colour (fog included) is the radiance of the occluders.
+uniform int u_bounce;                   // 1 = gather into o_Bounce
+uniform sampler2D u_sceneColorTex;
+uniform float u_fogEnd;                 // linear fog of the scene colour
+uniform float u_fogScale;
+uniform vec3 u_fogColor;
 
 in vec2 v_uv;
 
-out vec4 o_FragColor;
+layout(location = 0) out vec4 o_FragColor;
+// Gathered indirect irradiance (RGB, the AO pass target's second attachment;
+// ignored when the target has none).
+layout(location = 1) out vec4 o_Bounce;
 
 const float PI = 3.14159265359;
 const float HALF_PI = 1.57079632679;
@@ -142,47 +168,261 @@ vec3 selectNormal(vec2 uv, vec3 pC, out bool isExcluded)
     return reconstructNormal(uv, pC);
 }
 
-void main()
+// ---- Visibility bitmask AO (port of Blender EEVEE Next fast_gi::eval, AO only) ----
+// source/blender/draw/engines/eevee/shaders/eevee_fast_gi.bsl.hh (Therrien et al.,
+// "Screen Space Indirect Lighting with Visibility Bitmask"), with the screen
+// thickness estimator of eevee_ray_types_lib.bsl.hh. Works in GL view space
+// (camera looks down -Z), like Blender. Differences: no HiZ (the full depth
+// texture is read at LOD 0; emulating EEVEE's max-depth HiZ changed the
+// result by about 0.01) and no temporal accumulation unless jittered (a high
+// slice count stands in for EEVEE's 2 slices x accumulated samples).
+
+uint popcount32(uint v)
 {
-    float rawDepth = texture(u_depthTex, v_uv).r;
-    float viewspaceZ = linearizeZ(rawDepth);
-    vec3 pixCenterPos = viewPos(v_uv, viewspaceZ);
-    bool isExcluded;
-    vec3 N = selectNormal(v_uv, pixCenterPos, isExcluded);
+    v = v - ((v >> 1u) & 0x55555555u);
+    v = (v & 0x33333333u) + ((v >> 2u) & 0x33333333u);
+    v = (v + (v >> 4u)) & 0x0F0F0F0Fu;
+    return (v * 0x01010101u) >> 24u;
+}
 
-    if (u_debugMode == 1) {
-        // Normal fed to the integration, as RGB (debugging).
-        o_FragColor = vec4(N * 0.5 + 0.5, 1.0);
-        return;
+uint anglesToBitmask(vec2 theta)
+{
+    vec2 ratio = clamp(theta * (1.0 / PI) + 0.5, 0.0, 1.0);
+    uint a = uint(floor(32.0 * ratio.x));
+    uint b = uint(ceil(32.0 * (ratio.y - ratio.x)));
+    if (a >= 32u) return 0u;
+    return (((b < 32u) ? (1u << b) : 0u) - 1u) << a;
+}
+
+float bitmaskToVisibilityCosine(uint m)
+{
+    const vec4 weights = vec4(0.0095061, 0.0270951, 0.0405571, 0.0478421);
+    vec4 c = vec4(float(popcount32(m & 0xF000000Fu)), float(popcount32(m & 0x0F0000F0u)),
+                  float(popcount32(m & 0x00F00F00u)), float(popcount32(m & 0x000FF000u)));
+    return clamp(1.0 - dot(c, weights), 0.0, 1.0);
+}
+
+// GL view position (z < 0 in front) of the window position (uv, depth).
+vec3 glViewPos(vec2 uv, float d)
+{
+    vec3 p = viewPos(uv, linearizeZ(d));
+    return vec3(p.xy, -p.z);
+}
+
+// GL view position -> (uv, window depth).
+vec3 glProject(vec3 P)
+{
+    float vz = -P.z;
+    vec2 xy = (u_isOrtho != 0) ? P.xy : P.xy / vz;
+    vec2 uv = (xy - u_ndcToViewAdd) / u_ndcToViewMul;
+    float d = (u_isOrtho != 0) ? (vz - u_depthUnpack.x) / u_depthUnpack.y
+                               : u_depthUnpack.y - u_depthUnpack.x / vz;
+    return vec3(uv, d);
+}
+
+// Blender ScreenThicknessParameters::pixel_depth_thickness_at (screen-range).
+float pixelDepthThicknessAt(float vsZ, float avgPixRadius)
+{
+    if (u_isOrtho != 0) {
+        float winmat22 = -2.0 / u_depthUnpack.y;
+        return -(avgPixRadius + u_thicknessNear) * winmat22 * 0.5;
     }
-    if (u_debugMode == 2) {
-        float vnear = u_depthUnpack.x / u_depthUnpack.y;
-        float vfar = u_depthUnpack.x / (u_depthUnpack.y - 1.0);
-        float g = clamp((viewspaceZ - vnear) / (vfar - vnear), 0.0, 1.0);
-        o_FragColor = vec4(vec3(1.0 - g), 1.0);
-        return;
+    float winmat32 = -2.0 * u_depthUnpack.x;
+    float vsThickness = vsZ * avgPixRadius - u_thicknessNear;
+    float ndcThickness = vsThickness / (vsZ * (vsZ + vsThickness));
+    return ndcThickness * winmat32 * 0.5;
+}
+
+// Trilinear lookup of the probe atlas at world position pw.
+vec4 sampleProbeAtlas(vec3 pw)
+{
+    vec3 dim = vec3(u_probeDim);
+    vec3 g = (pw - u_probeOrigin) / u_probeSpacing - 0.5;
+    g = clamp(g, vec3(0.0), dim - 1.0);
+    float z0 = floor(g.z);
+    float z1 = min(z0 + 1.0, dim.z - 1.0);
+    float fz = g.z - z0;
+    vec2 atlas = vec2(dim.x * dim.z, dim.y);
+    // Bilinear within a slice: g.xy is clamped to [0, n-1], so the filter
+    // never reaches into the neighbouring slice.
+    vec4 s0 = texture(u_probeAtlas, (vec2(g.x + z0 * dim.x, g.y) + 0.5) / atlas);
+    vec4 s1 = texture(u_probeAtlas, (vec2(g.x + z1 * dim.x, g.y) + 0.5) / atlas);
+    return mix(s0, s1, fz);
+}
+
+// Distant visibility from the baked probes at world position pw with world
+// normal nw, cosine-weighted (m0 + 2 dot(m1, N)) and mixed by the strength.
+// Plain trilinear lookup: EEVEE's facing / validity weighting of the 8 probes
+// was tried and left out, since with probes 3 A apart (coarser than an atom)
+// it lets the dark probes in the gaps in front of a sunk atom dominate and
+// paints dark smudges on CPK spheres.
+float probeVisibility(vec3 pw, vec3 nw)
+{
+    vec3 pq = pw + nw * u_probeBias;
+    vec4 m = sampleProbeAtlas(pq);
+    return mix(1.0, clamp(m.x + 2.0 * dot(m.yzw, nw), 0.0, 1.0), u_probeStrength);
+}
+
+// Radiance of the occluding surface at uv: the lit scene colour with the
+// scene's linear fog taken out (c = mix(fog, lit, fogVis)). The scene colour
+// is not occluded yet; EEVEE reads the previous frame's final radiance, in
+// which an occluder deep in a cavity is itself dark. Approximate that with the
+// baked probes: darken the occluder's ambient part (fraction f, stored in the
+// scene normal's length as 2 - f) by its distant visibility. pG / nG: the
+// occluder position and the normal of its side facing the receiver, in the
+// GTAO view space.
+vec3 occluderRadiance(vec2 uv, float viewZ, vec4 sn, vec3 pG, vec3 nG)
+{
+    vec3 c = texture(u_sceneColorTex, uv).rgb;
+    float fogVis = clamp((u_fogEnd - viewZ) * u_fogScale, 0.0, 1.0);
+    vec3 lit = max((c - (1.0 - fogVis) * u_fogColor) / max(fogVis, 0.05), vec3(0.0));
+    if (u_hasProbe != 0) {
+        float f = clamp(2.0 - length(sn.xyz), 0.0, 1.0);
+        vec3 pw = (u_viewToWorld * vec4(pG, 1.0)).xyz;
+        vec3 nw = normalize(mat3(u_viewToWorld) * nG);
+        lit *= 1.0 - f * (1.0 - probeVisibility(pw, nw));
     }
+    return lit;
+}
 
-    // Far plane / no geometry: fully unoccluded (and flat edges).
-    if (rawDepth >= 1.0) {
-        o_FragColor = vec4(1.0);
-        return;
+// Visibility bitmask AO (Blender EEVEE Next fast_gi::eval). Returns the
+// cosine-weighted visibility; with u_bounce, also the near-field indirect
+// irradiance in `bounce`: every sample that newly occludes sectors of the
+// slice adds the radiance of the surface it hit, weighted by the cosine
+// weight of those sectors and by how much that surface faces the receiver
+// (EEVEE weights its radiance samples the same way). For occluders of uniform
+// radiance L this is L * (1 - visibility), i.e. the light the ambient term
+// loses, given back in the occluders' colour.
+float eeveeVisibility(vec3 vP, vec3 vN, float searchDistance, int sliceCount, int sampleCount,
+                      vec4 noise, out vec3 bounce)
+{
+    const float angleBias = 1.0 / (1.0 - 0.05);  // fast_gi_bias default
+    vec3 vV = (u_isOrtho != 0) ? vec3(0.0, 0.0, 1.0) : normalize(-vP);
+    // Average pixel radius at unit Z (perspective) / absolute (ortho), scaled
+    // by the minimum pixel thickness "eyeballed for 64 samples". Taken from the
+    // full-resolution pixel so the half-res pass (while the view moves) gets
+    // the same thickness, hence the same occlusion, as the full-res pass.
+    float avgPix = length(u_ndcToViewMul * u_fullPixelSize) *
+                   (4.0 * sqrt(64.0 / float(sampleCount)));
+    vec3 ssStart = glProject(vP);
+
+    float weightAccum = 0.0;
+    float occlusionAccum = 0.0;
+    vec3 bounceAccum = vec3(0.0);
+    for (int slice = 0; slice < sliceCount; slice++) {
+        float ang = 2.0 * PI * ((float(slice) + noise.x) / float(2 * sliceCount));
+        vec2 vDir = vec2(cos(ang), sin(ang));
+        vec3 vB = normalize(cross(vV, vec3(vDir, 0.0)));
+        vec3 vT = cross(vB, vV);
+
+        vec3 nProj = vN - vB * dot(vN, vB);
+        float vNLength = length(nProj);
+        nProj /= max(vNLength, 1e-6);
+        float vNAngle = sign(dot(nProj, vT)) * acos(clamp(dot(nProj, vV), -1.0, 1.0));
+        vNAngle += (noise.z - 0.5) * (PI / 32.0) * angleBias;
+
+        uint sliceBitmask = 0u;
+        vec3 sliceBounce = vec3(0.0);
+        for (int side = 0; side < 2; side++) {
+            vec3 dir = vec3((side == 0) ? vDir : -vDir, 0.0);
+            vec3 ssEnd = glProject(vP + dir * searchDistance);
+            vec3 ssDir = ssEnd - ssStart;
+            if (dot(ssDir.xy, ssDir.xy) < 1e-10) ssDir.xy = vec2(0.0, 1e-5);
+            float lenSqr = dot(ssDir, ssDir);
+            bool vert = abs(ssDir.x / u_viewportPixelSize.x) < abs(ssDir.y / u_viewportPixelSize.y);
+            ssDir /= vert ? abs(ssDir.y) : abs(ssDir.x);
+            ssDir *= vert ? u_viewportPixelSize.y : u_viewportPixelSize.x;
+            float maxTime = sqrt(lenSqr / max(dot(ssDir, ssDir), 1e-20));
+            // Clip to the screen.
+            vec2 tb = vec2(1e20);
+            if (ssDir.x > 0.0) tb.x = (1.0 - ssStart.x) / ssDir.x;
+            if (ssDir.x < 0.0) tb.x = -ssStart.x / ssDir.x;
+            if (ssDir.y > 0.0) tb.y = (1.0 - ssStart.y) / ssDir.y;
+            if (ssDir.y < 0.0) tb.y = -ssStart.y / ssDir.y;
+            maxTime = min(maxTime, min(tb.x, tb.y));
+            // Cap the march in pixels, as the GTAO path does (zoomed in, the
+            // search distance spans hundreds of pixels). The far occluders
+            // beyond the cap are left to the baked probes.
+            maxTime = min(maxTime, u_maxScreenspaceRadius);
+
+            // ScreenThicknessEstimator::init(ray.origin.z) (Blender passes the
+            // view-space Z here).
+            vec2 prevSlope = vec2(0.0);
+            float prevZ = vP.z;
+            float prevT = 0.0;
+
+            for (int j = 0; j < sampleCount; j++) {
+                float r = (float(j) + noise.y) / float(sampleCount);
+                float time = 1.0 + r * r * maxTime;
+                vec2 suv = ssStart.xy + ssDir.xy * time;
+                float sd = texture(u_depthTex, suv).r;
+                if (sd >= 1.0) continue;  // background
+
+                float sViewZ = glViewPos(suv, sd).z;
+                float minThick = pixelDepthThicknessAt(sViewZ, avgPix);
+                // ScreenThicknessEstimator::thickness
+                float dz = sd - prevZ;
+                float slope = dz / (time - prevT);
+                float thick = abs(dz);
+                if (any(greaterThan(abs(prevSlope - slope), abs(prevSlope)))) thick = 0.0;
+                thick = max(thick, minThick);
+                prevSlope = vec2(slope, prevSlope.x);
+                prevT = time;
+                prevZ = sd;
+
+                vec3 pFront = glViewPos(suv, sd + 2.0 * 2.4e-7);
+                vec3 pBack = glViewPos(suv, min(sd + thick, 1.0));
+                vec3 lsF = (pFront - vP) / searchDistance;
+                vec3 lsB = (pBack - vP) / searchDistance;
+                float maxDist = sqrt(clamp(1.0 - dot(lsF.xy, lsF.xy), 0.0, 1.0));
+                lsF.z = clamp(lsF.z, -maxDist, maxDist);
+                lsB.z = clamp(lsB.z, -maxDist, maxDist);
+                if (lsF.z == lsB.z) continue;
+
+                vec2 theta = acos(clamp(vec2(dot(normalize(lsF), vV), dot(normalize(lsB), vV)),
+                                        -1.0, 1.0));
+                theta.y = max(theta.x, theta.y);
+                theta = (side == 0) ? theta.xy : -theta.yx;
+                uint sampleBitmask = anglesToBitmask((theta - vNAngle) * angleBias);
+                if (u_bounce != 0) {
+                    uint newBits = sampleBitmask & ~sliceBitmask;
+                    if (newBits != 0u) {
+                        // Cosine weight of the newly occluded sectors.
+                        float w = 1.0 - bitmaskToVisibilityCosine(newBits);
+                        // Two-sided surfaces (ribbons): either side emits.
+                        vec4 sn = texture(u_normalTex, suv);
+                        vec3 dirL = normalize(lsF);  // receiver -> occluder (GL eye)
+                        float facing = 1.0;
+                        vec3 nE = -dirL;             // no normal: face the receiver
+                        if (dot(sn.xyz, sn.xyz) > 0.25) {
+                            nE = normalize(sn.xyz);
+                            float d = dot(nE, -dirL);
+                            // Two-sided surfaces (ribbons): either side emits;
+                            // take the side facing the receiver.
+                            if (d < 0.0) nE = -nE;
+                            facing = abs(d);
+                        }
+                        vec3 rad = occluderRadiance(suv, -pFront.z, sn,
+                                                    vec3(pFront.xy, -pFront.z),
+                                                    vec3(nE.xy, -nE.z));
+                        sliceBounce += rad * (w * facing);
+                    }
+                }
+                sliceBitmask |= sampleBitmask;
+            }
+        }
+        occlusionAccum += bitmaskToVisibilityCosine(sliceBitmask) * vNLength;
+        bounceAccum += sliceBounce * vNLength;
+        weightAccum += vNLength;
     }
+    bounce = bounceAccum / max(weightAccum, 1e-6);
+    return occlusionAccum / max(weightAccum, 1e-6);
+}
 
-    // Line / label / wireframe primitive: keep it fully lit (AO = 1, flat edges).
-    if (isExcluded) {
-        o_FragColor = vec4(1.0);
-        return;
-    }
-
-    // Depth-discontinuity edges for the denoise pass (uses un-nudged depth).
-    vec2 ep = u_viewportPixelSize;
-    float zL = linearizeZ(texture(u_depthTex, v_uv - vec2(ep.x, 0.0)).r);
-    float zR = linearizeZ(texture(u_depthTex, v_uv + vec2(ep.x, 0.0)).r);
-    float zT = linearizeZ(texture(u_depthTex, v_uv + vec2(0.0, ep.y)).r);
-    float zB = linearizeZ(texture(u_depthTex, v_uv - vec2(0.0, ep.y)).r);
-    float packedEdges = packEdges(calculateEdges(viewspaceZ, zL, zR, zT, zB));
-
+// GTAO horizon integration (XeGTAO). Returns the visibility in [0.03, 1].
+float gtaoVisibility(vec3 pixCenterPos, vec3 N, float viewspaceZ, float effectRadius,
+                     float finalValuePower)
+{
     // ---- GTAO horizon integration (depth-only) ----
     // Slice count sets the angular sampling = base noise level; a high count
     // keeps grain low without temporal accumulation. The AO spread (how far the
@@ -200,7 +440,6 @@ void main()
     pixCenterPos = viewPos(v_uv, viewspaceZ);
     vec3 viewVec = camDir(pixCenterPos);
 
-    float effectRadius = u_effectRadius;
 
     vec2 ndcToViewMul_x_pixelSize = u_ndcToViewMul * u_viewportPixelSize;
     // Orthographic: a pixel's world size is constant; perspective: it scales
@@ -320,8 +559,84 @@ void main()
     }
 
     visibility /= float(sliceCount);
-    visibility = pow(max(visibility, 0.0), u_finalValuePower);
+    visibility = pow(max(visibility, 0.0), finalValuePower);
     visibility = max(0.03, visibility);
+    return visibility;
+}
+
+void main()
+{
+    o_Bounce = vec4(0.0);
+    float rawDepth = texture(u_depthTex, v_uv).r;
+    float viewspaceZ = linearizeZ(rawDepth);
+    vec3 pixCenterPos = viewPos(v_uv, viewspaceZ);
+    bool isExcluded;
+    vec3 N = selectNormal(v_uv, pixCenterPos, isExcluded);
+
+    if (u_debugMode == 1) {
+        // Normal fed to the integration, as RGB (debugging).
+        o_FragColor = vec4(N * 0.5 + 0.5, 1.0);
+        return;
+    }
+    if (u_debugMode == 2) {
+        float vnear = u_depthUnpack.x / u_depthUnpack.y;
+        float vfar = u_depthUnpack.x / (u_depthUnpack.y - 1.0);
+        float g = clamp((viewspaceZ - vnear) / (vfar - vnear), 0.0, 1.0);
+        o_FragColor = vec4(vec3(1.0 - g), 1.0);
+        return;
+    }
+
+    // Far plane / no geometry: fully unoccluded (and flat edges).
+    if (rawDepth >= 1.0) {
+        o_FragColor = vec4(1.0);
+        return;
+    }
+
+    // Line / label / wireframe primitive: keep it fully lit (AO = 1, flat edges).
+    if (isExcluded) {
+        o_FragColor = vec4(1.0);
+        return;
+    }
+
+    // Depth-discontinuity edges for the denoise pass (uses un-nudged depth).
+    vec2 ep = u_viewportPixelSize;
+    float zL = linearizeZ(texture(u_depthTex, v_uv - vec2(ep.x, 0.0)).r);
+    float zR = linearizeZ(texture(u_depthTex, v_uv + vec2(ep.x, 0.0)).r);
+    float zT = linearizeZ(texture(u_depthTex, v_uv + vec2(0.0, ep.y)).r);
+    float zB = linearizeZ(texture(u_depthTex, v_uv - vec2(0.0, ep.y)).r);
+    float packedEdges = packEdges(calculateEdges(viewspaceZ, zL, zR, zT, zB));
+
+    if (u_method == 1) {
+        float n0 = fract(ign(gl_FragCoord.xy) + u_aoNoiseOffset);
+        vec4 noise = vec4(n0, fract(n0 + 0.5698402909 + u_aoNoiseOffset * 0.7548776662),
+                          fract(ign(gl_FragCoord.yx + 17.0) + u_aoNoiseOffset), 0.0);
+        vec3 vP = vec3(pixCenterPos.xy, -pixCenterPos.z);
+        vec3 vN = normalize(vec3(N.xy, -N.z));
+        vec3 bounce;
+        float vis = eeveeVisibility(vP, vN, u_effectRadius, clamp(u_sliceCount, 1, 32),
+                                    clamp(u_stepCount, 1, 32), noise, bounce);
+        o_Bounce = vec4(bounce, 1.0);
+        // Linear visibility, as EEVEE stores it (saturate(result), no power).
+        vis = clamp(vis, 0.0, 1.0);
+        if (u_hasProbe != 0) {
+            // Distant visibility from the probes, cosine-weighted around the
+            // normal: m0 + 2 dot(m1, N) (1 unoccluded, 1 on an open flat
+            // surface). Both terms estimate the same sky visibility, so take
+            // the smaller one: multiplying them (as EEVEE multiplies the probe
+            // irradiance by the near-field visibility) counts the near
+            // occluders twice, since the 3 A probes see them too. The screen
+            // term keeps the contact detail the grid cannot resolve, the
+            // probes the large cavities.
+            vec3 pw = (u_viewToWorld * vec4(pixCenterPos, 1.0)).xyz;
+            vec3 nw = normalize(mat3(u_viewToWorld) * N);
+            vis = min(vis, probeVisibility(pw, nw));
+        }
+        o_FragColor = vec4(vis, packedEdges, 0.0, 1.0);
+        return;
+    }
+
+    float visibility = gtaoVisibility(pixCenterPos, N, viewspaceZ, u_effectRadius,
+                                      u_finalValuePower);
 
     // R = AO term, G = packed edges (consumed by the denoise pass).
     o_FragColor = vec4(visibility, packedEdges, 0.0, 1.0);

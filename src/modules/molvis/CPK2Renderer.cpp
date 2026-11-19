@@ -247,6 +247,21 @@ void CPK2Renderer::renderShaderImpl(DisplayContext *pdc)
 //////////////////////
 // Coordinate texture (direct update) implementation
 
+void CPK2Renderer::collectOcclusionSpheres(std::vector<qlib::Vector4D> &out) const
+{
+  MolCoordPtr pMol = getClientMol();
+  if (pMol.isnull()) return;
+  CPK2Renderer *pThis = const_cast<CPK2Renderer *>(this);
+  AtomIterator iter(pMol, getSelection());
+  for (iter.first(); iter.hasMore(); iter.next()) {
+    MolAtomPtr pAtom = pMol->getAtom(iter.getID());
+    if (pAtom.isnull()) continue;
+    qlib::Vector4D v = pAtom->getPos();
+    v.w() = pThis->getVdWRadius(pAtom);
+    out.push_back(v);
+  }
+}
+
 void CPK2Renderer::renderCoordTexImpl(DisplayContext *pdc)
 {
   MolCoordPtr pMol = getClientMol();

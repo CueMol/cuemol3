@@ -118,6 +118,7 @@ void main()
     o_FragColor = fragFogColor(color, frag_alpha, fogz);
 
     // Eye-space sphere normal (sentinel on the silhouette edge ring).
-    o_Normal = bEdge ? vec4(0.0, 0.0, 0.0, 1.0) : vec4(normalize(normal), 1.0);
+    // Length encodes the ambient fraction (AO applies to the ambient only).
+    o_Normal = bEdge ? vec4(0.0, 0.0, 0.0, 1.0) : encodeNormalAmbient(normal, g_ambientFraction);
 #endif
 }

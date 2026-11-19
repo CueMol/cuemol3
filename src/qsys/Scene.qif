@@ -67,6 +67,73 @@ runtime_class Scene
   property boolean aoHalfRes => redirect(isAOHalfRes, setAOHalfRes);
   default aoHalfRes = false;
 
+  /// AO integration method (not saved; under evaluation): 0 = GTAO,
+  /// 1 = visibility bitmask as in Blender EEVEE Next (aoRadius = search
+  /// distance, aoSlices / aoSteps = slices / samples per side).
+  property integer aoMethod => redirect(getAOMethod, setAOMethod) (nopersist);
+  default aoMethod = 0;
+  /// Visibility bitmask: constant minimum occluder thickness (A; EEVEE
+  /// fast_gi_thickness_near).
+  property real aoThicknessNear => redirect(getAOThicknessNear, setAOThicknessNear) (nopersist);
+  default aoThicknessNear = 3.0;
+  /// Visibility bitmask: strength of the near-field indirect diffuse light
+  /// (the light the occluding surfaces reflect, gathered from the screen as
+  /// EEVEE's horizon scan does). 0 = off.
+  property real aoBounce => redirect(getAOBounce, setAOBounce) (nopersist);
+  default aoBounce = 0.0;
+  /// Visibility bitmask: darken the highlight by the AO too (specular
+  /// occlusion, Frostbite / legacy EEVEE approximation).
+  property boolean aoSpecOcclusion => redirect(isAOSpecOcclusion, setAOSpecOcclusion) (nopersist);
+  default aoSpecOcclusion = true;
+  /// Visibility bitmask: multiply by baked world-space ambient probes (the
+  /// counterpart of EEVEE's volume light probes; rebuilt when the occluder
+  /// spheres change) and their grid spacing (A).
+  property boolean aoProbe => redirect(isAOProbe, setAOProbe) (nopersist);
+  default aoProbe = true;
+  /// Bake: number of directions (<= 64) and depth tile size (pixels).
+  /// 32 / 128 halves the bake time of 64 / 256 with no visible difference
+  /// (2BBV surface: 14 ms vs 40 ms, AO term correlation 0.987).
+  property integer aoProbeDirs => redirect(getAOProbeDirs, setAOProbeDirs) (nopersist);
+  default aoProbeDirs = 32;
+  property integer aoProbeTile => redirect(getAOProbeTile, setAOProbeTile) (nopersist);
+  default aoProbeTile = 128;
+  property real aoProbeSpacing => redirect(getAOProbeSpacing, setAOProbeSpacing) (nopersist);
+  default aoProbeSpacing = 3.0;
+  /// Strength of the probe term: probe visibility = mix(1, probe,
+  /// aoProbeStrength) (0 = no probe darkening, 1 = full); the AO term is the
+  /// minimum of the screen-space and the probe visibility.
+  property real aoProbeStrength => redirect(getAOProbeStrength, setAOProbeStrength) (nopersist);
+  default aoProbeStrength = 1.0;
+  /// Light intensities (not saved; PoC). lightAmbient = ambient total,
+  /// lightSpecular = specular x material. Defaults are the former shader
+  /// constants. With aoMethod 1 the AO darkens the ambient part only (as in
+  /// Blender EEVEE) and the scene colour is kept unclamped until the composite.
+  property real lightAmbient => redirect(getLightAmbient, setLightAmbient) (nopersist);
+  default lightAmbient = 0.4;
+  property real lightDiffuse => redirect(getLightDiffuse, setLightDiffuse) (nopersist);
+  default lightDiffuse = 0.8;
+  property real lightSpecular => redirect(getLightSpecular, setLightSpecular) (nopersist);
+  default lightSpecular = 0.16;
+
+  /// Debug view of the AO stage (not saved). off = the normal image,
+  /// ao = the AO term in grayscale, normal = the normal fed to GTAO,
+  /// depth = the linear depth.
+  /// Applies to the live view and image export.
+  enumdef aoDebugView {
+    off = 0;
+    ao = 1;
+    normal = 2;
+    depth = 3;
+  }
+  property enum aoDebugView => redirect(getAODebugView, setAODebugView) (nopersist);
+  default aoDebugView = "off";
+
+  /// Log the per-pass times of the off-screen frame pipeline (not saved;
+  /// debugging). Each pass is followed by a GPU finish, so this slows down
+  /// rendering while on.
+  property boolean renderTiming => redirect(isRenderTiming, setRenderTiming) (nopersist);
+  default renderTiming = false;
+
   /// Post-process anti-aliasing method, independent of the AO setting (either
   /// one routes the frame through the off-screen pipeline).
   /// none = direct rendering with hardware MSAA, fxaa = FXAA, smaa = SMAA.

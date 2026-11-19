@@ -268,5 +268,19 @@ ColorPtr MolRenderer::evalMolColor(ColorPtr pCol, ColorPtr pCol2)
 
   // apply modifications of pCol(molcol) to pCol2 (refcol)
   return pNmcol->modifyColor(pCol2);
+
 }
 
+void MolRenderer::collectOcclusionSpheres(std::vector<qlib::Vector4D> &out) const
+{
+  MolCoordPtr pMol = getClientMol();
+  if (pMol.isnull()) return;
+  AtomIterator iter(pMol, getSelection());
+  for (iter.first(); iter.hasMore(); iter.next()) {
+    MolAtomPtr pAtom = pMol->getAtom(iter.getID());
+    if (pAtom.isnull()) continue;
+    qlib::Vector4D v = pAtom->getPos();
+    v.w() = 1.8;
+    out.push_back(v);
+  }
+}

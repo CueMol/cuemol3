@@ -8,6 +8,8 @@
 
 #include "qsys.hpp"
 
+#include <vector>
+
 #include <qlib/ObjectManager.hpp>
 #include <qlib/LScrSmartPtr.hpp>
 #include <qlib/LScrVector4D.hpp>
@@ -125,6 +127,11 @@ namespace qsys {
 
     /// Display 2D labels (UI elements /w depth)
     virtual void displayLabels(DisplayContext *pdc);
+
+    /// Append the spheres this renderer draws as world-space occluders for the
+    /// baked ambient occlusion probes: (x, y, z) = centre, w = radius.
+    /// Default: none.
+    virtual void collectOcclusionSpheres(std::vector<qlib::Vector4D> &out) const {}
 
     //////////
     // Hittest

@@ -71,6 +71,11 @@ struct FrameRenderParams
     /// Restore the scene depth into the default framebuffer so the UI overlay
     /// z-tests against the scene (live path). The exporter passes false.
     bool blitDepthToDefault = false;
+
+    /// Live path: defer the ambient probe bake while the geometry keeps
+    /// changing (draw without the probes, bake once it has settled). The
+    /// exporter passes false and bakes at once.
+    bool deferProbeBake = false;
 };
 
 /// Owns the off-screen render targets + the fullscreen post-process primitive and
@@ -126,6 +131,14 @@ public:
     /// True while presentLast() can replay the last live frame.
     bool hasCachedStage() const;
 
+    /// True when the last render() deferred an ambient probe bake: the view
+    /// must keep redrawing until the geometry settles and the bake runs.
+    bool isProbeBakePending() const { return m_bProbePending; }
+
+    /// True when the last render() (re)baked the ambient probes: the image
+    /// changed, so a temporal-jitter accumulation in progress must restart.
+    bool isProbeBaked() const { return m_bProbeBaked; }
+
     /// Backing-pixel size of the scene target (0 before setSize).
     int getWidth() const;
     int getHeight() const;
@@ -141,6 +154,16 @@ private:
     /// Final blend output target: the internal jitter sample target while
     /// jittering, otherwise the caller-supplied target (nullptr = default fb).
     gfx::RenderTarget *selectOutRT(const FrameRenderParams &params) const;
+
+    /// The AO pass target when its second attachment holds the bitmask AO's
+    /// gathered indirect light for the composite, otherwise nullptr.
+    gfx::RenderTarget *bounceRT(const gfx::AoConstants &aoc, bool aoActive) const
+    {
+        return (aoActive && aoc.aoMethod == 1 && aoc.bounceStrength > 0.0f &&
+                aoc.debugView == 0)
+                   ? m_pAoRT
+                   : nullptr;
+    }
 
     /// The final stage of the last live frame: what to draw, with the exact
     /// constants it was drawn with, so presentLast() reproduces the frame.
@@ -159,6 +182,19 @@ private:
     /// Draw the given final stage into the currently bound framebuffer. The
     /// caller sets depth test / blend off around it.
     void presentStage(gfx::DisplayContext *pdc, const StageRecord &st);
+
+    /// Baked world-space ambient probes for the bitmask AO (owned, lazily
+    /// created).
+    class AmbientProbeVolume *m_pProbe = nullptr;
+    bool m_bProbePending = false;
+    /// The last render() (re)baked the probes (see isProbeBaked).
+    bool m_bProbeBaked = false;
+
+    /// Scene colour is RGBA16F (unclamped lighting, clamped in the composite)
+    /// while the bitmask AO applies the occlusion to the ambient light only.
+    bool m_bSceneHdr = false;
+    /// (Re)create the scene target with the current attachment set.
+    void createSceneRT(gfx::DisplayContext *pdc, int w, int h, bool aoEnabled);
 
     /// Off-screen scene target (color + depth + MRT normal).
     gfx::RenderTarget *m_pAOSceneRT = nullptr;
@@ -183,6 +219,45 @@ private:
     /// WebGL2 context without EXT_color_buffer_float) leaves it false so the
     /// jitter path degrades gracefully to non-jittered rendering.
     bool m_jitterSupported = false;
+
+    enum TimingPass {
+        TP_SCENE,
+        TP_GTAO,
+        TP_DENOISE,
+        TP_COMPOSITE,
+        TP_POSTAA,
+        TP_COUNT
+    };
+
+    /// Per-pass timing (Scene.renderTiming): the CPU time spent submitting each
+    /// pass (WebGL cannot wait for the GPU: gl.finish() returns at once in
+    /// Chromium), logged as averages every TIMING_REPORT_FRAMES frames together
+    /// with the wall time between frames, which is the real frame time.
+    class PassTimer
+    {
+    public:
+        PassTimer(gfx::DisplayContext *pdc, bool on);
+        /// Add the time since the previous mark to `pass`.
+        void mark(int pass);
+        bool isOn() const { return m_bOn; }
+        double elapsed(int pass) const { return m_ms[pass]; }
+
+    private:
+        gfx::DisplayContext *m_pdc;
+        bool m_bOn;
+        double m_tPrev;
+        double m_ms[TP_COUNT] = {0, 0, 0, 0, 0};
+    };
+    enum { TIMING_REPORT_FRAMES = 30 };
+    double m_timingSum[TP_COUNT] = {0, 0, 0, 0, 0};
+    int m_timingFrames = 0;
+    /// Wall time between consecutive timed frames (the real frame time: the
+    /// render loop waits for the GPU when it falls behind). Gaps over 200 ms
+    /// (idle) are not counted.
+    double m_timingLastMs = 0.0;
+    std::vector<double> m_timingIntervals;
+    /// Add one frame's timings and log the averages when enough have gathered.
+    void reportTiming(const PassTimer &timer);
 };
 
 }  // namespace qsys

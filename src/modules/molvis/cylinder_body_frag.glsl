@@ -116,8 +116,9 @@ void main()
         // diffuse term but breaks the screen-space GTAO normal.)
         normal.xy = normal.x * v_normmat[1] + normal.y * v_normmat[0];
 
-        onrm = vec4(normalize(normal), 1.0);
         color = flight2(normal, ecpos, v_color);
+        // Length encodes the ambient fraction (AO applies to the ambient only).
+        onrm = encodeNormalAmbient(normal, g_ambientFraction);
     }
 
     // fog calculation

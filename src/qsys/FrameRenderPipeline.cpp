@@ -7,13 +7,88 @@
 #include <common.h>
 #include "FrameRenderPipeline.hpp"
 #include "Scene.hpp"
+#include "AmbientProbeVolume.hpp"
 
 #include <gfx/DisplayContext.hpp>
 #include <gfx/RenderTarget.hpp>
 #include <gfx/PostProcGpuPrim.hpp>
 #include <gfx/AbstractColor.hpp>
 
+#include <algorithm>
+#include <chrono>
+#include <cmath>
+#include <cstdio>
+#include <vector>
+
 namespace qsys {
+
+namespace {
+/// Geometry must stay unchanged this long before the ambient probes are baked
+/// (live path; see FrameRenderParams::deferProbeBake).
+constexpr double kProbeSettleSec = 0.2;
+}  // namespace
+
+namespace {
+double nowMs()
+{
+    using namespace std::chrono;
+    return duration<double, std::milli>(steady_clock::now().time_since_epoch()).count();
+}
+}  // namespace
+
+FrameRenderPipeline::PassTimer::PassTimer(gfx::DisplayContext *pdc, bool on)
+    : m_pdc(pdc), m_bOn(on && pdc != nullptr), m_tPrev(0.0)
+{
+    if (!m_bOn) return;
+    m_tPrev = nowMs();
+}
+
+void FrameRenderPipeline::PassTimer::mark(int pass)
+{
+    if (!m_bOn) return;
+    const double t = nowMs();
+    m_ms[pass] += t - m_tPrev;
+    m_tPrev = t;
+}
+
+void FrameRenderPipeline::reportTiming(const PassTimer &timer)
+{
+    if (!timer.isOn()) {
+        // Timing switched off: start the next report from a clean slate.
+        m_timingFrames = 0;
+        for (double &v : m_timingSum) v = 0.0;
+        return;
+    }
+    for (int i = 0; i < TP_COUNT; ++i) m_timingSum[i] += timer.elapsed(i);
+    const double tNow = nowMs();
+    if (m_timingLastMs > 0.0 && tNow - m_timingLastMs < 200.0)
+        m_timingIntervals.push_back(tNow - m_timingLastMs);
+    m_timingLastMs = tNow;
+    if (++m_timingFrames < TIMING_REPORT_FRAMES) return;
+
+    const double n = double(m_timingFrames);
+    // Median and maximum: a mean would be skewed by the idle gap before a
+    // temporal-jitter accumulation starts.
+    double median = 0.0, maxIv = 0.0;
+    if (!m_timingIntervals.empty()) {
+        std::vector<double> iv = m_timingIntervals;
+        std::sort(iv.begin(), iv.end());
+        median = iv[iv.size() / 2];
+        maxIv = iv.back();
+    }
+    double total = 0.0;
+    for (double v : m_timingSum) total += v;
+    LOG_DPRINTLN(
+        "Render timing (ms, mean of %d frames; CPU submit per pass): scene %.2f, gtao %.2f, "
+        "denoise %.2f, "
+        "composite %.2f, post-AA/jitter %.2f, total %.2f; frame interval median %.2f max %.2f",
+        m_timingFrames, m_timingSum[TP_SCENE] / n, m_timingSum[TP_GTAO] / n,
+        m_timingSum[TP_DENOISE] / n, m_timingSum[TP_COMPOSITE] / n,
+        m_timingSum[TP_POSTAA] / n, total / n, median, maxIv);
+    m_timingIntervals.clear();
+    m_timingFrames = 0;
+    for (double &v : m_timingSum) v = 0.0;
+}
 
 FrameRenderPipeline::~FrameRenderPipeline()
 {
@@ -41,9 +116,7 @@ void FrameRenderPipeline::setSize(gfx::DisplayContext *pdc, int w, int h, bool h
         m_pAOSceneRT = nullptr;
     }
     if (m_pAOSceneRT == nullptr) {
-        int flags = gfx::RT_COLOR_RGBA8 | gfx::RT_DEPTH_TEX;
-        if (aoEnabled) flags |= gfx::RT_NORMAL_RGBA16F;
-        m_pAOSceneRT = pdc->createRenderTarget(w, h, flags);
+        createSceneRT(pdc, w, h, aoEnabled);
     } else {
         m_pAOSceneRT->resize(w, h);
     }
@@ -64,8 +137,10 @@ void FrameRenderPipeline::setSize(gfx::DisplayContext *pdc, int w, int h, bool h
 
         // AO targets hold packed data (AO + edges) and must use NEAREST filtering.
         const int aoFlags = gfx::RT_COLOR_RGBA8 | gfx::RT_COLOR_NEAREST;
+        // The AO pass target carries a second (float) attachment for the
+        // bitmask AO's gathered indirect light (see bounceRT()).
         if (m_pAoRT == nullptr) {
-            m_pAoRT = pdc->createRenderTarget(aoW, aoH, aoFlags);
+            m_pAoRT = pdc->createRenderTarget(aoW, aoH, aoFlags | gfx::RT_NORMAL_RGBA16F);
         } else {
             m_pAoRT->resize(aoW, aoH);
         }
@@ -129,8 +204,21 @@ void FrameRenderPipeline::setSize(gfx::DisplayContext *pdc, int w, int h, bool h
     }
 }
 
+void FrameRenderPipeline::createSceneRT(gfx::DisplayContext *pdc, int w, int h,
+                                        bool aoEnabled)
+{
+    int flags = (m_bSceneHdr ? gfx::RT_COLOR_RGBA16F : gfx::RT_COLOR_RGBA8) |
+                gfx::RT_DEPTH_TEX;
+    if (aoEnabled) flags |= gfx::RT_NORMAL_RGBA16F;
+    m_pAOSceneRT = pdc->createRenderTarget(w, h, flags);
+}
+
 void FrameRenderPipeline::dispose()
 {
+    if (m_pProbe != nullptr) {
+        delete m_pProbe;
+        m_pProbe = nullptr;
+    }
     // The render targets and the post-proc primitive's VBO both guard the GL
     // context themselves (via the parent view looked up by ID in their
     // destructors), so do NOT call any display-context method here. dispose() runs
@@ -222,10 +310,13 @@ bool FrameRenderPipeline::hasCachedStage() const
 
 void FrameRenderPipeline::presentStage(gfx::DisplayContext *pdc, const StageRecord &st)
 {
-    gfx::RenderTarget *pAoDen = st.aoActive ? m_pAoDenRT : nullptr;
+    // Same AO source as render(): the raw GTAO buffer for its normal / depth
+    // debug images, otherwise the denoised term.
+    gfx::RenderTarget *pAoDen =
+        !st.aoActive ? nullptr : (st.aoc.debugView == 2) ? m_pAoRT : m_pAoDenRT;
     switch (st.kind) {
         case StageRecord::COMPOSITE:
-            m_pAOPostProc->drawComposite(pdc, m_pAOSceneRT, pAoDen, st.aoc);
+            m_pAOPostProc->drawComposite(pdc, m_pAOSceneRT, pAoDen, st.aoc, bounceRT(st.aoc, st.aoActive));
             break;
         case StageRecord::FXAA:
             m_pAOPostProc->drawFxaa(pdc, m_pCompRT, st.aoc);
@@ -274,22 +365,69 @@ bool FrameRenderPipeline::render(gfx::DisplayContext *pdc, const ScenePtr &pScen
     // normal). The clear precedes the scene callback; the model-matrix setup the
     // callback performs is independent of the clear, so the result is identical to
     // clearing after it.
+    // The bitmask AO (aoMethod 1) applies the occlusion to the ambient light
+    // only, which needs the lit colour before clamping: render the scene into
+    // a float target with the lighting clamp off (the composite clamps).
+    const bool hdr = aoActive && pScene->getAOMethod() == 1;
+    if (hdr != m_bSceneHdr) {
+        m_bSceneHdr = hdr;
+        const int w = m_pAOSceneRT->getWidth();
+        const int h = m_pAOSceneRT->getHeight();
+        const bool hasNormal = m_pAOSceneRT->hasNormal();
+        delete m_pAOSceneRT;
+        m_pAOSceneRT = nullptr;
+        createSceneRT(pdc, w, h, hasNormal);
+        m_lastStage.kind = StageRecord::NONE;
+        if (m_pAOSceneRT == nullptr) return false;
+    }
+
+        PassTimer timer(pdc, pScene->isRenderTiming());
     gfx::ColorPtr bg = pScene->getBgColor();
     const float bgA = params.bgTransparent ? 0.0f : 1.0f;
     m_pAOSceneRT->bind();
     m_pAOSceneRT->clear(float(bg->fr()), float(bg->fg()), float(bg->fb()), bgA);
+    pdc->setLightNoClamp(m_bSceneHdr);
     sceneRenderFn();
+    pdc->setLightNoClamp(false);
+    // Camera modelview the scene was drawn with (world -> eye), for the probe
+    // lookup's view -> world reconstruction.
+    const qlib::Matrix4D modelView = pdc->getModelViewMat();
     m_pAOSceneRT->unbind();
+    timer.mark(TP_SCENE);
+
+    // AO debug view: the GTAO pass's own normal / depth images bypass the
+    // denoise (shown as is), the AO view shows the denoised term in gray.
+    const int aoDebug = aoActive ? pScene->getAODebugView() : int(Scene::AODV_OFF);
+    const int gtaoDebug = (aoDebug == Scene::AODV_NORMAL) ? 1
+                          : (aoDebug == Scene::AODV_DEPTH) ? 2
+                                                           : 0;
 
     // 2. AO constants: camera part from params, AO tuning read from the Scene.
     gfx::AoConstants aoc = params.camAoc;
     // SMAA tuning (used by the post-AA stage, independent of AO).
     aoc.smaaThreshold = float(pScene->getAASmaaThreshold());
+    aoc.debugView = (gtaoDebug != 0)                         ? 2
+                    : (aoDebug == Scene::AODV_AO)             ? 1
+                                                              : 0;
     if (aoActive) {
         aoc.effectRadius = float(pScene->getAORadius());
         aoc.finalValuePower = float(pScene->getAOIntensity());
         aoc.sliceCount = pScene->getAOSlices();
         aoc.stepsPerSlice = pScene->getAOSteps();
+        aoc.aoMethod = pScene->getAOMethod();
+        // Bitmask, still view: each temporal-jitter sample computes only 2
+        // slices (EEVEE's default fast_gi_ray_count) with the noise rotated
+        // per sample, and the accumulation averages them; 8 samples of 2
+        // slices look the same as 8 slices. A full-resolution frame of 8
+        // slices costs ~45 ms when atoms fill a zoomed-in view.
+        if (aoc.aoMethod == 1 && params.jitterActive && aoc.sliceCount > 2)
+            aoc.sliceCount = 2;
+        aoc.thicknessNear = float(pScene->getAOThicknessNear());
+        aoc.bounceStrength =
+            (aoc.aoMethod == 1) ? float(std::max(0.0, pScene->getAOBounce())) : 0.0f;
+        aoc.lightAmbient = float(pScene->getLightAmbient());
+        aoc.lightDiffuse = float(pScene->getLightDiffuse());
+        aoc.specOcclusion = pScene->isAOSpecOcclusion();
         aoc.aoNoiseOffset = params.aoNoiseOffset;
         // AO buffer texel size (= full res, or 2x coarser at half res). The GTAO /
         // denoise passes run at this resolution, so they use it as their pixel size;
@@ -304,25 +442,62 @@ bool FrameRenderPipeline::render(gfx::DisplayContext *pdc, const ScenePtr &pScen
         const double fogStart = pdc->getFogStart();
         const double fogEnd = pdc->getFogEnd();
         aoc.fogEnd = float(fogEnd);
+        pdc->getDevRGBColor(pdc->getFogColor(), aoc.fogColor[0], aoc.fogColor[1],
+                            aoc.fogColor[2]);
         aoc.fogScale = (fogEnd > fogStart) ? float(1.0 / (fogEnd - fogStart)) : 0.0f;
         gfx::AoConstants aocAO = aoc;
+        aocAO.fullPixelSize[0] = aoc.viewportPixelSize[0];
+        aocAO.fullPixelSize[1] = aoc.viewportPixelSize[1];
         aocAO.viewportPixelSize[0] = aoc.aoTexelSize[0];
         aocAO.viewportPixelSize[1] = aoc.aoTexelSize[1];
         // Keep the horizon-radius cap at a fixed full-res-equivalent value so half
         // res yields the same occlusion as full res.
+        // The bitmask AO caps its march with the same value.
         aocAO.maxScreenspaceRadius =
             256.0f * (aoc.viewportPixelSize[0] / aoc.aoTexelSize[0]);
 
+        // Bitmask AO: baked world-space ambient probes (EEVEE volume probes).
+        // Updated before the AO target is bound: a (re)bake binds its own
+        // targets and unbinding them returns to the default framebuffer.
+        gfx::AoProbeParams probe;
+        const gfx::AoProbeParams *pProbe = nullptr;
+        m_bProbePending = false;
+        m_bProbeBaked = false;
+        if (aoc.aoMethod == 1 && pScene->isAOProbe()) {
+            if (m_pProbe == nullptr) m_pProbe = MB_NEW AmbientProbeVolume();
+            const double prevHash = m_pProbe->getHash();
+            const bool ok = m_pProbe->update(
+                pdc, pScene, pScene->getAOProbeSpacing(), m_pAOPostProc, pScene->getAOProbeDirs(),
+                pScene->getAOProbeTile(), params.deferProbeBake ? kProbeSettleSec : 0.0,
+                &m_bProbePending);
+            m_bProbeBaked = (m_pProbe->getHash() != prevHash);
+            if (ok) {
+                // GTAO view space has viewZ > 0 forward; the eye space looks down -Z.
+                qlib::Matrix4D flipZ;
+                flipZ.aij(3, 3) = -1.0;
+                probe.atlas = m_pProbe->getAtlas();
+                for (int a = 0; a < 3; ++a) probe.dim[a] = m_pProbe->getDim()[a];
+                probe.spacing = m_pProbe->getSpacing();
+                probe.viewToWorld = qlib::Matrix4D(modelView.invert() * flipZ);
+                for (int a = 0; a < 3; ++a) probe.origin[a] = m_pProbe->getOrigin()[a];
+                probe.bias = 0.5f * m_pProbe->getSpacing();
+                probe.strength = float(pScene->getAOProbeStrength());
+                pProbe = &probe;
+            }
+        }
         // 3. GTAO pass: read the scene depth, write AO + packed edges.
         m_pAoRT->bind();
         m_pAoRT->clear(1.0f, 1.0f, 1.0f, 1.0f);
-        m_pAOPostProc->drawGtao(pdc, m_pAOSceneRT, aocAO, /*debugMode=*/0);
+        m_pAOPostProc->drawGtao(pdc, m_pAOSceneRT, aocAO, gtaoDebug, pProbe);
         m_pAoRT->unbind();
+        timer.mark(TP_GTAO);
 
         // 4. Edge-aware denoise of the AO term (single pass).
         m_pAoDenRT->bind();
         m_pAOPostProc->drawDenoise(pdc, m_pAoRT, aocAO);
         m_pAoDenRT->unbind();
+        timer.mark(TP_DENOISE);
+
     } else {
         // AA-only: keep the AO texel size equal to the viewport so the
         // composite's upsample check stays off. The composite shader reads no
@@ -334,7 +509,8 @@ bool FrameRenderPipeline::render(gfx::DisplayContext *pdc, const ScenePtr &pScen
     gfx::RenderTarget *outRT = selectOutRT(params);
     // The composite multiplies the denoised AO term, or plain-copies the scene
     // color when the AO passes did not run (nullptr -> u_hasAO == 0).
-    gfx::RenderTarget *pAoDen = aoActive ? m_pAoDenRT : nullptr;
+    gfx::RenderTarget *pAoDen =
+        !aoActive ? nullptr : (gtaoDebug != 0) ? m_pAoRT : m_pAoDenRT;
 
     if (params.enablePostAA) {
         // ---- Live path: composite scene color * denoised AO, then the selected
@@ -357,8 +533,9 @@ bool FrameRenderPipeline::render(gfx::DisplayContext *pdc, const ScenePtr &pScen
         pdc->setBlendEnabled(false);
         if (postAA) {
             m_pCompRT->bind();
-            m_pAOPostProc->drawComposite(pdc, m_pAOSceneRT, pAoDen, aoc);
+            m_pAOPostProc->drawComposite(pdc, m_pAOSceneRT, pAoDen, aoc, bounceRT(aoc, aoActive));
             m_pCompRT->unbind();
+            timer.mark(TP_COMPOSITE);
 
             if (aaMethod == Scene::AA_SMAA && m_pSmaaEdgeRT != nullptr &&
                 m_pSmaaWeightRT != nullptr) {
@@ -386,6 +563,8 @@ bool FrameRenderPipeline::render(gfx::DisplayContext *pdc, const ScenePtr &pScen
         if (outRT != nullptr) outRT->bind();
         presentStage(pdc, st);
         if (outRT != nullptr) outRT->unbind();
+        // Without post-AA the final stage is the composite itself.
+        timer.mark(postAA ? TP_POSTAA : TP_COMPOSITE);
 
         // Temporal-jitter accumulate + display. The final color of this sample is
         // in m_pJitterSampleRT.
@@ -408,6 +587,7 @@ bool FrameRenderPipeline::render(gfx::DisplayContext *pdc, const ScenePtr &pScen
             st.kind = StageRecord::JITTER;
             st.dispWeight = float(params.jitterCount) / float(params.jitterIndex + 1);
             presentStage(pdc, st);
+            timer.mark(TP_POSTAA);
         }
         // Restore over-blend / depth test for the UI overlay drawn afterwards.
         pdc->setBlendEnabled(true);
@@ -425,12 +605,14 @@ bool FrameRenderPipeline::render(gfx::DisplayContext *pdc, const ScenePtr &pScen
         pdc->setDepthTestEnabled(false);
         pdc->setBlendEnabled(false);
         if (outRT != nullptr) outRT->bind();
-        m_pAOPostProc->drawComposite(pdc, m_pAOSceneRT, pAoDen, aoc);
+        m_pAOPostProc->drawComposite(pdc, m_pAOSceneRT, pAoDen, aoc, bounceRT(aoc, aoActive));
         if (outRT != nullptr) outRT->unbind();
+        timer.mark(TP_COMPOSITE);
         pdc->setBlendEnabled(true);
         pdc->setDepthTestEnabled(true);
     }
 
+    reportTiming(timer);
     return true;
 }
 

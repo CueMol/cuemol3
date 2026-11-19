@@ -37,7 +37,11 @@ public:
         float fogScale;         // offset 4  — 1/(fogEnd - fogStart)
         float _pad1, _pad2;     // offset 8, 12 — padding for vec3 alignment
         float fogColor[3];      // offset 16 — RGB fog colour
-        float _pad3;            // offset 28 — trailing padding
+        float _pad3;            // offset 28 - padding
+        float lightAmbient;     // offset 32 - ambient total
+        float lightDiffuse;     // offset 36
+        float lightSpecular;    // offset 40 - specular x material
+        float lightNoClamp;     // offset 44 - 1 = keep the lit colour unclamped (HDR)
     };
 
     /**

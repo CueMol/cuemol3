@@ -6,6 +6,8 @@
 #pragma once
 
 #include "gfx.hpp"
+
+#include <qlib/Matrix4D.hpp>
 #include "GpuPrim.hpp"
 #include "DrawAttrArray.hpp"
 
@@ -58,6 +60,8 @@ struct AoConstants
     /// background-color pixels). fogScale = 1/(fogEnd - fogStart); both in
     /// view-space Z units.
     float fogEnd = 0.0f;
+    /// Fog colour (device RGB), for undoing / redoing the fog around the AO.
+    float fogColor[3] = {0.0f, 0.0f, 0.0f};
     float fogScale = 0.0f;
     /// Number of horizon slices (quality vs. speed).
     int sliceCount = 9;
@@ -70,6 +74,26 @@ struct AoConstants
     /// mirrored from Scene.aaSmaaThreshold. 0.1 = SMAA Medium/High preset,
     /// 0.05 = Ultra.
     float smaaThreshold = 0.05f;
+    /// Composite debug output: 0 = color * AO, 1 = the AO term in grayscale,
+    /// 2 = the AO buffer's RGB as is (the GTAO pass's normal / depth debug
+    /// output). Only used when an AO buffer is supplied.
+    int debugView = 0;
+    /// AO integration: 0 = GTAO, 1 = visibility bitmask (EEVEE Next port), and
+    /// the bitmask's constant minimum thickness (view units).
+    int aoMethod = 0;
+    /// (1/width, 1/height) of the full-resolution output. The bitmask AO sizes
+    /// its minimum occluder thickness by the output pixel, not the AO pass
+    /// pixel, so the half-resolution pass (used while the view moves) yields
+    /// the same occlusion as the full-resolution one.
+    float fullPixelSize[2] = {0.0f, 0.0f};
+    float thicknessNear = 0.1f;
+    /// Bitmask: near-field indirect diffuse strength (0 = off) and the ambient
+    /// light intensity (to recover the albedo from the ambient part).
+    float bounceStrength = 0.0f;
+    float lightAmbient = 1.0f;
+    float lightDiffuse = 0.8f;
+    /// Darken the highlight by the AO as well (bitmask, ambient-only composite).
+    bool specOcclusion = false;
 
     /// Fill the camera-derived geometric fields (isOrtho, depthLinearize*,
     /// ndcToView*, viewportPixelSize) from the camera parameters. The AO tuning
@@ -80,6 +104,40 @@ struct AoConstants
     /// from DisplayContext::makePersProjMat / makeOrthoProjMat.
     static AoConstants fromCamera(double camDist, double zoom, double slabDepth,
                                   double aspect, int bcx, int bcy, bool perspec);
+};
+
+/// Inputs of the GPU probe bake passes (drawProbeBake / drawProbeFill).
+struct ProbeBakeParams
+{
+    float center[3] = {0.0f, 0.0f, 0.0f};
+    float radius = 1.0f;
+    float camDist = 1.0f;
+    float nearFar[2] = {0.0f, 1.0f};
+    int tileSize = 256;
+    int tilesPerRow = 8;
+    int dim[3] = {1, 1, 1};
+    float origin[3] = {0.0f, 0.0f, 0.0f};
+    float spacing = 1.0f;
+    float depthBias = 0.0f;
+    int numDirs = 64;
+};
+
+/// Baked ambient probe grid for the bitmask AO (drawGtao): world-space
+/// visibility moments (see qsys::AmbientProbeVolume) in a 2D atlas render
+/// target with the z slices side by side.
+struct AoProbeParams
+{
+    RenderTarget *atlas = nullptr;
+    int dim[3] = {1, 1, 1};
+    float spacing = 1.0f;
+    /// GTAO view space (viewZ > 0 forward) -> world space.
+    qlib::Matrix4D viewToWorld;
+    float origin[3] = {0.0f, 0.0f, 0.0f};
+    /// Lookup offset along the normal (world units).
+    float bias = 1.5f;
+    /// Probe visibility = mix(1, probe, strength); the AO term is the minimum
+    /// of the screen-space and the probe visibility.
+    float strength = 1.0f;
 };
 
 /// Fullscreen post-processing primitive.
@@ -110,6 +168,9 @@ private:
     ShaderObject *m_pGtaoPO = nullptr;
     /// Edge-aware AO denoise program.
     ShaderObject *m_pDenoisePO = nullptr;
+    /// GPU ambient probe bake programs.
+    ShaderObject *m_pProbeBakePO = nullptr;
+    ShaderObject *m_pProbeFillPO = nullptr;
     /// FXAA post-process program (final AA stage of the live AO path).
     ShaderObject *m_pFxaaPO = nullptr;
     /// SMAA 1x programs (edge detection / blending weights / neighborhood blend).
@@ -156,14 +217,25 @@ public:
     /// scene depth so the AO does not bleed across silhouettes. Pass aoRT ==
     /// nullptr for a plain copy. Self-initializes the vertex buffer and composite
     /// program (no init() call required).
+    /// bounceRT: the AO pass target whose second attachment holds the gathered
+    /// indirect diffuse light (bitmask with consts.bounceStrength > 0), or nullptr.
     void drawComposite(DisplayContext *pDC, RenderTarget *sceneRT,
-                       RenderTarget *aoRT, const AoConstants &consts);
+                       RenderTarget *aoRT, const AoConstants &consts,
+                       RenderTarget *bounceRT = nullptr);
 
     /// Read sceneRT's depth texture, reconstruct view-space depth/position with
     /// the given constants, and draw the GTAO term into the currently bound
     /// framebuffer (fullscreen). debugMode: 0 = AO, 1 = normal, 2 = depth.
+    /// GPU probe bake: for every probe of the atlas being drawn (the bound
+    /// framebuffer), test the 64 light-view depths in depthAtlasRT.
+    void drawProbeBake(DisplayContext *pDC, RenderTarget *depthAtlasRT,
+                       const ProbeBakeParams &bp);
+    /// GPU probe bake: fill probes inside atoms from their valid neighbours.
+    void drawProbeFill(DisplayContext *pDC, RenderTarget *srcRT, const ProbeBakeParams &bp);
+
     void drawGtao(DisplayContext *pDC, RenderTarget *sceneRT,
-                  const AoConstants &consts, int debugMode);
+                  const AoConstants &consts, int debugMode,
+                  const AoProbeParams *probe = nullptr);
 
     /// Edge-aware blur of aoRT (R = AO, G = packed edges) into the currently
     /// bound framebuffer (fullscreen). consts supplies the viewport pixel size.

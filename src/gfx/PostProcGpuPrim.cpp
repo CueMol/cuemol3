@@ -13,6 +13,8 @@
 
 #include <qlib/LTypes.hpp>
 
+#include <algorithm>
+
 using namespace gfx;
 
 // static
@@ -120,7 +122,8 @@ void PostProcGpuPrim::drawDepthVis(DisplayContext *pDC, RenderTarget *prt,
 }
 
 void PostProcGpuPrim::drawComposite(DisplayContext *pDC, RenderTarget *sceneRT,
-                                    RenderTarget *aoRT, const AoConstants &consts)
+                                    RenderTarget *aoRT, const AoConstants &consts,
+                                    RenderTarget *bounceRT)
 {
     if (sceneRT == nullptr) return;
     if (!ensureDrawElem(pDC)) return;
@@ -137,10 +140,18 @@ void PostProcGpuPrim::drawComposite(DisplayContext *pDC, RenderTarget *sceneRT,
     }
 
     sceneRT->bindColorTex(0, RT_TU_COLOR);
+    // Bitmask AO (aoMethod 1) darkens the ambient light only: the scene
+    // normal target's .w carries the ambient fraction of each pixel.
+    const bool ambientOnly =
+        aoRT != nullptr && consts.aoMethod == 1 && sceneRT->hasNormal();
     if (aoRT != nullptr) {
         aoRT->bindColorTex(0, RT_TU_NORMAL);   // AO term on unit 2
         sceneRT->bindDepthTex(RT_TU_DEPTH);    // scene depth for the upsample
     }
+    if (ambientOnly) sceneRT->bindColorTex(1, RT_TU_NOISE);  // normal + ambient fraction
+    // Gathered indirect light (the AO pass target's second attachment).
+    const bool hasBounce = ambientOnly && bounceRT != nullptr && bounceRT->hasNormal();
+    if (hasBounce) bounceRT->bindColorTex(1, RT_TU_SMAA_AREA);
 
     m_pCompPO->enable();
     m_pCompPO->setUniform("u_colorTex", RT_TU_COLOR);
@@ -156,10 +167,23 @@ void PostProcGpuPrim::drawComposite(DisplayContext *pDC, RenderTarget *sceneRT,
     // so a fully-fogged (background-color) pixel is not darkened by AO.
     m_pCompPO->setUniformF("u_fogEnd", consts.fogEnd);
     m_pCompPO->setUniformF("u_fogScale", consts.fogScale);
+    m_pCompPO->setUniformF("u_fogColor", consts.fogColor[0], consts.fogColor[1],
+                           consts.fogColor[2]);
     m_pCompPO->setUniform("u_isOrtho", consts.isOrtho);
     // Upsample only when the AO buffer is coarser than the output (half res).
     const bool upsample = consts.aoTexelSize[0] > consts.viewportPixelSize[0] * 1.5f;
     m_pCompPO->setUniform("u_upsample", upsample ? 1 : 0);
+    m_pCompPO->setUniform("u_debugView", consts.debugView);
+    m_pCompPO->setUniform("u_ambientOnly", ambientOnly ? 1 : 0);
+    m_pCompPO->setUniform("u_sceneNormalTex", RT_TU_NOISE);
+    m_pCompPO->setUniform("u_bounceTex", RT_TU_SMAA_AREA);
+    m_pCompPO->setUniform("u_specOcclusion", consts.specOcclusion ? 1 : 0);
+    m_pCompPO->setUniformF("u_lightAmbient", consts.lightAmbient);
+    m_pCompPO->setUniformF("u_lightDiffuse", consts.lightDiffuse);
+    m_pCompPO->setUniform("u_hasBounce", hasBounce ? 1 : 0);
+    m_pCompPO->setUniformF("u_bounceScale",
+                           hasBounce ? consts.bounceStrength / std::max(consts.lightAmbient, 1e-3f)
+                                     : 0.0f);
 
     pDC->drawElem(*m_pDrawElem);
 
@@ -167,10 +191,66 @@ void PostProcGpuPrim::drawComposite(DisplayContext *pDC, RenderTarget *sceneRT,
 
     sceneRT->unbindTextures();
     if (aoRT != nullptr) aoRT->unbindTextures();
+    if (hasBounce) bounceRT->unbindTextures();
+}
+
+void PostProcGpuPrim::drawProbeBake(DisplayContext *pDC, RenderTarget *depthAtlasRT,
+                                    const ProbeBakeParams &bp)
+{
+    if (depthAtlasRT == nullptr || !ensureDrawElem(pDC)) return;
+    if (m_pProbeBakePO == nullptr) {
+        m_pProbeBakePO =
+            pDC->loadShaderObject("probe_bake", "%%CONFDIR%%/data/shaders/postproc_vert.glsl",
+                                  "%%CONFDIR%%/data/shaders/probe_bake_frag.glsl");
+        if (m_pProbeBakePO == nullptr) {
+            LOG_DPRINTLN("PostProcGpuPrim> ERROR: cannot load probe_bake shader.");
+            return;
+        }
+    }
+    depthAtlasRT->bindDepthTex(RT_TU_DEPTH);
+    m_pProbeBakePO->enable();
+    m_pProbeBakePO->setUniform("u_depthAtlas", RT_TU_DEPTH);
+    m_pProbeBakePO->setUniformF("u_center", bp.center[0], bp.center[1], bp.center[2]);
+    m_pProbeBakePO->setUniformF("u_radius", bp.radius);
+    m_pProbeBakePO->setUniformF("u_camDist", bp.camDist);
+    m_pProbeBakePO->setUniformF("u_nearFar", bp.nearFar[0], bp.nearFar[1]);
+    m_pProbeBakePO->setUniform("u_tileSize", bp.tileSize);
+    m_pProbeBakePO->setUniform("u_tilesPerRow", bp.tilesPerRow);
+    m_pProbeBakePO->setUniform("u_dim", bp.dim[0], bp.dim[1], bp.dim[2]);
+    m_pProbeBakePO->setUniformF("u_origin", bp.origin[0], bp.origin[1], bp.origin[2]);
+    m_pProbeBakePO->setUniformF("u_spacing", bp.spacing);
+    m_pProbeBakePO->setUniformF("u_depthBias", bp.depthBias);
+    m_pProbeBakePO->setUniform("u_numDirs", bp.numDirs);
+    pDC->drawElem(*m_pDrawElem);
+    m_pProbeBakePO->disable();
+    depthAtlasRT->unbindTextures();
+}
+
+void PostProcGpuPrim::drawProbeFill(DisplayContext *pDC, RenderTarget *srcRT,
+                                    const ProbeBakeParams &bp)
+{
+    if (srcRT == nullptr || !ensureDrawElem(pDC)) return;
+    if (m_pProbeFillPO == nullptr) {
+        m_pProbeFillPO =
+            pDC->loadShaderObject("probe_fill", "%%CONFDIR%%/data/shaders/postproc_vert.glsl",
+                                  "%%CONFDIR%%/data/shaders/probe_fill_frag.glsl");
+        if (m_pProbeFillPO == nullptr) {
+            LOG_DPRINTLN("PostProcGpuPrim> ERROR: cannot load probe_fill shader.");
+            return;
+        }
+    }
+    srcRT->bindColorTex(0, RT_TU_COLOR);
+    m_pProbeFillPO->enable();
+    m_pProbeFillPO->setUniform("u_src", RT_TU_COLOR);
+    m_pProbeFillPO->setUniform("u_dim", bp.dim[0], bp.dim[1], bp.dim[2]);
+    pDC->drawElem(*m_pDrawElem);
+    m_pProbeFillPO->disable();
+    srcRT->unbindTextures();
 }
 
 void PostProcGpuPrim::drawGtao(DisplayContext *pDC, RenderTarget *sceneRT,
-                              const AoConstants &consts, int debugMode)
+                              const AoConstants &consts, int debugMode,
+                              const AoProbeParams *probe)
 {
     if (sceneRT == nullptr) return;
     if (!ensureDrawElem(pDC)) return;
@@ -213,10 +293,40 @@ void PostProcGpuPrim::drawGtao(DisplayContext *pDC, RenderTarget *sceneRT,
     m_pGtaoPO->setUniformF("u_aoNoiseOffset", consts.aoNoiseOffset);
     m_pGtaoPO->setUniformF("u_maxScreenspaceRadius", consts.maxScreenspaceRadius);
     m_pGtaoPO->setUniform("u_isOrtho", consts.isOrtho);
+    m_pGtaoPO->setUniform("u_method", consts.aoMethod);
+    const bool hasProbe = probe != nullptr && probe->atlas != nullptr;
+    m_pGtaoPO->setUniform("u_hasProbe", hasProbe ? 1 : 0);
+    // Its own unit, clear of the scene colour / depth / normal units.
+    m_pGtaoPO->setUniform("u_probeAtlas", RT_TU_SMAA_SEARCH);
+    if (hasProbe) {
+        probe->atlas->bindColorTex(0, RT_TU_SMAA_SEARCH);
+        m_pGtaoPO->setUniform("u_probeDim", probe->dim[0], probe->dim[1], probe->dim[2]);
+        m_pGtaoPO->setUniformF("u_probeSpacing", probe->spacing);
+        m_pGtaoPO->setMatrix("u_viewToWorld", probe->viewToWorld);
+        m_pGtaoPO->setUniformF("u_probeOrigin", probe->origin[0], probe->origin[1],
+                               probe->origin[2]);
+        m_pGtaoPO->setUniformF("u_probeBias", probe->bias);
+        m_pGtaoPO->setUniformF("u_probeStrength", probe->strength);
+    }
+    m_pGtaoPO->setUniformF("u_fullPixelSize", consts.fullPixelSize[0], consts.fullPixelSize[1]);
+    m_pGtaoPO->setUniformF("u_thicknessNear", consts.thicknessNear);
+    // Near-field indirect light (bitmask): the lit scene colour is the
+    // radiance of the occluders; the fog is taken out of it per sample.
+    const bool bounce = consts.aoMethod == 1 && consts.bounceStrength > 0.0f;
+    m_pGtaoPO->setUniform("u_bounce", bounce ? 1 : 0);
+    m_pGtaoPO->setUniform("u_sceneColorTex", RT_TU_COLOR);
+    if (bounce) {
+        sceneRT->bindColorTex(0, RT_TU_COLOR);
+        m_pGtaoPO->setUniformF("u_fogEnd", consts.fogEnd);
+        m_pGtaoPO->setUniformF("u_fogScale", consts.fogScale);
+        m_pGtaoPO->setUniformF("u_fogColor", consts.fogColor[0], consts.fogColor[1],
+                               consts.fogColor[2]);
+    }
 
     pDC->drawElem(*m_pDrawElem);
 
     m_pGtaoPO->disable();
+    if (hasProbe) probe->atlas->unbindTextures();
 
     sceneRT->unbindTextures();
 }
@@ -546,6 +656,8 @@ void PostProcGpuPrim::invalidate()
     m_pCompPO = nullptr;
     m_pGtaoPO = nullptr;
     m_pDenoisePO = nullptr;
+    m_pProbeBakePO = nullptr;
+    m_pProbeFillPO = nullptr;
     m_pHoverMaskPO = nullptr;
     m_pHoverBlurPO = nullptr;
     m_pHoverPO = nullptr;

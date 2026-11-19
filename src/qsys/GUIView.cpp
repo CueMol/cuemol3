@@ -35,6 +35,9 @@ namespace {
 /// pick pass clips at the fog end (dist + slab/2, see computeSlabPlanes), so
 /// the CPU-only renderers get the same visible range.
 constexpr double PICK_FAR_FACTOR = 0.5;
+/// AO stays at half resolution while still when a backing pixel is smaller
+/// than this (A): zoomed in, 1 A spans more than 25 pixels.
+constexpr double kAOHalfResPixelSize = 0.04;
 }  // namespace
 
 GUIView::GUIView() : View()
@@ -572,6 +575,7 @@ void GUIView::drawScene()
     m_jitterMoreSamples = false;
     m_jitterPxX = m_jitterPxY = 0.0;
     m_aoHalfPending = false;
+    m_probeBakePending = false;
     m_bFrameCached = false;
 
     if (isProjChange()) setUpProjMat(-1, -1);
@@ -602,8 +606,18 @@ void GUIView::drawScene()
             // at full resolution once the view settles. getUpdateFlag() is true
             // for camera/scene-driven redraws and false for the idle continuous
             // redraws, so it distinguishes "moving" from "still".
-            const bool aoHalfRes =
-                aoOn && pScene->isAOHalfRes() && getUpdateFlag();
+            //
+            // Zoomed in, the AO varies slowly against the pixel grid (an atom
+            // spans tens of pixels), so it stays at half resolution while still
+            // too: a quarter of the cost when atoms fill the view, with no
+            // visible loss (the composite upsamples it depth-aware). EEVEE
+            // computes its AO at half resolution throughout.
+            const bool aoMoving = aoOn && pScene->isAOHalfRes() && getUpdateFlag();
+            const bool aoZoomedIn =
+                aoOn && pScene->isAOHalfRes() &&
+                double(getZoom()) / std::max(1, convToBackingY(getHeight())) <
+                    kAOHalfResPixelSize;
+            const bool aoHalfRes = aoMoving || aoZoomedIn;
             if (usePipeline) {
                 ensurePipeline(convToBackingX(getWidth()),
                                convToBackingY(getHeight()), aoHalfRes, aoOn);
@@ -611,8 +625,9 @@ void GUIView::drawScene()
             // Owe a full-resolution follow-up frame after a half-res one, so the
             // idle loop keeps running until the still image is rendered at full
             // resolution (needed when temporal jitter is off and would not
-            // otherwise re-arm the redraw).
-            m_aoHalfPending = aoHalfRes;
+            // otherwise re-arm the redraw). Not when zoomed in: the still image
+            // is half resolution then.
+            m_aoHalfPending = aoHalfRes && !aoZoomedIn;
 
             if (usePipeline && m_pPipeline != nullptr &&
                 m_pPipeline->isReady()) {
@@ -654,6 +669,7 @@ void GUIView::drawScene()
                 FrameRenderParams params;
                 params.camAoc = computeAoConstants();
                 params.enableAO = aoOn;
+                params.deferProbeBake = true;
                 // Rotate the GTAO noise per accumulated jitter sample (R1
                 // sequence) so the grain averages out; 0 when not jittering.
                 if (jitterActive) {
@@ -672,6 +688,9 @@ void GUIView::drawScene()
                     pScene->display(pdc);
                 });
                 m_bFrameCached = true;
+                // A deferred ambient probe bake keeps the idle loop running
+                // until the geometry settles and the bake runs.
+                m_probeBakePending = m_pPipeline->isProbeBakePending();
 
                 // Advance / converge the jitter accumulation. The pipeline ran
                 // this sample; the View owns the sample index and the idle redraw
@@ -683,7 +702,13 @@ void GUIView::drawScene()
                         m_jitterSampleIndex += 1;
                         m_jitterMoreSamples = true;  // keep redrawing on idle
                     } else {
-                        m_jitterMoreSamples = false;  // converged
+                        // Converged. Park the index past the last sample so a
+                        // later redraw of the same scene (e.g. one kept alive
+                        // by a pending probe bake) restarts the accumulation
+                        // instead of adding the last sample once more, which
+                        // brightened the displayed average beyond 1.
+                        m_jitterSampleIndex = jitterN;
+                        m_jitterMoreSamples = false;
                         MB_DPRINTLN("GUIView> jitter SS converged (%d samples)",
                                     jitterN);
                     }
@@ -693,6 +718,12 @@ void GUIView::drawScene()
                     m_jitterSampleIndex = 0;
                     m_jitterMoreSamples = true;
                     m_tJitterChange = std::chrono::steady_clock::now();
+                }
+                // A probe (re)bake changed the image: the samples accumulated
+                // so far are stale, so start over from the first sample.
+                if (jitterLevel > 0 && m_pPipeline->isProbeBaked()) {
+                    m_jitterSampleIndex = 0;
+                    m_jitterMoreSamples = true;
                 }
             } else {
                 setUpModelMat(MM_NORMAL);
@@ -1606,3 +1637,4 @@ void GUIView::setupInDevEvent(double clientX, double clientY, double screenX,
 }
 
 }  // namespace qsys
+

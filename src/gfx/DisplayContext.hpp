@@ -80,6 +80,10 @@ private:
     bool m_bFogEnabled;
     float m_fFogStart;
     float m_fFogEnd;
+    float m_fLightAmbient = 0.4f;
+    float m_fLightDiffuse = 0.8f;
+    float m_fLightSpecular = 0.16f;
+    bool m_bLightNoClamp = false;
     ColorPtr m_fogColor;
 
     /// Screen-space ambient occlusion (GTAO)
@@ -259,6 +263,22 @@ public:
     {
         return m_fogColor;
     }
+
+    // Light intensities passed to the lit shaders (FogBlock UBO). ambient =
+    // ambient total, specular = specular x material. Defaults reproduce the
+    // former constants of lighting_inc.glsl. lightNoClamp: the lit colour is
+    // not clamped to [0,1] (HDR scene target; the composite clamps).
+    void setLightIntensities(float ambient, float diffuse, float specular)
+    {
+        m_fLightAmbient = ambient;
+        m_fLightDiffuse = diffuse;
+        m_fLightSpecular = specular;
+    }
+    float getLightAmbient() const { return m_fLightAmbient; }
+    float getLightDiffuse() const { return m_fLightDiffuse; }
+    float getLightSpecular() const { return m_fLightSpecular; }
+    void setLightNoClamp(bool b) { m_bLightNoClamp = b; }
+    bool isLightNoClamp() const { return m_bLightNoClamp; }
 
     // Screen-space ambient occlusion (GTAO)
     virtual void enableAO(bool b);
