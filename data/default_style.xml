@@ -329,8 +329,21 @@
   </style>
 
   <!-- ========== default material definition (for OpenGL view) ========== -->
+  <!-- default: also the material of a renderer without one (CueMol3), and
+       the built-in values for an undefined name (Scene::kDefaultMaterial*).
+       Matte plastic, the same values as matte_plastic. -->
   <material id="default">
-    <def ambient="0.2" diffuse="0.8" specular="0.0" shininess="32.0"/>
+    <def ambient="0.2" diffuse="0.8" specular="0.3" shininess="16.0"/>
+  </material>
+  <!-- plastic: polished plastic / ceramic, a small white highlight on a
+       diffuse-dominant colour. -->
+  <material id="plastic">
+    <def ambient="0.2" diffuse="0.8" specular="0.7" shininess="76.8"/>
+  </material>
+  <!-- matte_plastic: a weak broad white highlight on a diffuse-dominant
+       colour (diff_metal has a weaker diffuse under a stronger one). -->
+  <material id="matte_plastic">
+    <def ambient="0.2" diffuse="0.8" specular="0.3" shininess="16.0"/>
   </material>
   <material id="shadow">
     <def ambient="0.75" diffuse="0.0" specular="0.0" shininess="0.0"/>
@@ -347,11 +360,16 @@
   <material id="matte">
     <def ambient="0.3" diffuse="0.6" specular="0.0" shininess="32.0"/>
   </material>
+  <!-- Metals: a weak diffuse under a strong highlight. The highlight stays
+       white (no tint by the colour yet), so these approximate a metal by
+       the balance of highlight and colour only.
+       diff_metal: matte (brushed) metal, a broad highlight.
+       spec_metal: polished metal, a strong tight highlight. -->
   <material id="diff_metal">
-    <def ambient="0.2" diffuse="0.5" specular="0.7" shininess="76.8"/>
+    <def ambient="0.2" diffuse="0.5" specular="0.625" shininess="16.0"/>
   </material>
   <material id="spec_metal">
-    <def ambient="0.2" diffuse="0.5" specular="0.7" shininess="76.8"/>
+    <def ambient="0.2" diffuse="0.3" specular="1.0" shininess="48.0"/>
   </material>
   
   <!-- ========== default material definition (for POV-Ray) ========== -->
@@ -374,7 +392,7 @@ texture {
   finish {
    ambient 0.2
    diffuse 0.8  brilliance 1.0
-   specular 0.4  roughness 0.01
+   specular 0.15  roughness 0.08
   }
   pigment { color rgbt @COLOR@ }
 }
@@ -382,6 +400,36 @@ texture {
     </def>
   </material>
     
+  <material id="plastic">
+    <def type="pov">
+<![CDATA[
+texture {
+  finish {
+   ambient 0.2
+   diffuse 0.8  brilliance 1.0
+   specular 0.4  roughness 0.01
+  }
+  pigment { color rgbt @COLOR@ }
+}
+]]>
+    </def>
+  </material>
+
+  <material id="matte_plastic">
+    <def type="pov">
+<![CDATA[
+texture {
+  finish {
+   ambient 0.2
+   diffuse 0.8  brilliance 1.0
+   specular 0.15  roughness 0.08
+  }
+  pigment { color rgbt @COLOR@ }
+}
+]]>
+    </def>
+  </material>
+
   <material id="spec_metal">
     <def type="pov">
       texture {finish {F_MetalD} pigment { color rgbt @COLOR@ }}

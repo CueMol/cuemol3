@@ -154,9 +154,12 @@ void EcRenderTarget::bindColorTex(int idx, int texUnit)
 {
     auto pView = getView();
     if (pView == nullptr) return;
-    // idx 1 selects the MRT normal attachment (when present), idx 0 the color
-    // attachment -- mirrors OcRenderTarget::bindColorTex.
-    const char *which = (idx == 1 && hasNormal()) ? "normal" : "color";
+    // idx 1 selects the MRT normal attachment, idx 2 the material one (when
+    // present), idx 0 the color attachment -- mirrors
+    // OcRenderTarget::bindColorTex.
+    const char *which = (idx == 1 && hasNormal())     ? "normal"
+                        : (idx == 2 && hasMaterial()) ? "material"
+                                                      : "color";
     auto peer = pView->getPeerObj();
     auto env = peer.Env();
     try {

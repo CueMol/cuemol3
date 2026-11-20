@@ -53,6 +53,10 @@ public:
     bool readColorUInt(int idx, int x, int y, int w, int h,
                        quint32 *pbuf) override;
 
+    bool hasMaterial() const override
+    {
+        return (m_nFlags & gfx::RT_MATERIAL_RGBA8) != 0 && hasNormal();
+    }
     bool hasNormal() const override
     {
         return (m_nFlags & gfx::RT_NORMAL_RGBA16F) != 0;

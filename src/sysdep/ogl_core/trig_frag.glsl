@@ -4,6 +4,7 @@
 //
 #define varying in
 
+#include "lighting_inc.glsl"
 #include "fog_inc.glsl"
 
 ////////////////////
@@ -22,21 +23,30 @@ layout(std140) uniform DrawParamsBlock {
 varying vec4 v_frontColor;
 varying float v_fogCoord;
 varying vec3 v_ecNormal;
-varying float v_ambFrac;
 
 layout(location = 0) out vec4 o_FragColor;
 // MRT eye-space normal for GTAO (sentinel (0,0,0) -> reconstruct from depth).
 // Its length is 2 - (ambient fraction of the lit colour), see lighting_inc.glsl.
 // vec4 to match o_FragColor (Apple Metal GL mishandles mixed vec4/vec3 MRT).
 layout(location = 1) out vec4 o_Normal;
+// MRT material for the Fast GI composite (fog_inc.glsl encodeMaterial; 0 = none).
+layout(location = 2) out vec4 o_Material;
 
 void main(void)
 {
-    o_FragColor = fragFogColor(v_frontColor, frag_alpha, v_fogCoord);
+    // Lit per pixel (the vertex shader passes the vertex colour).
+    vec4 color = v_frontColor;
+    float ambFrac = 1.0;
+    if (enable_lighting != 0 && dot(v_ecNormal, v_ecNormal) > 1e-12) {
+        color = flight2(normalize(v_ecNormal), vec4(0.0), v_frontColor);
+        ambFrac = g_ambientFraction;
+    }
+    o_FragColor = fragFogColor(color, frag_alpha, v_fogCoord);
 
     // Write the real eye-space normal whenever one is available (lit or not), so
     // only genuinely normal-less primitives fall back to the sentinel.
     o_Normal = (dot(v_ecNormal, v_ecNormal) > 1e-12)
-                   ? vec4(normalize(v_ecNormal) * (2.0 - clamp(v_ambFrac, 0.0, 1.0)), 1.0)
+                   ? vec4(normalize(v_ecNormal) * (2.0 - clamp(ambFrac, 0.0, 1.0)), 1.0)
                    : vec4(0.0, 0.0, 0.0, 1.0);
+    o_Material = (enable_lighting != 0) ? encodeMaterial() : vec4(0.0);
 }

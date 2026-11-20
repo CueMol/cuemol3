@@ -22,9 +22,12 @@ layout(location = 0) out vec4 o_FragColor;
 // GTAO leaves these pixels unshaded. vec4 to match o_FragColor (Apple Metal GL
 // mishandles mixed vec4/vec3 MRT).
 layout(location = 1) out vec4 o_Normal;
+// MRT material for the Fast GI composite (fog_inc.glsl encodeMaterial; 0 = none).
+layout(location = 2) out vec4 o_Material;
 
 void main (void)
 {
   o_FragColor = vec4(u_color.rgb, u_color.a * frag_alpha);
   o_Normal = vec4(0.0, 0.0, 0.0, 1.0);
+  o_Material = vec4(0.0);
 }

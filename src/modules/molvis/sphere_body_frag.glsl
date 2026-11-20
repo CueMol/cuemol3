@@ -49,6 +49,8 @@ layout(location = 0) out vec4 o_FragColor;
 // vec4 to match o_FragColor's component count (Apple Metal GL mishandles MRT
 // with mixed vec4/vec3 outputs and broadcasts output 0 to all targets).
 layout(location = 1) out vec4 o_Normal;
+// MRT material for the Fast GI composite (fog_inc.glsl encodeMaterial; 0 = none).
+layout(location = 2) out vec4 o_Material;
 #endif
 
 void main()
@@ -120,5 +122,6 @@ void main()
     // Eye-space sphere normal (sentinel on the silhouette edge ring).
     // Length encodes the ambient fraction (AO applies to the ambient only).
     o_Normal = bEdge ? vec4(0.0, 0.0, 0.0, 1.0) : encodeNormalAmbient(normal, g_ambientFraction);
+    o_Material = bEdge ? vec4(0.0) : encodeMaterial();
 #endif
 }

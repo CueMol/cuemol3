@@ -12,7 +12,7 @@ Scene の AO 方式の一つ。Blender EEVEE Next の Fast GI (visibility bitmas
               R = 可視性 = min(画面の bitmask AO, プローブ), G = edges, B = key light の届く割合
               2 枚目の attachment = 照り返し (近くの面からの間接光)
 [denoise]     R を edge-aware に平滑化、B は素通し
-[composite]   環境光の分だけ AO で暗く、拡散は B で暗く、鏡面は AO で暗く、照り返しを足して 0〜1 に収める
+[composite]   環境光の分だけ AO で暗く、拡散は B で暗く、鏡面は AO で暗く、照り返しを足してトーンカーブで 0〜1 に収める
 ```
 
 主なファイル:
@@ -44,19 +44,21 @@ Scene の AO 方式の一つ。Blender EEVEE Next の Fast GI (visibility bitmas
 
 ## 3. 光
 
-Fast GI のときの光の強さ (`Scene::kFastGILight*`、`lightBrightness` 倍):
+Fast GI のときの光の強さ (material `default` のとき。`Scene::kFastGILight*`、`lightBrightness` 倍):
 
 | 項目 | Fast GI | AO なし・GTAO |
 |---|---|---|
 | 環境光 | 0.56 | 0.4 |
 | 拡散 (key light) | 0.52 | 0.8 |
-| 鏡面 / 指数 | 0.25 / 16 | 0.16 / 32 |
+| 鏡面 / 指数 | material の値 (`default` は 0.12 / 16) | 同じ |
 | key light の向き (eye 空間) | (1, 1, 1.5) 右上手前 | 同じ |
 
-- **AO は環境光にだけ掛ける**: EEVEE と同じく直接光は AO で暗くしない。scene pass は環境光の割合 f を法線の長さ (`2 - f`) に埋め (ブレンドで `.w` が背景と混ざるため `.w` は使えない)、合成は `色 - 環境光の分 × (1 - AO)`。その前に色を clamp すると割合が狂うので、Fast GI のときは scene の色を RGBA16F にしてライティングの clamp を外し、合成の後で 0〜1 に収める。フォグは合成で外してから AO を掛けて戻す (照明の後にフォグ)。
+光の強さは renderer の material から決まり、Fast GI では環境光と拡散だけを上の比率で換算する ([renderer-material.md](renderer-material.md))。
+
+- **AO は環境光にだけ掛ける**: EEVEE と同じく直接光は AO で暗くしない。scene pass は環境光の割合 f を法線の長さ (`2 - f`) に埋め (ブレンドで `.w` が背景と混ざるため `.w` は使えない)、合成は `色 - 環境光の分 × (1 - AO)`。その前に色を clamp すると割合が狂うので、Fast GI のときは scene の色を RGBA16F にしてライティングの clamp を外し、合成の最後にトーンカーブ (`tonemap_inc.glsl`、[renderer-material.md](renderer-material.md) §5) で 0〜1 に収める。拡散と環境光の比や鏡面の粗さは、画素ごとの material (scene の描画先の 3 枚目の添付) から読む。フォグは合成で外してから AO を掛けて戻す (照明の後にフォグ)。
 - **key light の影**: 拡散を入れると円柱の側面と蓋が見分けられる一方、拡散は AO で暗くならないので窪みの底が明るく残り、CPK と分子表面の奥行きが ChimeraX より浅くなった。そこで key light に、焼き込みプローブから作る柔らかい影を付けた (§5)。拡散だけに掛け、鏡面には掛けない (格子が粗く、外に出た原子のハイライトまで弱めるため。窪みのハイライトは鏡面の遮蔽で消える)。
-- **鏡面の遮蔽**: 鏡面 = 環境光以外 − 拡散 (`albedo × 拡散 × N.L`) として取り出し、Lagarde & de Rousiers の近似 `saturate(pow(N.V + AO, exp2(-16 r - 1)) - 1 + AO)` で暗くする。r は指数 16 を GGX の alpha に直した `sqrt(2 / 18)`。
-- **明るさのつまみ**: 3 つの光に同じ倍率を掛けるので、明暗の比 (AO の奥行き感) を保ったまま明るさだけが変わる (明るい側が 1 で頭打ちになる分だけ比がわずかに動く)。既定値の 0.8 倍の明るさは、つまみではなく `kFastGILight*` に入れてある。つまみの既定を 0.8 にすると、AO なし・GTAO まで暗くなり、既定値を書かない古いファイルも暗く読まれるため。
+- **鏡面の遮蔽**: 鏡面 = 環境光以外 − 拡散 (`albedo × 拡散 × N.L`) として取り出し、Lagarde & de Rousiers の近似 `saturate(pow(N.V + AO, exp2(-16 r - 1)) - 1 + AO)` で暗くする。r はその画素の material の指数 n を GGX の alpha に直した `sqrt(2 / (n + 2))`。
+- **明るさのつまみ**: 3 つの光に同じ倍率を掛けるので、明暗の比 (AO の奥行き感) を保ったまま明るさだけが変わる (明るい側がトーンカーブで圧縮される分だけ比がわずかに動く)。既定値の 0.8 倍の明るさは、つまみではなく `kFastGILight*` に入れてある。つまみの既定を 0.8 にすると、AO なし・GTAO まで暗くなり、既定値を書かない古いファイルも暗く読まれるため。
 - **調整の経緯** (2BBV、白背景、明暗比 = 暗い 10% 点 / 明るい 10% 点): 環境光だけ (1.15 / 0) で CPK は ChimeraX soft と同等 (0.23 / 0.20) だったが円柱の面が見分けられない。拡散 0.5 を足すと円柱は直るが CPK が 0.35 に浅くなる。拡散を弱めても向きを変えても戻らず、影を付けて 0.27、影の指数 2 と環境光 0.7・拡散 0.65 で 0.23。そこからユーザーの目視で全体を 0.8 倍し、焼き込みを 0.8 にした。ChimeraX に合わせて光を左上にする案は、CueMol の他の方式と向きが揃わないので採らなかった。
 
 ## 4. 画面の AO (visibility bitmask)
@@ -104,4 +106,3 @@ Fast GI のときの光の強さ (`Scene::kFastGILight*`、`lightBrightness` 倍
 | CPU の焼き込み | GPU 版と相関 0.986 で、GPU の方が速く描いたものすべてを遮蔽物にできる |
 | 表現ごとの厚み・プローブの重み付け | 形の判断を表現に頼らない / CPK に斑点 |
 | 光の向きを ChimeraX (左上) に合わせる | AO なし・GTAO と向きが揃わない |
-| 三角形のライティングを画素ごとにする | 凹凸の明暗への寄与が小さい |

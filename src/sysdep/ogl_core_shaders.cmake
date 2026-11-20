@@ -50,4 +50,5 @@ SET(OGL_CORE_SHADER_DEPS
   ${CMAKE_CURRENT_LIST_DIR}/ogl_core/lib_atoms.glsl
   ${CMAKE_CURRENT_LIST_DIR}/ogl_core/pick_inc.glsl
   ${CMAKE_CURRENT_LIST_DIR}/ogl_core/fastgi_bitmask_inc.glsl
+  ${CMAKE_CURRENT_LIST_DIR}/ogl_core/tonemap_inc.glsl
 )

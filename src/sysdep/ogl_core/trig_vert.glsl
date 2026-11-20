@@ -4,7 +4,6 @@
 //
 #define varying out
 
-#include "lighting_inc.glsl"
 #include "fog_inc.glsl"
 #include "matrices_inc.glsl"
 
@@ -30,11 +29,10 @@ layout(location = 2) in vec4 aColor;
 
 varying vec4 v_frontColor;
 varying float v_fogCoord;
-// Eye-space geometry normal forwarded to the MRT normal output (GTAO). Raw
-// (un-normalized) here; the fragment shader normalizes with a zero guard.
+// Eye-space geometry normal, for the lighting and the MRT normal output
+// (GTAO). Raw (un-normalized) here; the fragment shader normalizes with a zero
+// guard.
 varying vec3 v_ecNormal;
-// Ambient fraction of the lit colour (lighting_inc.glsl), for the MRT normal .w.
-varying float v_ambFrac;
 
 void main(void)
 {
@@ -46,13 +44,9 @@ void main(void)
     vec3 ecNormal = mat3(u_NormalMatrix) * aNormal.xyz;
     v_ecNormal = ecNormal;
 
-    if (enable_lighting != 0) {
-        v_frontColor = flight2(normalize(ecNormal), ecPosition, aColor);
-        v_ambFrac = g_ambientFraction;
-    } else {
-        v_frontColor = aColor;
-        v_ambFrac = 1.0;
-    }
+    // The vertex colour; the fragment shader lights it per pixel, so a
+    // tight highlight does not break up across the triangles.
+    v_frontColor = aColor;
 
     if (u_nodepth > 0) {
         // billboarded line without depth

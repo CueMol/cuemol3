@@ -31,6 +31,7 @@
 
 #include <gfx/DisplayContext.hpp>
 #include <gfx/ColProfMgr.hpp>
+#include <gfx/Material.hpp>
 #include "style/StyleMgr.hpp"
 #include "style/StyleFile.hpp"
 #include "style/StyleSet.hpp"
@@ -683,17 +684,11 @@ void Scene::display(DisplayContext *pdc)
   // Scoped push of this scene's style context: a renderer throwing mid-display
   // must not leave the scene ID on the StyleMgr context stack.
   AutoStyleCtxt style_ctxt(getUID());
-  // The ambient-dominant light pairs with the Fast GI AO, which darkens the
-  // ambient part only; without it the former constants keep the shading.
-  const float bri = float(std::max(0.0, m_fLightBrightness));
-  if (isAOEnabled() && getAOMethod() == AOM_FASTGI) {
-    pdc->setLightIntensities(float(kFastGILightAmbient) * bri, float(kFastGILightDiffuse) * bri,
-                             float(kFastGILightSpecular) * bri);
-    pdc->setLightShininess(float(kFastGILightShininess));
-  } else {
-    pdc->setLightIntensities(0.4f * bri, 0.8f * bri, 0.16f * bri);
-    pdc->setLightShininess(float(kLegacyLightShininess));
-  }
+  // The light of a renderer without a material; each renderer sets its own
+  // in displayRendImpl.
+  const MaterialLight ml = getMaterialLight(LString());
+  pdc->setLightIntensities(ml.ambient, ml.diffuse, ml.specular);
+  pdc->setLightShininess(ml.shininess);
   pdc->setLightDir(kLightDir[0], kLightDir[1], kLightDir[2]);
   pdc->startRender();
 
@@ -783,6 +778,52 @@ void Scene::display(DisplayContext *pdc)
   pdc->endRender();
 }
 
+Scene::MaterialLight Scene::getMaterialLight(const LString &mat_id) const
+{
+  // CueMol2's OpenGL view (OglDisplayContext::setMaterImpl) gave the material
+  // values to its light: ambient on top of a global ambient of 0.2, a
+  // light specular of 0.4, and built-in values for a name it did not find.
+  // Here the built-in values are those of the material "default"
+  // (kDefaultMaterial*), and a renderer without a material takes that one
+  // (unlike CueMol2, which gave it the built-in values), so the three always
+  // look the same.
+  double ka = kDefaultMaterialAmbient, kd = kDefaultMaterialDiffuse,
+         ks = kDefaultMaterialSpecular, shin = kDefaultMaterialShininess;
+  {
+    // Look the name up in this scene's styles (display() has already pushed
+    // the context; pushing it again is harmless).
+    AutoStyleCtxt style_ctxt(getUID());
+    StyleMgr *pSM = StyleMgr::getInstance();
+    const LString name = mat_id.isEmpty() ? LString("default") : mat_id;
+    double v = pSM->getMaterial(name, gfx::Material::MAT_AMBIENT);
+    if (v >= -0.1) ka = v;
+    v = pSM->getMaterial(name, gfx::Material::MAT_DIFFUSE);
+    if (v >= -0.1) kd = v;
+    v = pSM->getMaterial(name, gfx::Material::MAT_SPECULAR);
+    if (v >= -0.1) ks = v;
+    v = pSM->getMaterial(name, gfx::Material::MAT_SHININESS);
+    if (v >= -0.1) shin = v;
+  }
+  double amb = 0.2 + ka, diff = kd, spec = 0.4 * ks;
+
+  // The ambient-dominant light pairs with the Fast GI AO, which darkens the
+  // ambient part only: scale the ambient and diffuse of every material so
+  // that "default" gets the kFastGILight* values. The specular and the
+  // exponent stay the material's, so the balance of highlight and colour
+  // that makes it read as plastic or metal does not change with the mode.
+  if (isAOEnabled() && getAOMethod() == AOM_FASTGI) {
+    amb *= kFastGILightAmbient / kLegacyLightAmbient;
+    diff *= kFastGILightDiffuse / kLegacyLightDiffuse;
+  }
+  const double bri = std::max(0.0, m_fLightBrightness);
+  MaterialLight ml;
+  ml.ambient = float(amb * bri);
+  ml.diffuse = float(diff * bri);
+  ml.specular = float(spec * bri);
+  ml.shininess = float(shin);
+  return ml;
+}
+
 void Scene::displayRendImpl(DisplayContext *pdc, ObjectPtr pObj, RendererPtr pRend)
 {
   // alpha should be set before startSection,
@@ -790,6 +831,10 @@ void Scene::displayRendImpl(DisplayContext *pdc, ObjectPtr pObj, RendererPtr pRe
   pdc->setAlpha(pRend->getDefaultAlpha());
 
   pdc->setMaterial(pRend->getDefaultMaterial());
+  // The lit shaders read the light at each draw (ShaderObject::setupFog).
+  const MaterialLight ml = getMaterialLight(pRend->getDefaultMaterial());
+  pdc->setLightIntensities(ml.ambient, ml.diffuse, ml.specular);
+  pdc->setLightShininess(ml.shininess);
   pdc->setStyleNames(pRend->getStyleNames());
   
   // transfer the edge settings

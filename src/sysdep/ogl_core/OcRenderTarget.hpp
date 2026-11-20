@@ -29,6 +29,7 @@ private:
     quint32 m_nColorTex;
     quint32 m_nDepthTex;
     quint32 m_nNormalTex;
+    quint32 m_nMaterialTex;
 
     int m_nWidth;
     int m_nHeight;
@@ -66,6 +67,7 @@ public:
         return (m_nFlags & gfx::RT_COLOR_RGBA32UI) != 0;
     }
 
+    bool hasMaterial() const override { return m_nMaterialTex != 0; }
     bool hasNormal() const override
     {
         return (m_nFlags & gfx::RT_NORMAL_RGBA16F) != 0;

@@ -154,6 +154,10 @@ architecture, it belongs here.
   (HDR の scene 色、鏡面の遮蔽、照り返し)、3 A 格子の焼き込みプローブ (GPU の焼き込み、形が止まってからの焼き直し、
   時間 AA のやり直し、3 次 B-spline の読み出し)、プローブから作る key light の柔らかい影、明るさのつまみ、
   `aoMethod` の無い古い qsc を GTAO で読む互換、調整の経緯と採らなかった案。
+- [renderer の material と光](renderer-material.md) (日本語) -- renderer の `material` で光の強さと
+  ハイライトを決める。material の一覧 (磨いた / 艶消しのプラスチック、艶消し / 磨いた金属ほか)、CueMol2 と同じ名前から
+  光への換算と Fast GI での換算 (環境光と拡散だけ)、三角形の画素ごとのライティング、1 を超えた明るさのトーンカーブ、
+  Fast GI の合成に渡す画素ごとの material、既知の制限 (白いハイライト、toon の量子化なし)。
 - [GTAO Screen-Space AO](gtao-screen-space-ao.md) (日本語) -- リアルタイム
   GTAO のパイプライン、projection 由来の view-space 復元と GL 座標系、MRT
   geometry 法線、Apple Metal-GL の MRT/ブレンドのハマりどころ、tritium

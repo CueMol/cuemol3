@@ -987,10 +987,10 @@ TEST(UmbreonExport, GlobalIlluminationAffectsOutput)
 // via giIntegrator=2 in buildSceneAndOptions): a reflective material must mirror
 // the actual scene geometry, not the background color.
 //
-// Setup: a gray "spec_metal" panel (a principled metal ported from POV
-// F_MetalD: metallic 1, roughness 0.37, reflection 0.65 -- the reflection
-// scalar is dormant in the BSDF but still sets the non-pt2 fake environment
-// amount) tilted 45 deg about Y, so its mirror direction is exactly -X. Note
+// Setup: a gray "spec_metal" panel (a principled metal: metallic 0.7,
+// roughness 0.37, no POV reflection scalar, so the non-pt2 fake environment
+// term would be F0 * background) tilted 45 deg about Y, so its mirror
+// direction is exactly -X. Note
 // the traced lobe is glossy at that roughness, not a sharp mirror; the
 // threshold below has margin for the spread. A red "matte"
 // panel sits at x = -4, OUTSIDE the view frustum (zoom 6 => the frame spans x
@@ -998,9 +998,9 @@ TEST(UmbreonExport, GlobalIlluminationAffectsOutput)
 // only reach the metal through a reflection bounce. The background is black.
 //
 // The discriminator is the MAGNITUDE of the red the metal picks up. A traced
-// specular lobe composites reflection * E_spec = 0.65 * red. The older fake
-// environment term composites reflection * background = 0.65 * black = 0, and
-// leaves only the diffuse gather's bounce -- the red panel subtends a small
+// specular lobe picks up the red panel itself. The older fake environment
+// term composites F0 * background = F0 * black = 0, and leaves only the
+// diffuse gather's bounce -- the red panel subtends a small
 // part of the cosine-weighted hemisphere, so that is an order of magnitude
 // weaker. The threshold below sits between the two measured regimes.
 TEST(UmbreonExport, ReflectiveMaterialMirrorsSceneGeometryUnderGI)

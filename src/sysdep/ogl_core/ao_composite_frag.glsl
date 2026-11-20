@@ -9,6 +9,8 @@
 // similarity to the full-res pixel, so the AO does not bleed across silhouettes
 // (no halo around objects).
 
+#include "tonemap_inc.glsl"
+
 uniform sampler2D u_colorTex;
 uniform sampler2D u_aoTex;       // AO term in R (half or full resolution)
 uniform sampler2D u_depthTex;    // full-res scene depth
@@ -41,10 +43,21 @@ uniform int u_keyShadow;   // 1 = the AO buffer's B is the key-light visibility
 uniform int u_hasBounce;
 uniform sampler2D u_bounceTex;
 uniform float u_bounceScale;
+// Material of each pixel (fog_inc.glsl encodeMaterial): the renderers' own
+// lights replace u_lightAmbient / u_lightDiffuse and the exponent the
+// specular occlusion assumes. A pixel without one (a = 0) keeps the uniforms.
+uniform int u_hasMaterial;
+uniform sampler2D u_sceneMaterialTex;
 
 in vec2 v_uv;
 
 out vec4 o_FragColor;
+
+// Inverse of fog_inc.glsl encodeMaterial's x / (1 + x).
+float decodeMaterialRatio(float e)
+{
+    return e / max(1.0 - e, 1.0 / 255.0);
+}
 
 float linearizeZ(float d)
 {
@@ -144,6 +157,19 @@ void main()
             // result is c - that * f * (1 - ao). Fogged pixels keep their
             // shading in proportion instead of losing it.
             float f = clamp(2.0 - length(texture(u_sceneNormalTex, v_uv).xyz), 0.0, 1.0);
+            // The light of this pixel's material: diffuse / ambient, the
+            // specular roughness and the ambient intensity.
+            float diffPerAmb = u_lightDiffuse / max(u_lightAmbient, 1e-3);
+            float rough = 0.3333;  // exponent 16, Scene::kDefaultMaterialShininess
+            float ambient = u_lightAmbient;
+            if (u_hasMaterial != 0) {
+                vec4 mat = texture(u_sceneMaterialTex, v_uv);
+                if (mat.a > 0.5) {
+                    diffPerAmb = decodeMaterialRatio(mat.r);
+                    rough = mat.g;
+                    ambient = decodeMaterialRatio(mat.b);
+                }
+            }
             vec3 litPart = c.rgb - (1.0 - fogVis) * u_fogColor;
             vec3 outc = c.rgb - litPart * (f * (1.0 - ao));
             if ((u_specOcclusion != 0 || u_keyShadow != 0) && f < 0.999) {
@@ -153,15 +179,15 @@ void main()
                 vec3 nE = normalize(texture(u_sceneNormalTex, v_uv).xyz);
                 float nDotL = max(dot(nE, normalize(u_lightDir)), 0.0);
                 vec3 albedoAmb = litPart * f;  // albedo * ambient (fog-attenuated)
-                vec3 diff = albedoAmb * (u_lightDiffuse / max(u_lightAmbient, 1e-3)) * nDotL;
+                vec3 diff = albedoAmb * (diffPerAmb * nDotL);
                 vec3 spec = max(litPart * (1.0 - f) - diff, vec3(0.0));
                 // Lagarde & de Rousiers 2014 (Moving Frostbite to PBR):
                 // so = saturate(pow(NV + ao,
-                // exp2(-16 r - 1)) - 1 + ao), r = the Blinn-Phong exponent 16
-                // (Scene::kFastGILightShininess) as GGX alpha sqrt(2 / (16 + 2)).
+                // exp2(-16 r - 1)) - 1 + ao), r = the Blinn-Phong exponent as
+                // GGX alpha sqrt(2 / (n + 2)) (the material's, or that of
+                // Scene::kDefaultMaterialShininess without one).
                 // The view vector is taken as the eye axis.
                 float nDotV = max(nE.z, 0.0);
-                const float rough = 0.3333;
                 float so = 1.0;
                 if (u_specOcclusion != 0)
                     so = clamp(pow(nDotV + ao, exp2(-16.0 * rough - 1.0)) - 1.0 + ao, 0.0, 1.0);
@@ -176,9 +202,13 @@ void main()
                 // Indirect diffuse: albedo * E, with albedo * ambient = the
                 // ambient part (litPart * f, fog-attenuated like litPart).
                 vec3 e = texture(u_bounceTex, v_uv).rgb;
-                outc += litPart * f * u_bounceScale * e;
+                // u_bounceScale = strength / u_lightAmbient; the albedo is the
+                // ambient part over this pixel's ambient intensity.
+                outc += litPart * f * (u_bounceScale * u_lightAmbient / max(ambient, 1e-3)) * e;
             }
-            o_FragColor = clamp(vec4(outc, c.a), 0.0, 1.0);
+            // The HDR scene colour leaves its range here (lighting_inc.glsl
+            // flight2 does it for an LDR target).
+            o_FragColor = vec4(toneMap(outc), clamp(c.a, 0.0, 1.0));
             return;
         }
         ao = mix(1.0, ao, fogVis);

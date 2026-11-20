@@ -20,6 +20,7 @@ OcRenderTarget::OcRenderTarget()
       m_nColorTex(0),
       m_nDepthTex(0),
       m_nNormalTex(0),
+      m_nMaterialTex(0),
       m_nWidth(0),
       m_nHeight(0),
       m_nFlags(0)
@@ -52,6 +53,11 @@ bool OcRenderTarget::init(gfx::DisplayContext *pdc, int w, int h, int flags)
         tex = 0;
         glGenTextures(1, &tex);
         m_nNormalTex = tex;
+        if (m_nFlags & gfx::RT_MATERIAL_RGBA8) {
+            tex = 0;
+            glGenTextures(1, &tex);
+            m_nMaterialTex = tex;
+        }
     }
     CHK_GLERROR("OcRenderTarget::init gen");
 
@@ -69,8 +75,16 @@ bool OcRenderTarget::init(gfx::DisplayContext *pdc, int w, int h, int flags)
     if (m_nNormalTex != 0) {
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D,
                                m_nNormalTex, 0);
-        GLenum bufs[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
-        glDrawBuffers(2, bufs);
+        if (m_nMaterialTex != 0) {
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D,
+                                   m_nMaterialTex, 0);
+            GLenum bufs[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1,
+                              GL_COLOR_ATTACHMENT2};
+            glDrawBuffers(3, bufs);
+        } else {
+            GLenum bufs[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+            glDrawBuffers(2, bufs);
+        }
     } else {
         GLenum bufs[1] = {GL_COLOR_ATTACHMENT0};
         glDrawBuffers(1, bufs);
@@ -140,6 +154,17 @@ void OcRenderTarget::allocAttachments(int w, int h)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     }
 
+    // Optional MRT material attachment 2 (packed data: NEAREST).
+    if (m_nMaterialTex != 0) {
+        glBindTexture(GL_TEXTURE_2D, m_nMaterialTex);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                     nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    }
+
     glBindTexture(GL_TEXTURE_2D, 0);
     CHK_GLERROR("OcRenderTarget::allocAttachments");
 }
@@ -164,6 +189,7 @@ OcRenderTarget::~OcRenderTarget()
     if (m_nColorTex != 0) glDeleteTextures(1, &m_nColorTex);
     if (m_nDepthTex != 0) glDeleteTextures(1, &m_nDepthTex);
     if (m_nNormalTex != 0) glDeleteTextures(1, &m_nNormalTex);
+    if (m_nMaterialTex != 0) glDeleteTextures(1, &m_nMaterialTex);
     glDeleteFramebuffers(1, &m_nFBO);
 
     MB_DPRINTLN("OcRenderTarget> fbo=%d deleted", m_nFBO);
@@ -181,6 +207,7 @@ void OcRenderTarget::bind()
     // corrupts COLOR1. Disable blending for draw buffer 1 while this target is
     // bound; restore it on unbind.
     if (m_nNormalTex != 0) glDisablei(GL_BLEND, 1);
+    if (m_nMaterialTex != 0) glDisablei(GL_BLEND, 2);
 
     CHK_GLERROR("OcRenderTarget::bind");
 }
@@ -188,6 +215,7 @@ void OcRenderTarget::bind()
 void OcRenderTarget::unbind()
 {
     if (m_nNormalTex != 0) glEnablei(GL_BLEND, 1);
+    if (m_nMaterialTex != 0) glEnablei(GL_BLEND, 2);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(m_savedVp[0], m_savedVp[1], m_savedVp[2], m_savedVp[3]);
 }
@@ -213,6 +241,9 @@ void OcRenderTarget::clear(float r, float g, float b, float a)
         const GLfloat depth1 = 1.0f;
         glClearBufferfv(GL_COLOR, 0, color0);
         glClearBufferfv(GL_COLOR, 1, normal1);
+        // Material attachment: (0,0,0,0) = no material, the composite falls
+        // back to the scene light.
+        if (m_nMaterialTex != 0) glClearBufferfv(GL_COLOR, 2, normal1);
         glClearBufferfv(GL_DEPTH, 0, &depth1);
     } else {
         glClearColor(r, g, b, a);
@@ -230,7 +261,9 @@ void OcRenderTarget::resize(int w, int h)
 
 void OcRenderTarget::bindColorTex(int idx, int texUnit)
 {
-    GLuint tex = (idx == 1 && m_nNormalTex != 0) ? m_nNormalTex : m_nColorTex;
+    GLuint tex = (idx == 1 && m_nNormalTex != 0)     ? m_nNormalTex
+                 : (idx == 2 && m_nMaterialTex != 0) ? m_nMaterialTex
+                                                     : m_nColorTex;
     glActiveTexture(GL_TEXTURE0 + texUnit);
     glBindTexture(GL_TEXTURE_2D, tex);
 }

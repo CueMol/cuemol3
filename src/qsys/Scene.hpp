@@ -269,28 +269,55 @@ namespace qsys {
       AOM_FASTGI = 1,
     };
 
-    /// Light intensities while the Fast GI AO is on (ambient total, diffuse,
-    /// specular x material). The AO darkens the ambient part; the diffuse key
+    /// Ambient total and diffuse light while the Fast GI AO is on, for the
+    /// material "default" (other materials are scaled alike,
+    /// getMaterialLight). The AO darkens the ambient part; the diffuse key
     /// light tells the faces of a shape apart (a cartoon cylinder's side from
     /// its cap) and is darkened in the cavities by its probe shadow, so a
     /// strong key does not light the cavities up. Without Fast GI the scene
-    /// keeps the former 0.4 / 0.8 / 0.16, which shade without AO (see
-    /// display()). Both are scaled by lightBrightness.
+    /// keeps the former 0.4 / 0.8 (kLegacyLight*), which shade without AO.
+    /// Both are scaled by lightBrightness.
     /// (ambient / diffuse 0.7 / 0.65 tuned for the depth cue, x 0.8 for the
-    /// brightness). The highlight is broader (exponent 16) and stronger than
-    /// the former 32 / 0.16 to read as plastic over the ambient-lit colour.
+    /// brightness). The specular light and exponent are not scaled: they are
+    /// the material's in every AO mode, so that a material keeps its
+    /// character (plastic, metal) when the mode changes.
     static constexpr double kFastGILightAmbient = 0.56;
     static constexpr double kFastGILightDiffuse = 0.52;
-    static constexpr double kFastGILightSpecular = 0.25;
-    static constexpr double kFastGILightShininess = 16.0;
-    /// The former specular exponent, kept without Fast GI.
-    static constexpr double kLegacyLightShininess = 32.0;
+    /// The former ambient total / diffuse light without Fast GI, for the
+    /// material "default".
+    static constexpr double kLegacyLightAmbient = 0.4;
+    static constexpr double kLegacyLightDiffuse = 0.8;
+    /// Values of the material "default" (data/default_style.xml), also used
+    /// for a material name no style defines: matte plastic (the material
+    /// "matte_plastic"), a weak broad white highlight (specular 0.3 x the
+    /// light's 0.4 = 0.12, exponent 16) on a diffuse-dominant colour. Polished
+    /// plastic ("plastic", exponent 76.8) shines too much for a default.
+    static constexpr double kDefaultMaterialAmbient = 0.2;
+    static constexpr double kDefaultMaterialDiffuse = 0.8;
+    static constexpr double kDefaultMaterialSpecular = 0.3;
+    static constexpr double kDefaultMaterialShininess = 16.0;
     /// Eye-space direction to the key light (upper right front), the same
     /// with and without Fast GI.
     static constexpr float kLightDir[3] = {1.0f, 1.0f, 1.5f};
     /// Fast GI: contrast (power of the visibility) of the key light's soft
     /// shadow from the baked probes (gtao_frag.glsl).
     static constexpr double kFastGIKeyShadowPower = 2.0;
+
+    /// Light intensities and specular exponent (FogBlock) of one material.
+    struct MaterialLight
+    {
+      float ambient;
+      float diffuse;
+      float specular;
+      float shininess;
+    };
+
+    /// The light a renderer of material mat_id is lit with: the material's
+    /// values (data/default_style.xml, as CueMol2's OpenGL view read them),
+    /// scaled for the AO method and by lightBrightness. An empty name takes
+    /// the material "default"; an unknown name is lit as before materials
+    /// took effect.
+    MaterialLight getMaterialLight(const LString &mat_id) const;
 
     /// Overall light scale (lightBrightness): multiplies the ambient, diffuse
     /// and specular intensities alike, so the image gets brighter or darker
