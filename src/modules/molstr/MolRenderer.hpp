@@ -37,6 +37,12 @@ namespace molstr {
     
     SelectionPtr m_pSel;
 
+    /// The atoms the selection matches, for collectOcclusionSpheres (see
+    /// occlusionAtomIDs).
+    mutable std::vector<int> m_occAids;
+    mutable bool m_bOccAidsValid = false;
+    mutable int m_nOccMolAtoms = -1;
+
   public:
 
     MolRenderer();
@@ -85,6 +91,17 @@ namespace molstr {
     /// uses these only for the grid bounds and change detection; renderers
     /// that draw atom spheres override with their radii.
     void collectOcclusionSpheres(std::vector<qlib::Vector4D> &out) const override;
+
+  protected:
+    /// IDs of the atoms the selection matches. Evaluating the selection over
+    /// every atom is the costly part of collecting the occluders (~11 ms per
+    /// renderer for 59k atoms), so the IDs are kept until the selection or the
+    /// molecule's atoms change (a topology change, or a different atom count).
+    /// Atoms moving keeps them: the coordinate-texture paths of the renderers
+    /// likewise keep their selected atoms while atoms move.
+    const std::vector<int> &occlusionAtomIDs() const;
+
+  public:
 
     /// make hittestresult JSON string for atom aid
     static LString interpHitAidImpl(MolAtomPtr pAtom);
