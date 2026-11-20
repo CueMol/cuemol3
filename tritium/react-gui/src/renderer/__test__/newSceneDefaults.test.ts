@@ -20,9 +20,8 @@ const FACTORY_PROPS = {
   aa_method: 'fxaa',
   aaJitterLevel: 3,
   aoEnabled: true,
-  aoRadius: 8,
-  aoSteps: 4,
-  aoIntensity: 1.9,
+  aoRadius: 10,
+  aoSteps: 8,
   aoHalfRes: true,
   bgcolor: '#000000',
   use_colproof: false,
@@ -71,6 +70,6 @@ describe('newSceneDefaults', () => {
     })
     expect(props.aa_method).toBe('none')
     expect(props.aoEnabled).toBe(true)
-    expect(props.aoRadius).toBe(12)
+    expect(props.aoRadius).toBe(14)
   })
 })

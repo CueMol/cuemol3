@@ -159,11 +159,17 @@ Scene::Scene()
   m_bUseColProof = false;
 
   m_bAOEnabled = false;
-  m_fAORadius = 4.0;
+  m_fAORadius = 10.0;
   m_fAOIntensity = 2.2;
-  m_nAOSlices = 9;
-  m_nAOSteps = 3;
-  m_bAOHalfRes = false;
+  m_nAOSlices = 8;
+  m_nAOSteps = 8;
+  m_bAOHalfRes = true;
+  m_nAOMethod = AOM_FASTGI;
+  m_fAOBounce = 0.5;
+  m_fAOProbeStrength = 0.8;
+  m_fLightBrightness = 1.0;
+  m_nAODebugView = AODV_OFF;
+  m_bRenderTiming = false;
   m_nAAMethod = AA_FXAA;
   m_nAAJitterLevel = 0;
   m_fAASmaaThreshold = 0.05;
@@ -677,6 +683,18 @@ void Scene::display(DisplayContext *pdc)
   // Scoped push of this scene's style context: a renderer throwing mid-display
   // must not leave the scene ID on the StyleMgr context stack.
   AutoStyleCtxt style_ctxt(getUID());
+  // The ambient-dominant light pairs with the Fast GI AO, which darkens the
+  // ambient part only; without it the former constants keep the shading.
+  const float bri = float(std::max(0.0, m_fLightBrightness));
+  if (isAOEnabled() && getAOMethod() == AOM_FASTGI) {
+    pdc->setLightIntensities(float(kFastGILightAmbient) * bri, float(kFastGILightDiffuse) * bri,
+                             float(kFastGILightSpecular) * bri);
+    pdc->setLightShininess(float(kFastGILightShininess));
+  } else {
+    pdc->setLightIntensities(0.4f * bri, 0.8f * bri, 0.16f * bri);
+    pdc->setLightShininess(float(kLegacyLightShininess));
+  }
+  pdc->setLightDir(kLightDir[0], kLightDir[1], kLightDir[2]);
   pdc->startRender();
 
   std::vector<RendererPtr> transps;
@@ -1697,6 +1715,11 @@ void Scene::writeTo2(qlib::LDom2Node *pNode) const
   // Write properties of the scene
   super_t::writeTo2(pNode);
 
+  // Always write the AO method, even at its default: a file without it is
+  // read as one saved before the bitmask AO existed (see readFrom2).
+  if (qlib::LDom2Node *pMeth = pNode->findChild("aoMethod"))
+    pMeth->setDefaultFlag(false);
+
   // Write reader options
   if (m_pQscOpts!=NULL) {
     qlib::LDom2Node *pChNode = MB_NEW qlib::LDom2Node(*m_pQscOpts);
@@ -1944,8 +1967,42 @@ void Scene::readFrom2(qlib::LDom2Node *pNode)
       setQscOpts(pRoptsCopy);
     }
 
+    // A file without aoMethod was saved before the bitmask AO existed: its AO
+    // properties left at their defaults were not written, and the defaults
+    // have changed since. Restore the former look: GTAO with the former
+    // defaults for the AO properties the file does not carry. (The light
+    // intensities follow the method, see display().)
+    const bool bLegacyAO = pNode->findChild("aoMethod") == NULL;
+    const bool bHasRadius = pNode->findChild("aoRadius") != NULL;
+    const bool bHasSlices = pNode->findChild("aoSlices") != NULL;
+    const bool bHasSteps = pNode->findChild("aoSteps") != NULL;
+    const bool bHasHalfRes = pNode->findChild("aoHalfRes") != NULL;
+
     // read other properties of scene
     super_t::readFrom2(pNode);
+
+    if (bLegacyAO) {
+      // Mark them modified so that a later save writes them (the new file
+      // then carries aoMethod and is read with the current defaults).
+      m_nAOMethod = AOM_GTAO;
+      setDefaultPropFlag("aoMethod", false);
+      if (!bHasRadius) {
+        m_fAORadius = 4.0;
+        setDefaultPropFlag("aoRadius", false);
+      }
+      if (!bHasSlices) {
+        m_nAOSlices = 9;
+        setDefaultPropFlag("aoSlices", false);
+      }
+      if (!bHasSteps) {
+        m_nAOSteps = 3;
+        setDefaultPropFlag("aoSteps", false);
+      }
+      if (!bHasHalfRes) {
+        m_bAOHalfRes = false;
+        setDefaultPropFlag("aoHalfRes", false);
+      }
+    }
 
     for (pNode->firstChild(); pNode->hasMoreChild(); pNode->nextChild()) {
       qlib::LDom2Node *pChNode = pNode->getCurChild();

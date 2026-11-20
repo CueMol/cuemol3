@@ -42,7 +42,6 @@
 | [261108-chx-surface-per-chain-speed-plan.md](261108-chx-surface-per-chain-speed-plan.md) | ChX の `surface` が chain ごとに流す処理を軽くする (色は chain ごとに 1 色、作った直後の `showsel` の空書きをやめる) | **未実装** (plugin で完結) |
 | [261108-map-surface-dust-plan.md](261108-map-surface-dust-plan.md) | 地図の等値面の小さな破片を隠す (`MapSurfRenderer` の `dust_size` / `dust_metric`、ChX の `surface dust`) | **未実装 / 着手の条件あり** (libcuemol2 の変更。GUI での有用性を確かめてから) |
 | [261108-clip-planes-and-caps-plan.md](261108-clip-planes-and-caps-plan.md) | ChimeraX と同等の clipping plane (near / far / front / back、renderer ごとの切り替え) と、切った表面の断面の蓋。シェーダーの `discard`、CPU で作る蓋、外部レンダラー (umbreon の front / back) | **未実装 / 着手の条件あり** (libcuemol2 の変更) |
-| [261108-large-scale-ambient-shadow-plan.md](261108-large-scale-ambient-shadow-plan.md) | GTAO が苦手な大きな凹凸の立体感を補う: 粗い multishadow を AO のパスで引き、GTAO の半径より近い遮蔽物を外して遠距離だけを受け持つ。同じ地図から柔らかい方向のある影も出す | **未実装** |
 
 ## 実装済み (旧ルールで残っているもの)
 

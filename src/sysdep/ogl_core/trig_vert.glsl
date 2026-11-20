@@ -33,6 +33,8 @@ varying float v_fogCoord;
 // Eye-space geometry normal forwarded to the MRT normal output (GTAO). Raw
 // (un-normalized) here; the fragment shader normalizes with a zero guard.
 varying vec3 v_ecNormal;
+// Ambient fraction of the lit colour (lighting_inc.glsl), for the MRT normal .w.
+varying float v_ambFrac;
 
 void main(void)
 {
@@ -46,8 +48,10 @@ void main(void)
 
     if (enable_lighting != 0) {
         v_frontColor = flight2(normalize(ecNormal), ecPosition, aColor);
+        v_ambFrac = g_ambientFraction;
     } else {
         v_frontColor = aColor;
+        v_ambFrac = 1.0;
     }
 
     if (u_nodepth > 0) {

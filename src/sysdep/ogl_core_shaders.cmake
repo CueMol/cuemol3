@@ -31,6 +31,8 @@ SET(OGL_CORE_SHADER_SOURCES
   ${CMAKE_CURRENT_LIST_DIR}/ogl_core/ao_composite_frag.glsl
   ${CMAKE_CURRENT_LIST_DIR}/ogl_core/gtao_frag.glsl
   ${CMAKE_CURRENT_LIST_DIR}/ogl_core/ao_denoise_frag.glsl
+  ${CMAKE_CURRENT_LIST_DIR}/ogl_core/probe_bake_frag.glsl
+  ${CMAKE_CURRENT_LIST_DIR}/ogl_core/probe_fill_frag.glsl
   ${CMAKE_CURRENT_LIST_DIR}/ogl_core/fxaa_frag.glsl
   ${CMAKE_CURRENT_LIST_DIR}/ogl_core/smaa_edges_frag.glsl
   ${CMAKE_CURRENT_LIST_DIR}/ogl_core/smaa_weights_frag.glsl
@@ -47,4 +49,5 @@ SET(OGL_CORE_SHADER_DEPS
   ${CMAKE_CURRENT_LIST_DIR}/ogl_core/linew_inc.glsl
   ${CMAKE_CURRENT_LIST_DIR}/ogl_core/lib_atoms.glsl
   ${CMAKE_CURRENT_LIST_DIR}/ogl_core/pick_inc.glsl
+  ${CMAKE_CURRENT_LIST_DIR}/ogl_core/fastgi_bitmask_inc.glsl
 )

@@ -22,9 +22,11 @@ layout(std140) uniform DrawParamsBlock {
 varying vec4 v_frontColor;
 varying float v_fogCoord;
 varying vec3 v_ecNormal;
+varying float v_ambFrac;
 
 layout(location = 0) out vec4 o_FragColor;
 // MRT eye-space normal for GTAO (sentinel (0,0,0) -> reconstruct from depth).
+// Its length is 2 - (ambient fraction of the lit colour), see lighting_inc.glsl.
 // vec4 to match o_FragColor (Apple Metal GL mishandles mixed vec4/vec3 MRT).
 layout(location = 1) out vec4 o_Normal;
 
@@ -35,6 +37,6 @@ void main(void)
     // Write the real eye-space normal whenever one is available (lit or not), so
     // only genuinely normal-less primitives fall back to the sentinel.
     o_Normal = (dot(v_ecNormal, v_ecNormal) > 1e-12)
-                   ? vec4(normalize(v_ecNormal), 1.0)
+                   ? vec4(normalize(v_ecNormal) * (2.0 - clamp(v_ambFrac, 0.0, 1.0)), 1.0)
                    : vec4(0.0, 0.0, 0.0, 1.0);
 }

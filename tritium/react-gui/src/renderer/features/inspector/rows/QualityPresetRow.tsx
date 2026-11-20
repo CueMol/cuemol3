@@ -21,14 +21,20 @@ import { RENDER_QUALITY_CUSTOM, stepPatch } from '@renderer/data/renderSettings'
 import { sceneStepOf } from '@renderer/data/sceneQualityPresets'
 import type { RenderQualityAxis } from '@renderer/data/renderSettings'
 import type { PropMultiWrite } from '@renderer/features/inspector/rendererPropSections'
-import type { CustomRowProps } from '@renderer/features/inspector/schema/types'
+import type { CustomRowProps, PropCtx } from '@renderer/features/inspector/schema/types'
 
 /**
  * A preset dropdown for one quality axis. Called at module scope by the page
  * that wants it, so the component identity is stable across renders.
+ *
+ * @param axisOf - The axis, or a function picking it from the page state (the
+ *   scene's AO ladder depends on its AO method)
  */
-export function qualityPresetRow(axis: RenderQualityAxis): React.FC<CustomRowProps> {
+export function qualityPresetRow(
+  axisOf: RenderQualityAxis | ((ctx: PropCtx) => RenderQualityAxis),
+): React.FC<CustomRowProps> {
   const QualityPresetRow: React.FC<CustomRowProps> = ({ ctx, onSetMany, disabled }) => {
+    const axis = typeof axisOf === 'function' ? axisOf(ctx) : axisOf
     // Show it only when every property the axis writes is present.
     if (Object.keys(axis.steps[0].patch).some((k) => !ctx.get(k))) return null
 
@@ -56,6 +62,8 @@ export function qualityPresetRow(axis: RenderQualityAxis): React.FC<CustomRowPro
       </PropertyField>
     )
   }
-  QualityPresetRow.displayName = `QualityPresetRow(${axis.label})`
+  QualityPresetRow.displayName = `QualityPresetRow(${
+    typeof axisOf === 'function' ? 'dynamic' : axisOf.label
+  })`
   return QualityPresetRow
 }

@@ -72,5 +72,6 @@ void main()
     float ao = sum / sumW;
     // Preserve the packed edges in G so further denoise passes (ping-pong) can
     // still read them; the composite only uses R.
-    o_FragColor = vec4(ao, cC.g, 0.0, 1.0);
+    // B = the key-light shadow (bitmask AO), smooth already: passed through.
+    o_FragColor = vec4(ao, cC.g, texture(u_aoTex, v_uv).b, 1.0);
 }

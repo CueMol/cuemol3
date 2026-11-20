@@ -23,6 +23,11 @@ void ShaderObject::setupFog(DisplayContext *pdc)
     data.fogColor[0] = fog_r;
     data.fogColor[1] = fog_g;
     data.fogColor[2] = fog_b;
+    data.lightAmbient = pdc->getLightAmbient();
+    data.lightDiffuse = pdc->getLightDiffuse();
+    data.lightSpecular = pdc->getLightSpecular();
+    data.lightNoClamp = pdc->isLightNoClamp() ? 1.0f : 0.0f;
+    pdc->getLightDir(data.lightDir);
 
     updateFogUBO(&data, sizeof(data));
 }

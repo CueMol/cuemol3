@@ -40,32 +40,84 @@ runtime_class Scene
   property object<AbstractColor$> bgcolor => redirect(getBgColor, setBgColor);
   default bgcolor = gfx::SolidColor::createRGB(0.0, 0.0, 0.0);
 
-  /// Screen-space ambient occlusion (GTAO) enable flag
+  /// Screen-space ambient occlusion enable flag
   property boolean aoEnabled => redirect(isAOEnabled, setAOEnabled);
   default aoEnabled = false;
 
-  /// GTAO occlusion sphere radius (view-space / world units)
+  /// AO occlusion sphere radius / search distance (view-space / world units)
   property real aoRadius => redirect(getAORadius, setAORadius);
-  default aoRadius = 4.0;
+  default aoRadius = 10.0;
 
-  /// GTAO contrast (occlusion = pow(occlusion, aoIntensity))
+  /// GTAO contrast (occlusion = pow(occlusion, aoIntensity)); the bitmask AO
+  /// (aoMethod 1) does not use it
   property real aoIntensity => redirect(getAOIntensity, setAOIntensity);
   default aoIntensity = 2.2;
 
-  /// GTAO number of horizon slices (higher = smoother, slower)
+  /// AO number of slices (higher = smoother, slower). The bitmask AO uses 2
+  /// per temporal-jitter sample once the view is still.
   property integer aoSlices => redirect(getAOSlices, setAOSlices);
-  default aoSlices = 9;
+  default aoSlices = 8;
 
-  /// GTAO number of steps marched per slice (radial samples)
+  /// AO number of steps marched per slice side (radial samples)
   property integer aoSteps => redirect(getAOSteps, setAOSteps);
-  default aoSteps = 3;
+  default aoSteps = 8;
 
-  /// Adaptive half-resolution GTAO: while the camera is moving, compute the AO
+  /// Adaptive half-resolution AO: while the camera is moving, compute the AO
   /// term at half resolution (edge-aware upsampled on composite) for
-  /// responsiveness, then re-render at full resolution once the view is still.
-  /// Off-screen export is always full resolution. Off = always full resolution.
+  /// responsiveness, then re-render at full resolution once the view is still
+  /// (zoomed in, it stays at half resolution). Off-screen export is always
+  /// full resolution. Off = always full resolution.
   property boolean aoHalfRes => redirect(isAOHalfRes, setAOHalfRes);
-  default aoHalfRes = false;
+  default aoHalfRes = true;
+
+  /// AO integration method. gtao = GTAO. fastgi = Fast GI (named after the
+  /// same feature of Blender): the visibility bitmask AO (horizon scan;
+  /// aoRadius = search distance, aoSlices / aoSteps = slices / samples per
+  /// side) with its near-field indirect light (aoBounce), combined with baked
+  /// world-space ambient probes (aoProbeStrength) and an ambient-dominant
+  /// light, since the AO darkens the ambient light only. Always saved: a scene
+  /// file without it predates Fast GI and loads as gtao with the former AO
+  /// defaults (Scene::readFrom2).
+  enumdef aoMethod {
+    gtao = 0;
+    fastgi = 1;
+  }
+  property enum aoMethod => redirect(getAOMethod, setAOMethod);
+  default aoMethod = "fastgi";
+  /// Fast GI: strength of the near-field indirect light (the colour the
+  /// neighbouring surfaces reflect into a cavity). 0 = ambient occlusion only.
+  property real aoBounce => redirect(getAOBounce, setAOBounce);
+  default aoBounce = 0.5;
+  /// Fast GI: strength of the baked ambient probes, the occlusion of the large
+  /// cavities (0 = off, no bake; 1 = full). The AO term is the minimum of the
+  /// screen-space and the probe visibility.
+  property real aoProbeStrength => redirect(getAOProbeStrength, setAOProbeStrength);
+  default aoProbeStrength = 0.8;
+
+  /// Overall brightness of the lighting: scales the ambient, diffuse and
+  /// specular light alike (1 = the standard look), so the shading ratios
+  /// and the AO depth cue stay the same. Applies with and without AO.
+  property real lightBrightness => redirect(getLightBrightness, setLightBrightness);
+  default lightBrightness = 1.0;
+
+  /// Debug view of the AO stage (not saved). off = the normal image,
+  /// ao = the AO term in grayscale, normal = the normal fed to GTAO,
+  /// depth = the linear depth.
+  /// Applies to the live view and image export.
+  enumdef aoDebugView {
+    off = 0;
+    ao = 1;
+    normal = 2;
+    depth = 3;
+  }
+  property enum aoDebugView => redirect(getAODebugView, setAODebugView) (nopersist);
+  default aoDebugView = "off";
+
+  /// Log the CPU time spent submitting each pass of the off-screen frame
+  /// pipeline and the frame interval (median / max) every 30 frames (not
+  /// saved; debugging).
+  property boolean renderTiming => redirect(isRenderTiming, setRenderTiming) (nopersist);
+  default renderTiming = false;
 
   /// Post-process anti-aliasing method, independent of the AO setting (either
   /// one routes the frame through the off-screen pipeline).

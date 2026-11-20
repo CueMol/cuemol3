@@ -15,6 +15,14 @@ layout(std140) uniform FogBlock {
     float _fog_p2;     // offset 12
     vec3 u_fogColor;   // offset 16
     float _fog_p3;     // offset 28
+    // Light intensities (lighting_inc.glsl). Shared with the fog in one block
+    // because every lit primitive already updates it per draw.
+    float u_lightAmbient;   // offset 32
+    float u_lightDiffuse;   // offset 36
+    float u_lightSpecular;  // offset 40
+    float u_lightNoClamp;   // offset 44: 1 = do not clamp (HDR scene target)
+    vec4 u_lightDir;        // offset 48: .xyz = eye-space direction to the light,
+                            // .w = specular exponent
 };
 
 ////////////////////

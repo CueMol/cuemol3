@@ -55,6 +55,13 @@ import { RENDER_QUALITY_CUSTOM } from '@renderer/data/renderSettings'
 import { getRendererPropSections } from '@renderer/features/inspector/rendererPropSections'
 import { PropertiesTab } from '@renderer/features/inspector/PropertiesTab'
 
+/** A Scene section by key (not by position, which moves as sections are added). */
+function sceneSection(key: string) {
+  const section = SCENE_SECTIONS.find((s) => s.key === key)
+  if (!section) throw new Error(`no scene section ${key}`)
+  return section
+}
+
 function entry(over: Partial<GenericPropEntry>): GenericPropEntry {
   return {
     key: '',
@@ -92,11 +99,11 @@ function rowByLabel(container: HTMLElement, label: string): HTMLElement | null {
 function fullEntries(aoOn = true): GenericPropEntry[] {
   return [
     entry({ key: 'aoEnabled', type: 'boolean', value: aoOn }),
-    entry({ key: 'aoRadius', type: 'real', value: 4.0 }),
+    entry({ key: 'aoRadius', type: 'real', value: 10.0 }),
     entry({ key: 'aoIntensity', type: 'real', value: 2.2 }),
-    entry({ key: 'aoSlices', type: 'integer', value: 9 }),
-    entry({ key: 'aoSteps', type: 'integer', value: 3 }),
-    entry({ key: 'aoHalfRes', type: 'boolean', value: false }),
+    entry({ key: 'aoSlices', type: 'integer', value: 8 }),
+    entry({ key: 'aoSteps', type: 'integer', value: 8 }),
+    entry({ key: 'aoHalfRes', type: 'boolean', value: true }),
     // enumdef arrives from C++ getPropsJSON in alphabetical order; the section
     // must impose the natural None/FXAA/SMAA display order itself.
     entry({ key: 'aa_method', type: 'enum', value: 'fxaa', enumdef: ['fxaa', 'none', 'smaa'] }),
@@ -122,6 +129,7 @@ describe('Scene section registry', () => {
     const sections = getRendererPropSections('Scene')
     expect(sections.map((s) => s.title)).toEqual([
       'Ambient occlusion',
+      'Lighting',
       'Anti-aliasing',
       'Background',
       'Color proofing',
@@ -134,7 +142,7 @@ describe('the scene ambient-occlusion page', () => {
   it('renders Enabled + Preset only; the tuning knobs have no rows', () => {
     const { container, unmount } = mountTree(
       <SchemaSection
-        section={SCENE_SECTIONS[0]}
+        section={sceneSection('scene-ao')}
         rendererType="Scene"
         entries={fullEntries()}
         onSet={vi.fn()}
@@ -157,7 +165,7 @@ describe('the scene ambient-occlusion page', () => {
   it('keeps the Enabled toggle active while AO is off', () => {
     const { container, unmount } = mountTree(
       <SchemaSection
-        section={SCENE_SECTIONS[0]}
+        section={sceneSection('scene-ao')}
         rendererType="Scene"
         entries={fullEntries(false)}
         onSet={vi.fn()}
@@ -178,7 +186,7 @@ describe('the scene anti-aliasing page', () => {
   it('renders the Quality dropdown only; method / jitter / threshold have no rows', () => {
     const { container, unmount } = mountTree(
       <SchemaSection
-        section={SCENE_SECTIONS[1]}
+        section={sceneSection('scene-aa')}
         rendererType="Scene"
         entries={fullEntries()}
         onSet={vi.fn()}
@@ -211,36 +219,29 @@ describe('Scene quality presets', () => {
   })
 
   it('the default steps match the C++ defaults (a fresh scene is not Custom)', () => {
-    expect(sceneStepOf(SCENE_AO_PRESET_AXIS, read(fullEntries()))).toBe('low')
+    expect(sceneStepOf(SCENE_AO_PRESET_AXIS, read(fullEntries()))).toBe('medium')
     expect(sceneStepOf(SCENE_AA_QUALITY_AXIS, read(fullEntries()))).toBe('standard')
   })
 
   it('sceneStepOf tolerates float round-trip noise (epsilon compare)', () => {
     const entries = fullEntries().map((e) =>
-      e.key === 'aoIntensity'
-        ? entry({ key: 'aoIntensity', type: 'real', value: 2.2000000001 })
+      e.key === 'aoRadius'
+        ? entry({ key: 'aoRadius', type: 'real', value: 10.0000000001 })
         : e,
     )
-    expect(sceneStepOf(SCENE_AO_PRESET_AXIS, read(entries))).toBe('low')
+    expect(sceneStepOf(SCENE_AO_PRESET_AXIS, read(entries))).toBe('medium')
   })
 
-  // The costlier AO rungs take the adaptive half-resolution path so tumbling
-  // stays responsive; Low stays full-res (and must, to match the C++ default).
-  it('AO presets drive aoHalfRes: off on Low, on from Medium up', () => {
-    const halfResOf = (id: string) =>
-      SCENE_AO_PRESET_AXIS.steps.find((s) => s.id === id)?.patch.aoHalfRes
-    expect(halfResOf('low')).toBe(false)
-    expect(halfResOf('medium')).toBe(true)
-    expect(halfResOf('high')).toBe(true)
+  // Every AO rung keeps the adaptive half-resolution path so tumbling (and a
+  // zoomed-in view) stays responsive.
+  it('every AO preset keeps aoHalfRes on', () => {
+    for (const step of SCENE_AO_PRESET_AXIS.steps) expect(step.patch.aoHalfRes).toBe(true)
   })
 
   it('a scene with Medium values but half-res off reads Custom', () => {
-    const entries = fullEntries().map((e) => {
-      if (e.key === 'aoRadius') return entry({ key: 'aoRadius', type: 'real', value: 8 })
-      if (e.key === 'aoSteps') return entry({ key: 'aoSteps', type: 'integer', value: 4 })
-      if (e.key === 'aoIntensity') return entry({ key: 'aoIntensity', type: 'real', value: 1.9 })
-      return e
-    })
+    const entries = fullEntries().map((e) =>
+      e.key === 'aoHalfRes' ? entry({ key: 'aoHalfRes', type: 'boolean', value: false }) : e,
+    )
     expect(sceneStepOf(SCENE_AO_PRESET_AXIS, read(entries))).toBe(RENDER_QUALITY_CUSTOM)
     const withHalfRes = entries.map((e) =>
       e.key === 'aoHalfRes' ? entry({ key: 'aoHalfRes', type: 'boolean', value: true }) : e,
@@ -252,15 +253,15 @@ describe('Scene quality presets', () => {
     const entries = fullEntries().map((e) =>
       e.key === 'aoSlices' ? entry({ key: 'aoSlices', type: 'integer', value: 12 }) : e,
     )
-    expect(sceneStepOf(SCENE_AO_PRESET_AXIS, read(entries))).toBe('low')
+    expect(sceneStepOf(SCENE_AO_PRESET_AXIS, read(entries))).toBe('medium')
   })
 
-  it('AO Preset reads "low" on defaults and applies a step as one multi-write', () => {
+  it('AO Preset reads "medium" on defaults and applies a step as one multi-write', () => {
     const onSet = vi.fn()
     const onSetMany = vi.fn()
     const { container, unmount } = mountTree(
       <SchemaSection
-        section={SCENE_SECTIONS[0]}
+        section={sceneSection('scene-ao')}
         rendererType="Scene"
         entries={fullEntries()}
         onSet={onSet}
@@ -271,18 +272,17 @@ describe('Scene quality presets', () => {
     )
     expandSection(container)
     const sel = rowByLabel(container, 'Preset')!.querySelector('select') as HTMLSelectElement
-    expect(sel.value).toBe('low')
+    expect(sel.value).toBe('medium')
     // Custom is only offered while it is the truth -- not on a step.
     expect(Array.from(sel.options).map((o) => o.value)).toEqual(['low', 'medium', 'high'])
     act(() => {
-      sel.value = 'medium'
+      sel.value = 'high'
       sel.dispatchEvent(new Event('change', { bubbles: true }))
     })
     expect(onSetMany).toHaveBeenCalledTimes(1)
     expect(onSetMany).toHaveBeenCalledWith([
-      { key: 'aoRadius', valueType: 'real', value: 8 },
-      { key: 'aoSteps', valueType: 'integer', value: 4 },
-      { key: 'aoIntensity', valueType: 'real', value: 1.9 },
+      { key: 'aoRadius', valueType: 'real', value: 14 },
+      { key: 'aoSteps', valueType: 'integer', value: 12 },
       { key: 'aoHalfRes', valueType: 'boolean', value: true },
     ])
     expect(onSet).not.toHaveBeenCalled()
@@ -296,7 +296,7 @@ describe('Scene quality presets', () => {
     const onSetMany = vi.fn()
     const { container, unmount } = mountTree(
       <SchemaSection
-        section={SCENE_SECTIONS[0]}
+        section={sceneSection('scene-ao')}
         rendererType="Scene"
         entries={entries}
         onSet={vi.fn()}
@@ -323,7 +323,7 @@ describe('Scene quality presets', () => {
   it('disables the AO Preset while AO is off; the AA Quality stays enabled', () => {
     const ao = mountTree(
       <SchemaSection
-        section={SCENE_SECTIONS[0]}
+        section={sceneSection('scene-ao')}
         rendererType="Scene"
         entries={fullEntries(false)}
         onSet={vi.fn()}
@@ -339,7 +339,7 @@ describe('Scene quality presets', () => {
 
     const aa = mountTree(
       <SchemaSection
-        section={SCENE_SECTIONS[1]}
+        section={sceneSection('scene-aa')}
         rendererType="Scene"
         entries={fullEntries(false)}
         onSet={vi.fn()}
@@ -360,7 +360,7 @@ describe('Scene quality presets', () => {
     const onSetMany = vi.fn()
     const { container, unmount } = mountTree(
       <SchemaSection
-        section={SCENE_SECTIONS[1]}
+        section={sceneSection('scene-aa')}
         rendererType="Scene"
         entries={fullEntries()}
         onSet={onSet}
@@ -393,7 +393,7 @@ describe('Scene quality presets', () => {
     )
     const { container, unmount } = mountTree(
       <SchemaSection
-        section={SCENE_SECTIONS[1]}
+        section={sceneSection('scene-aa')}
         rendererType="Scene"
         entries={entries}
         onSet={vi.fn()}
@@ -414,7 +414,7 @@ describe('the scene background page', () => {
   it('renders the background Color row', () => {
     const { container, unmount } = mountTree(
       <SchemaSection
-        section={SCENE_SECTIONS[2]}
+        section={sceneSection('scene-bg')}
         rendererType="Scene"
         entries={fullEntries()}
         onSet={vi.fn()}
@@ -434,7 +434,7 @@ describe('the scene colour-proofing page', () => {
     const onSetMany = vi.fn()
     const { container, unmount } = mountTree(
       <SchemaSection
-        section={SCENE_SECTIONS[3]}
+        section={sceneSection('scene-proof')}
         rendererType="Scene"
         entries={fullEntries()}
         onSet={onSet}
@@ -462,7 +462,7 @@ describe('the scene colour-proofing page', () => {
     )
     const { container, unmount } = mountTree(
       <SchemaSection
-        section={SCENE_SECTIONS[3]}
+        section={sceneSection('scene-proof')}
         rendererType="Scene"
         entries={withProfile}
         onSet={onSet}

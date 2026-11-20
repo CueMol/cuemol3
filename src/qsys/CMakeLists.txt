@@ -51,6 +51,7 @@ MultiGradient.cpp
 TTYView.cpp
 GUIView.cpp
 FrameRenderPipeline.cpp
+AmbientProbeVolume.cpp
 OffScreenView.cpp
 GUIDisplayContext.cpp
 QdfAbsWriter.cpp

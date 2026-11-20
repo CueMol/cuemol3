@@ -80,6 +80,12 @@ private:
     bool m_bFogEnabled;
     float m_fFogStart;
     float m_fFogEnd;
+    float m_fLightAmbient = 0.4f;
+    float m_fLightDiffuse = 0.8f;
+    float m_fLightSpecular = 0.16f;
+    bool m_bLightNoClamp = false;
+    float m_lightDir[3] = {1.0f, 1.0f, 1.5f};
+    float m_fLightShininess = 32.0f;
     ColorPtr m_fogColor;
 
     /// Screen-space ambient occlusion (GTAO)
@@ -259,6 +265,39 @@ public:
     {
         return m_fogColor;
     }
+
+    // Light intensities passed to the lit shaders (FogBlock UBO). ambient =
+    // ambient total, specular = specular x material. Defaults reproduce the
+    // former constants of lighting_inc.glsl. lightNoClamp: the lit colour is
+    // not clamped to [0,1] (HDR scene target; the composite clamps).
+    void setLightIntensities(float ambient, float diffuse, float specular)
+    {
+        m_fLightAmbient = ambient;
+        m_fLightDiffuse = diffuse;
+        m_fLightSpecular = specular;
+    }
+    float getLightAmbient() const { return m_fLightAmbient; }
+    float getLightDiffuse() const { return m_fLightDiffuse; }
+    float getLightSpecular() const { return m_fLightSpecular; }
+    void setLightNoClamp(bool b) { m_bLightNoClamp = b; }
+    /// Eye-space direction to the (single, directional) light, not normalized;
+    /// getLightDir returns the specular exponent in d[3] (FogBlock layout).
+    void setLightDir(float x, float y, float z)
+    {
+        m_lightDir[0] = x;
+        m_lightDir[1] = y;
+        m_lightDir[2] = z;
+    }
+    void getLightDir(float d[4]) const
+    {
+        d[0] = m_lightDir[0];
+        d[1] = m_lightDir[1];
+        d[2] = m_lightDir[2];
+        d[3] = m_fLightShininess;
+    }
+    /// Specular (Blinn-Phong) exponent of the lit shaders.
+    void setLightShininess(float s) { m_fLightShininess = s; }
+    bool isLightNoClamp() const { return m_bLightNoClamp; }
 
     // Screen-space ambient occlusion (GTAO)
     virtual void enableAO(bool b);

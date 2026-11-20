@@ -84,11 +84,12 @@ public:
     /// Keep redrawing on idle while temporal-jitter accumulation is unfinished
     /// and the view has been still long enough (isJitterStill), while a
     /// full-resolution AO follow-up is owed after a half-res (camera-moving)
-    /// frame (adaptive aoHalfRes), or while a present-only frame is owed
-    /// because the hover highlight changed.
+    /// frame (adaptive aoHalfRes), while an ambient probe bake waits for the
+    /// geometry to settle, or while a present-only frame is owed because the
+    /// hover highlight changed.
     bool needsContinuousRedraw() const override
     {
-        if (m_aoHalfPending || m_bPresentDirty) return true;
+        if (m_aoHalfPending || m_bPresentDirty || m_probeBakePending) return true;
         if (!m_jitterMoreSamples) return false;
         const double ms = std::chrono::duration<double, std::milli>(
                               std::chrono::steady_clock::now() - m_tJitterChange)
@@ -353,6 +354,9 @@ private:
     /// this frame (camera moving). It keeps the idle loop alive for one more
     /// frame so the still image is re-rendered at full resolution.
     bool m_aoHalfPending = false;
+    /// The pipeline deferred an ambient probe bake (geometry still changing):
+    /// keep redrawing until it runs.
+    bool m_probeBakePending = false;
 
     /// Lazily create the off-screen pipeline (needs a valid display context) and
     /// (re)size its render targets to the given backing-pixel size. When halfRes
