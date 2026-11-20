@@ -169,6 +169,22 @@ vec3 envReflection(vec3 normal, vec3 albedo)
     return metal * albedo * sky * u_lightAmbient;
 }
 
+// Fresnel rim of a glazed surface (u_matExtra.z = strength, Schlick's
+// (1 - N.V)^5 rise toward the silhouette): the glaze mirrors the
+// environment at grazing angles, white as for any dielectric. Uses the same
+// sky gradient as the metals, sharp (a glaze is smooth), scaled by the
+// ambient light.
+vec3 fresnelRim(vec3 normal)
+{
+    float k = u_matExtra.z;
+    if (k <= 0.0) return vec3(0.0);
+    float c = clamp(normal.z, 0.0, 1.0);
+    float schlick = pow(1.0 - c, 5.0);
+    vec3 r = reflect(vec3(0.0, 0.0, -1.0), normal);
+    vec3 sky = mix(ENV_GROUND, ENV_SKY, smoothstep(-0.5, 0.5, r.y));
+    return k * schlick * sky * u_lightAmbient;
+}
+
 vec4 flight2(in vec3 normal, in vec4 ecPosition, in vec4 in_color)
 {
     vec4 color;
@@ -186,7 +202,8 @@ vec4 flight2(in vec3 normal, in vec4 ecPosition, in vec4 in_color)
     vec3 amb = Ambient.rgb * in_color.rgb * (1.0 - metal);
     vec3 specColor = mix(vec3(1.0), in_color.rgb, 0.5 * metal);
     vec3 rgb = amb + Diffuse.rgb * in_color.rgb * (1.0 - metal) +
-               Specular.rgb * specColor + envReflection(normal, in_color.rgb);
+               Specular.rgb * specColor + envReflection(normal, in_color.rgb) +
+               fresnelRim(normal);
     const vec3 LUM = vec3(0.2126, 0.7152, 0.0722);
     g_ambientFraction = clamp(dot(amb, LUM) / max(dot(rgb, LUM), 1e-4), 0.0, 1.0);
     color = vec4(rgb, in_color.a);

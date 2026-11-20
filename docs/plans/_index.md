@@ -19,7 +19,7 @@
 
 | ファイル | 内容 | 状態 |
 |---|---|---|
-| [261120-renderer-material-plan.md](261120-renderer-material-plan.md) | renderer の material の残り: 陶器 (Fresnel の照り) | **未実装** (`feat/material-metal-toon` で着手中)。material を光に掛ける仕組み・金属度・環境の映り込み・toon は実装済み (`../architecture/renderer-material.md`) |
+| [261120-renderer-material-plan.md](261120-renderer-material-plan.md) | renderer の material の残り: material の検索のキャッシュ、色ごとの material | **未着手 / 必要になったら**。material を光に掛ける仕組み・金属度・環境の映り込み・toon・陶器は実装済み (`../architecture/renderer-material.md`) |
 | [260908-tritium-plugin-system-plan.md](260908-tritium-plugin-system-plan.md) | tritium の plugin システム (JS/TS + C++ 両レーン)。VSCode 拡張機構の調査、C++ 登録機構の seam、packaging と配置、Phase 0/A/A'/B/C | **Phase 0 のみ実装済み** (react 側の in-tree plugin host。`../architecture/tritium_plugin/`)。実行時ロード (Phase A)、C++ レーン (Phase A')、schema 駆動 UI / sideload (Phase B)、重い native の分離 (Phase C) は未実装 |
 | [umbreon-process-isolation-plan.md](umbreon-process-isolation-plan.md) | umbreon GI(OIDN) の大確保が Chromium PartitionAlloc で crash する件と、恒久対策としての process 分離 (mmap zero-copy) | **未実装 / 当面着手しない**。§2 の原因究明は確定した調査結果。着手条件は crash が実害になったとき |
 | [260925-molcoord-atom-vector-plan.md](260925-molcoord-atom-vector-plan.md) | `MolCoord` の原子プール (`std::map<int, MolAtomPtr>` + 検索用の索引 vector) を、所有も持つ vector に置き換える案。互換 `AtomIter`、見込み (メモリ 5-6% 減) と着手時の確認事項 | **未実装 / 今後の課題**。GRO 読み込み高速化 (`perf/gro-load`) では索引の併設までで止めた |

@@ -340,6 +340,12 @@
   <material id="plastic">
     <def ambient="0.2" diffuse="0.8" specular="0.7" shininess="76.8"/>
   </material>
+  <!-- ceramic: glazed ceramic, a sharper highlight than plastic and a
+       Fresnel rim (the glaze mirroring the surroundings toward the
+       silhouette). -->
+  <material id="ceramic">
+    <def ambient="0.2" diffuse="0.8" specular="1.0" shininess="160.0" fresnel="3.0"/>
+  </material>
   <!-- matte_plastic: a weak broad white highlight on a diffuse-dominant
        colour (diff_metal has a weaker diffuse under a stronger one). -->
   <material id="matte_plastic">
@@ -410,6 +416,22 @@ texture {
    ambient 0.2
    diffuse 0.8  brilliance 1.0
    specular 0.4  roughness 0.01
+  }
+  pigment { color rgbt @COLOR@ }
+}
+]]>
+    </def>
+  </material>
+
+  <material id="ceramic">
+    <def type="pov">
+<![CDATA[
+texture {
+  finish {
+   ambient 0.2
+   diffuse 0.8  brilliance 1.0
+   specular 0.6  roughness 0.005
+   reflection { 0.02, 0.3 falloff 5 }
   }
   pigment { color rgbt @COLOR@ }
 }

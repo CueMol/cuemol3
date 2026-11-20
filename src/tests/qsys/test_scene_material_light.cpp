@@ -64,6 +64,8 @@ TEST(SceneMaterialLight, MaterialSetsTheLight)
     EXPECT_EQ(metal.fresnel, 0.0f);
     // A material without the attributes is not metallic.
     EXPECT_EQ(pScene->getMaterialLight("").metallic, 0.0f);
+    // ceramic: the Fresnel rim strength 3 from its <def> attribute.
+    EXPECT_NEAR(pScene->getMaterialLight("ceramic").fresnel, 3.0, 1e-5);
 
     // toon1 (POV-Ray: ambient 0, diffuse 0.8): with AO it keeps its flat
     // tones under the light any material gets, not its POV-Ray finish.

@@ -844,7 +844,7 @@ Scene::MaterialLight Scene::getMaterialLight(const LString &mat_id) const
   ml.metallic = float(std::clamp(metal, 0.0, 1.0));
   ml.toon = bToon ? 1.0f : 0.0f;
   ml.toonPov = bToonPov ? 1.0f : 0.0f;
-  ml.fresnel = float(std::clamp(fresnel, 0.0, 1.0));
+  ml.fresnel = float(std::max(fresnel, 0.0));
   return ml;
 }
 
