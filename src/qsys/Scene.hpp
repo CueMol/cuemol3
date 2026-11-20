@@ -305,8 +305,9 @@ namespace qsys {
 
     /// The light a renderer of material mat_id is lit with: the material's
     /// values (data/default_style.xml, as CueMol2's OpenGL view read them),
-    /// scaled for the AO method and by lightBrightness. An empty or unknown
-    /// name is lit as before materials took effect.
+    /// scaled for the AO method and by lightBrightness. An empty name takes
+    /// the material "default"; an unknown name is lit as before materials
+    /// took effect.
     MaterialLight getMaterialLight(const LString &mat_id) const;
 
     /// Overall light scale (lightBrightness): multiplies the ambient, diffuse

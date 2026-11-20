@@ -1,8 +1,8 @@
 // -*-Mode: C++;-*-
 //
 // Scene::getMaterialLight: a renderer's material (data/default_style.xml)
-// sets the light it is lit with, read as CueMol2's OpenGL view read it, and a
-// renderer without one keeps the former light.
+// sets the light it is lit with, read as CueMol2's OpenGL view read it; a
+// renderer without one takes the material "default".
 //
 
 #include <gtest/gtest.h>
@@ -35,8 +35,12 @@ TEST(SceneMaterialLight, MaterialSetsTheLight)
     sfile.loadFile(LString(CUEMOL2_DATA_DIR) + "/default_style.xml", pScene->getUID());
     pScene->setAOEnabled(false);
 
-    // No material, or a name no style defines: the former light.
+    // No material is the material "default", and a name no style defines
+    // gets the same values: the former light.
     expectLight(pScene->getMaterialLight(""), Scene::kLegacyLightAmbient,
+                Scene::kLegacyLightDiffuse, Scene::kLegacyLightSpecular,
+                Scene::kLegacyLightShininess);
+    expectLight(pScene->getMaterialLight("default"), Scene::kLegacyLightAmbient,
                 Scene::kLegacyLightDiffuse, Scene::kLegacyLightSpecular,
                 Scene::kLegacyLightShininess);
     expectLight(pScene->getMaterialLight("no_such_material"), Scene::kLegacyLightAmbient,

@@ -784,20 +784,23 @@ Scene::MaterialLight Scene::getMaterialLight(const LString &mat_id) const
   // values to its light: ambient on top of a global ambient of 0.2, a
   // material specular of 0.4, and built-in values 0.2 / 0.8 / 0.4 / 32 for a
   // name it did not find. The built-in values give the former light,
-  // kLegacyLight* (0.4 / 0.8 / 0.16 / 32).
+  // kLegacyLight* (0.4 / 0.8 / 0.16 / 32). A renderer without a material
+  // takes the one named "default" (unlike CueMol2, which gave it the built-in
+  // values), so the two always look the same.
   double ka = 0.2, kd = 0.8, ks = 0.4, shin = 32.0;
-  if (!mat_id.isEmpty()) {
+  {
     // Look the name up in this scene's styles (display() has already pushed
     // the context; pushing it again is harmless).
     AutoStyleCtxt style_ctxt(getUID());
     StyleMgr *pSM = StyleMgr::getInstance();
-    double v = pSM->getMaterial(mat_id, gfx::Material::MAT_AMBIENT);
+    const LString name = mat_id.isEmpty() ? LString("default") : mat_id;
+    double v = pSM->getMaterial(name, gfx::Material::MAT_AMBIENT);
     if (v >= -0.1) ka = v;
-    v = pSM->getMaterial(mat_id, gfx::Material::MAT_DIFFUSE);
+    v = pSM->getMaterial(name, gfx::Material::MAT_DIFFUSE);
     if (v >= -0.1) kd = v;
-    v = pSM->getMaterial(mat_id, gfx::Material::MAT_SPECULAR);
+    v = pSM->getMaterial(name, gfx::Material::MAT_SPECULAR);
     if (v >= -0.1) ks = v;
-    v = pSM->getMaterial(mat_id, gfx::Material::MAT_SHININESS);
+    v = pSM->getMaterial(name, gfx::Material::MAT_SHININESS);
     if (v >= -0.1) shin = v;
   }
   double amb = 0.2 + ka, diff = kd, spec = 0.4 * ks;
