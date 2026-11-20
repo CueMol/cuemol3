@@ -610,8 +610,7 @@ void GUIView::drawScene()
             // Zoomed in, the AO varies slowly against the pixel grid (an atom
             // spans tens of pixels), so it stays at half resolution while still
             // too: a quarter of the cost when atoms fill the view, with no
-            // visible loss (the composite upsamples it depth-aware). EEVEE
-            // computes its AO at half resolution throughout.
+            // visible loss (the composite upsamples it depth-aware).
             const bool aoMoving = aoOn && pScene->isAOHalfRes() && getUpdateFlag();
             const bool aoZoomedIn =
                 aoOn && pScene->isAOHalfRes() &&

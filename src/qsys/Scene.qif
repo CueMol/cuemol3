@@ -70,8 +70,8 @@ runtime_class Scene
   property boolean aoHalfRes => redirect(isAOHalfRes, setAOHalfRes);
   default aoHalfRes = true;
 
-  /// AO integration method. gtao = GTAO. fastgi = Fast GI, after Blender
-  /// EEVEE's Fast GI Approximation: the visibility bitmask AO (horizon scan;
+  /// AO integration method. gtao = GTAO. fastgi = Fast GI (named after the
+  /// same feature of Blender): the visibility bitmask AO (horizon scan;
   /// aoRadius = search distance, aoSlices / aoSteps = slices / samples per
   /// side) with its near-field indirect light (aoBounce), combined with baked
   /// world-space ambient probes (aoProbeStrength) and an ambient-dominant

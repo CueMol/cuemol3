@@ -21,7 +21,8 @@ uniform float u_fogScale;        // 1/(fogEnd - fogStart)
 uniform vec3 u_fogColor;         // fog colour (= background)
 uniform int u_isOrtho;           // 1 = orthographic projection, 0 = perspective
 uniform int u_debugView;         // 0 = color * AO, 1 = AO in gray, 2 = AO buffer RGB
-// 1 = apply the AO to the ambient light only (Blender EEVEE): the scene normal
+// 1 = apply the AO to the ambient light only (direct light is not occluded,
+// as in Blender's Fast GI): the scene normal
 // target's length is 2 - f, f = the ambient fraction of the lit colour, and the
 // colour becomes c * (1 - f * (1 - ao)). The scene colour may exceed 1 (HDR target);
 // the output is clamped here.
@@ -30,7 +31,7 @@ uniform sampler2D u_sceneNormalTex;
 // Bitmask: gathered near-field indirect irradiance (RGB, AO resolution) and
 // bounceStrength / lightAmbient (the albedo is the ambient part / ambient).
 // Specular occlusion (1 = on): the highlight of the lit colour is darkened by
-// the AO too, with the Frostbite / legacy-EEVEE approximation. u_lightAmbient /
+// the AO too, with the approximation of Lagarde & de Rousiers (Frostbite). u_lightAmbient /
 // u_lightDiffuse split the non-ambient part into diffuse and specular.
 uniform int u_specOcclusion;
 uniform float u_lightAmbient;
@@ -154,8 +155,8 @@ void main()
                 vec3 albedoAmb = litPart * f;  // albedo * ambient (fog-attenuated)
                 vec3 diff = albedoAmb * (u_lightDiffuse / max(u_lightAmbient, 1e-3)) * nDotL;
                 vec3 spec = max(litPart * (1.0 - f) - diff, vec3(0.0));
-                // Lagarde & de Rousiers 2014 (Moving Frostbite to PBR), also the
-                // legacy EEVEE specular_occlusion: so = saturate(pow(NV + ao,
+                // Lagarde & de Rousiers 2014 (Moving Frostbite to PBR):
+                // so = saturate(pow(NV + ao,
                 // exp2(-16 r - 1)) - 1 + ao), r = the Blinn-Phong exponent 16
                 // (Scene::kFastGILightShininess) as GGX alpha sqrt(2 / (16 + 2)).
                 // The view vector is taken as the eye axis.

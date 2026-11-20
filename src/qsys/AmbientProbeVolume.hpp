@@ -2,8 +2,8 @@
 //
 // AmbientProbeVolume: baked world-space ambient visibility probes.
 //
-// The counterpart of Blender EEVEE's volume light probes for an environment of
-// uniform ambient light: a 3D grid of probes, each storing the visibility of
+// Precomputed occlusion of a uniform ambient light (the role a volume light
+// probe plays in a game engine or in Blender): a 3D grid of probes, each storing the visibility of
 // the surrounding sphere of directions as an L1 spherical-harmonic-like moment
 // pair: m0 = mean visibility, m1 = mean(visibility * direction). It is baked on
 // the GPU from depth views of the scene's own renderers (so everything drawn

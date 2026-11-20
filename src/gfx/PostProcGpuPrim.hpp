@@ -78,8 +78,8 @@ struct AoConstants
     /// 2 = the AO buffer's RGB as is (the GTAO pass's normal / depth debug
     /// output). Only used when an AO buffer is supplied.
     int debugView = 0;
-    /// AO integration: 0 = GTAO, 1 = Fast GI (visibility bitmask, EEVEE Next
-    /// port; qsys::Scene::AOM_FASTGI).
+    /// AO integration: 0 = GTAO, 1 = Fast GI (visibility bitmask AO with baked
+    /// probes; qsys::Scene::AOM_FASTGI).
     int aoMethod = 0;
     /// (1/width, 1/height) of the full-resolution output. The bitmask AO sizes
     /// its minimum occluder thickness by the output pixel, not the AO pass

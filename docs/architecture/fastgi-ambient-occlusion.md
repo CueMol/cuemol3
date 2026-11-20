@@ -61,7 +61,7 @@ Fast GI のときの光の強さ (`Scene::kFastGILight*`、`lightBrightness` 倍
 
 ## 4. 画面の AO (visibility bitmask)
 
-`gtao_frag.glsl` の `eeveeVisibility` が Blender の `fast_gi::eval` (`eevee_fast_gi.bsl.hh`、Therrien ら) の AO 部分の移植。ビット演算 (`popcount32`、`anglesToBitmask`、`bitmaskToVisibilityCosine`) は uniform を読まない関数として `fastgi_bitmask_inc.glsl` に分けてある。
+`gtao_frag.glsl` の `fastGIVisibility` が Blender の `fast_gi::eval` (`eevee_fast_gi.bsl.hh`、Therrien ら) の AO 部分の移植。ビット演算 (`popcount32`、`anglesToBitmask`、`bitmaskToVisibilityCosine`) は uniform を読まない関数として `fastgi_bitmask_inc.glsl` に分けてある。
 
 - 遮蔽物の厚みは 3 Å の一定値 (`kFastGIThicknessNear`)。表現 (CPK / リボン) で厚みを変える案は、形の判断を表現に頼らないため採らなかった。
 - 値は線形 (`saturate`) のまま使う。`aoIntensity` (指数) は GTAO だけ。

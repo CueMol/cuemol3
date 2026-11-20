@@ -28,9 +28,8 @@ namespace {
 constexpr double kProbeSettleSec = 0.2;
 
 /// Fast GI tuning, fixed (measured on 2BBV against ChimeraX soft lighting):
-/// the occluder thickness the bitmask AO assumes behind each pixel (A; EEVEE
-/// fast_gi_thickness_near; 3 A suits ribbons and CPK alike once the probes
-/// carry the large cavities), and the probe bake: grid spacing (A), number of
+/// the occluder thickness the bitmask AO assumes behind each pixel (A; 3 A
+/// suits ribbons and CPK alike once the probes carry the large cavities), and the probe bake: grid spacing (A), number of
 /// directions and depth tile size (32 / 128 bakes 2BBV in ~14 ms and looks the
 /// same as 64 / 256).
 constexpr float kFastGIThicknessNear = 3.0f;
@@ -467,8 +466,8 @@ bool FrameRenderPipeline::render(gfx::DisplayContext *pdc, const ScenePtr &pScen
         aoc.stepsPerSlice = pScene->getAOSteps();
         aoc.aoMethod = pScene->getAOMethod();
         // Bitmask, still view: each temporal-jitter sample computes only 2
-        // slices (EEVEE's default fast_gi_ray_count) with the noise rotated
-        // per sample, and the accumulation averages them; 8 samples of 2
+        // slices with the noise rotated per sample, and the accumulation
+        // averages them; 8 samples of 2
         // slices look the same as 8 slices. A full-resolution frame of 8
         // slices costs ~45 ms when atoms fill a zoomed-in view.
         if (aoc.aoMethod == Scene::AOM_FASTGI && params.jitterActive && aoc.sliceCount > 2)
@@ -513,7 +512,7 @@ bool FrameRenderPipeline::render(gfx::DisplayContext *pdc, const ScenePtr &pScen
         aocAO.maxScreenspaceRadius =
             256.0f * (aoc.viewportPixelSize[0] / aoc.aoTexelSize[0]);
 
-        // Bitmask AO: baked world-space ambient probes (EEVEE volume probes).
+        // Bitmask AO: baked world-space ambient probes (AmbientProbeVolume).
         // Updated before the AO target is bound: a (re)bake binds its own
         // targets and unbinding them returns to the default framebuffer.
         gfx::AoProbeParams probe;

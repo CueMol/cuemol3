@@ -8,8 +8,8 @@
 #include "fog_inc.glsl"
 
 // Fraction of the lit colour that comes from the ambient light (luminance), so
-// the composite can apply the AO to the ambient light only, as Blender EEVEE
-// does (direct light is not occluded). It is stored in the MRT normal's length
+// the composite can apply the AO to the ambient light only (direct light is
+// not occluded). It is stored in the MRT normal's length
 // (encodeNormalAmbient), not in .w: the scene pass blends, and blending would
 // mix a .w < 1 normal with the background. Length 1 = fraction 1 (the plain
 // unit normals other shaders write keep the AO on the whole colour).

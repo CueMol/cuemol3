@@ -26,11 +26,11 @@ uniform int u_debugMode;                // 0 = AO, 1 = normal, 2 = linear depth
 uniform float u_aoNoiseOffset;          // per-sample noise rotation (temporal SS)
 uniform float u_maxScreenspaceRadius;   // horizon search radius cap (pass pixels)
 uniform int u_isOrtho;                  // 1 = orthographic projection, 0 = perspective
-uniform int u_method;                   // 0 = GTAO, 1 = visibility bitmask (EEVEE Next)
+uniform int u_method;                   // 0 = GTAO, 1 = Fast GI (visibility bitmask)
 uniform float u_thicknessNear;          // bitmask: constant minimum thickness (view units)
 uniform vec2 u_fullPixelSize;          // (1/width, 1/height) of the full-res output
 // Bitmask: baked world-space ambient probes (qsys::AmbientProbeVolume), the
-// counterpart of EEVEE's volume light probes. RGBA = (m0, m1.xyz): mean
+// occlusion of the large cavities. RGBA = (m0, m1.xyz): mean
 // visibility and mean visibility-weighted direction over the sphere.
 // The probe grid is a 2D atlas, z slices side by side (x + z * nx, y).
 uniform int u_hasProbe;                 // 1 = probes bound
@@ -45,7 +45,8 @@ uniform vec3 u_lightDirEye;             // eye-space direction to the key light
 uniform float u_keyShadow;              // key-light shadow strength (0 = off)
 uniform float u_keyShadowPower;         // contrast of the key-light shadow
 
-// Bitmask: near-field indirect diffuse light (EEVEE horizon scan radiance).
+// Bitmask: near-field indirect diffuse light (the colour that neighbouring
+// surfaces reflect into a cavity).
 // The lit scene colour (fog included) is the radiance of the occluders.
 uniform int u_bounce;                   // 1 = gather into o_Bounce
 uniform sampler2D u_sceneColorTex;
@@ -171,14 +172,17 @@ vec3 selectNormal(vec2 uv, vec3 pC, out bool isExcluded)
     return reconstructNormal(uv, pC);
 }
 
-// ---- Visibility bitmask AO (port of Blender EEVEE Next fast_gi::eval, AO only) ----
-// source/blender/draw/engines/eevee/shaders/eevee_fast_gi.bsl.hh (Therrien et al.,
-// "Screen Space Indirect Lighting with Visibility Bitmask"), with the screen
-// thickness estimator of eevee_ray_types_lib.bsl.hh. Works in GL view space
-// (camera looks down -Z), like Blender. Differences: no HiZ (the full depth
-// texture is read at LOD 0; emulating EEVEE's max-depth HiZ changed the
-// result by about 0.01) and no temporal accumulation unless jittered (a high
-// slice count stands in for EEVEE's 2 slices x accumulated samples).
+// ---- Fast GI: visibility bitmask AO (Therrien et al., "Screen Space Indirect
+// Lighting with Visibility Bitmask") ----
+// Ported from Blender's real-time renderer (named EEVEE in Blender's sources):
+// fast_gi::eval in source/blender/draw/engines/eevee/shaders/eevee_fast_gi.bsl.hh,
+// AO part only, with the screen thickness estimator of
+// eevee_ray_types_lib.bsl.hh. The rest of this file refers to it as "Blender".
+// Works in GL view space (camera looks down -Z), like Blender. Differences: no
+// HiZ (the full depth texture is read at LOD 0; emulating Blender's max-depth
+// HiZ changed the result by about 0.01) and no temporal accumulation unless
+// jittered (a high slice count stands in for Blender's 2 slices x accumulated
+// samples).
 
 // Bit operations of the visibility bitmask (popcount32, anglesToBitmask,
 // bitmaskToVisibilityCosine). Uses the file constant PI, so it is included
@@ -274,8 +278,8 @@ vec4 sampleProbeAtlasCubic(vec3 pw)
 
 // Distant visibility from the probe moments m = (m0, m1.xyz) at world normal
 // nw, cosine-weighted (m0 + 2 dot(m1, N); 1 unoccluded, 1 on an open flat
-// surface) and mixed by the strength. EEVEE's facing / validity weighting of
-// the 8 probes was tried and left out, since with probes 3 A apart (coarser
+// surface) and mixed by the strength. Weighting the 8 probes by facing and
+// validity (as Blender does) was tried and left out, since with probes 3 A apart (coarser
 // than an atom) it lets the dark probes in the gaps in front of a sunk atom
 // dominate and paints dark smudges on CPK spheres.
 float probeMomentVisibility(vec4 m, vec3 nw)
@@ -295,7 +299,7 @@ float probeVisibility(vec3 pw, vec3 nw)
 
 // Radiance of the occluding surface at uv: the lit scene colour with the
 // scene's linear fog taken out (c = mix(fog, lit, fogVis)). The scene colour
-// is not occluded yet; EEVEE reads the previous frame's final radiance, in
+// is not occluded yet; Blender reads the previous frame's final radiance, in
 // which an occluder deep in a cavity is itself dark. Approximate that with the
 // baked probes: darken the occluder's ambient part (fraction f, stored in the
 // scene normal's length as 2 - f) by its distant visibility. pG / nG: the
@@ -315,18 +319,18 @@ vec3 occluderRadiance(vec2 uv, float viewZ, vec4 sn, vec3 pG, vec3 nG)
     return lit;
 }
 
-// Visibility bitmask AO (Blender EEVEE Next fast_gi::eval). Returns the
+// Fast GI visibility bitmask AO (see the port note above). Returns the
 // cosine-weighted visibility; with u_bounce, also the near-field indirect
 // irradiance in `bounce`: every sample that newly occludes sectors of the
 // slice adds the radiance of the surface it hit, weighted by the cosine
 // weight of those sectors and by how much that surface faces the receiver
-// (EEVEE weights its radiance samples the same way). For occluders of uniform
+// (Blender weights its radiance samples the same way). For occluders of uniform
 // radiance L this is L * (1 - visibility), i.e. the light the ambient term
 // loses, given back in the occluders' colour.
-float eeveeVisibility(vec3 vP, vec3 vN, float searchDistance, int sliceCount, int sampleCount,
-                      vec4 noise, out vec3 bounce)
+float fastGIVisibility(vec3 vP, vec3 vN, float searchDistance, int sliceCount, int sampleCount,
+                       vec4 noise, out vec3 bounce)
 {
-    const float angleBias = 1.0 / (1.0 - 0.05);  // fast_gi_bias default
+    const float angleBias = 1.0 / (1.0 - 0.05);  // Blender's default bias (fast_gi_bias)
     vec3 vV = (u_isOrtho != 0) ? vec3(0.0, 0.0, 1.0) : normalize(-vP);
     // Average pixel radius at unit Z (perspective) / absolute (ortho), scaled
     // by the minimum pixel thickness "eyeballed for 64 samples". Taken from the
@@ -644,16 +648,16 @@ void main()
         vec3 vN = normalize(vec3(N.xy, -N.z));
         vec3 bounce;
         float keyVis = 1.0;
-        float vis = eeveeVisibility(vP, vN, u_effectRadius, clamp(u_sliceCount, 1, 32),
-                                    clamp(u_stepCount, 1, 32), noise, bounce);
+        float vis = fastGIVisibility(vP, vN, u_effectRadius, clamp(u_sliceCount, 1, 32),
+                                     clamp(u_stepCount, 1, 32), noise, bounce);
         o_Bounce = vec4(bounce, 1.0);
-        // Linear visibility, as EEVEE stores it (saturate(result), no power).
+        // Linear visibility, as Blender stores it (saturate(result), no power).
         vis = clamp(vis, 0.0, 1.0);
         if (u_hasProbe != 0) {
             // Distant visibility from the probes (tricubic B-spline lookup,
             // smooth when zoomed in; see probeMomentVisibility). Both terms
             // estimate the same sky visibility, so take the smaller one:
-            // multiplying them (as EEVEE multiplies the probe irradiance by
+            // multiplying them (as Blender multiplies the probe irradiance by
             // the near-field visibility) counts the near occluders twice,
             // since the 3 A probes see them too. The screen term keeps the
             // contact detail the grid cannot resolve, the probes the large

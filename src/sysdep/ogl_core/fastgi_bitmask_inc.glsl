@@ -1,8 +1,8 @@
 // -*-Mode: C++;-*-
 //
-// Visibility bitmask operations of the Fast GI AO (gtao_frag.glsl), from
-// Blender EEVEE Next fast_gi (eevee_fast_gi.bsl.hh; Therrien et al., "Screen
-// Space Indirect Lighting with Visibility Bitmask"). Pure functions of their
+// Visibility bitmask operations of the Fast GI AO (gtao_frag.glsl; Therrien
+// et al., "Screen Space Indirect Lighting with Visibility Bitmask"), ported
+// from Blender (see the port note in gtao_frag.glsl). Pure functions of their
 // arguments: they read no uniform. The including shader must define the
 // constant PI before the include.
 //
