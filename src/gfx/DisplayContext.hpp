@@ -430,6 +430,11 @@ public:
     /// Used by temporal-jitter accumulation. Caller must restore the default
     /// before normal (UI/overlay) drawing. Default is a no-op.
     virtual void setBlendModeAdd(bool) {}
+    /// Veil composite blend (true): colour SRC_ALPHA / ONE_MINUS_SRC_ALPHA,
+    /// alpha ONE / ONE_MINUS_SRC_ALPHA, so the source alpha (the veil
+    /// coverage 1 - T) weighs the colour and adds to the coverage of the
+    /// background. false restores the default over-blend.
+    virtual void setBlendModeVeil(bool) {}
 
     ////////////////
     // Geometry construction

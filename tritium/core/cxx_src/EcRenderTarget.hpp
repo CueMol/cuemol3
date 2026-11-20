@@ -46,6 +46,7 @@ public:
     void bindColorTex(int idx, int texUnit) override;
     void bindDepthTex(int texUnit) override;
     void blitDepthToDefault() override;
+    void blitDepthTo(gfx::RenderTarget *pDst) override;
     void unbindTextures() override;
     void readColor(int idx, int x, int y, int w, int h, int ncomp,
                    void *pbuf) override;

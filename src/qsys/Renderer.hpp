@@ -128,6 +128,11 @@ namespace qsys {
     /// Display 2D labels (UI elements /w depth)
     virtual void displayLabels(DisplayContext *pdc);
 
+    /// True when displayLabels draws its labels in front of everything (the
+    /// label_on_top property): the frame pipeline then draws them after the
+    /// translucent veils are composited, so no veil colour lies over them.
+    virtual bool isLabelOnTop() const { return false; }
+
     /// Append the spheres this renderer draws as world-space occluders for the
     /// baked ambient occlusion probes: (x, y, z) = centre, w = radius. They
     /// set the probe grid bounds, collected once per bake (the bake itself

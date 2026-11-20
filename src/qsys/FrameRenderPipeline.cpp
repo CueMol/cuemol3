@@ -209,6 +209,10 @@ void FrameRenderPipeline::setSize(gfx::DisplayContext *pdc, int w, int h, bool h
         m_pJitterAccumRT->resize(w, h);
     }
 
+    // Veil targets follow the size once allocated (compositeVeils).
+    for (gfx::RenderTarget *pRT : {m_pVeilRT, m_pVeilAccRT, m_pVeilLogRT})
+        if (pRT != nullptr) pRT->resize(w, h);
+
     if (m_pAOPostProc == nullptr) {
         m_pAOPostProc = MB_NEW gfx::PostProcGpuPrim();
     }
@@ -261,6 +265,12 @@ void FrameRenderPipeline::dispose()
     if (m_pCompRT != nullptr) {
         delete m_pCompRT;
         m_pCompRT = nullptr;
+    }
+    for (gfx::RenderTarget **pp : {&m_pVeilRT, &m_pVeilAccRT, &m_pVeilLogRT}) {
+        if (*pp != nullptr) {
+            delete *pp;
+            *pp = nullptr;
+        }
     }
     if (m_pAoDenRT != nullptr) {
         delete m_pAoDenRT;
@@ -317,6 +327,8 @@ bool FrameRenderPipeline::hasCachedStage() const
             return m_pCompRT != nullptr && m_pSmaaWeightRT != nullptr;
         case StageRecord::JITTER:
             return m_pJitterAccumRT != nullptr && m_jitterSupported;
+        case StageRecord::COPY:
+            return m_pCompRT != nullptr;
         default:
             return false;
     }
@@ -340,6 +352,9 @@ void FrameRenderPipeline::presentStage(gfx::DisplayContext *pdc, const StageReco
             break;
         case StageRecord::JITTER:
             m_pAOPostProc->drawJitterCompose(pdc, m_pJitterAccumRT, st.dispWeight);
+            break;
+        case StageRecord::COPY:
+            m_pAOPostProc->drawJitterCompose(pdc, m_pCompRT, 1.0f);
             break;
         default:
             break;
@@ -402,6 +417,79 @@ const gfx::AoProbeParams *FrameRenderPipeline::prepareProbes(gfx::DisplayContext
     return &probe;
 }
 
+bool FrameRenderPipeline::compositeVeils(gfx::DisplayContext *pdc, const ScenePtr &pScene,
+                                         const std::vector<double> &veils,
+                                         const std::function<void()> &sceneRenderFn)
+{
+    const int w = m_pAOSceneRT->getWidth();
+    const int h = m_pAOSceneRT->getHeight();
+    // The veil target shares the scene target's depth format, so the
+    // background depth can be blitted into it.
+    if (m_pVeilRT == nullptr)
+        m_pVeilRT = pdc->createRenderTarget(w, h, gfx::RT_COLOR_RGBA8 | gfx::RT_DEPTH_TEX);
+    if (m_pVeilAccRT == nullptr)
+        m_pVeilAccRT = pdc->createRenderTarget(w, h, gfx::RT_COLOR_RGBA16F);
+    if (m_pVeilLogRT == nullptr)
+        m_pVeilLogRT = pdc->createRenderTarget(w, h, gfx::RT_COLOR_RGBA16F);
+    if (m_pVeilRT == nullptr || m_pVeilAccRT == nullptr || m_pVeilLogRT == nullptr)
+        return false;
+
+    for (size_t v = 0; v < veils.size(); ++v) {
+        // 1. The veil alone, opaque, from the background's depth: the opaque
+        // scene hides what lies behind it, and within the veil only its
+        // front-most surface remains (it writes depth). Lit without the HDR
+        // clamp-off of the background (the composite is in display values).
+        m_pVeilRT->bind();
+        m_pVeilRT->clear(0.0f, 0.0f, 0.0f, 0.0f);
+        m_pVeilRT->unbind();
+        m_pAOSceneRT->blitDepthTo(m_pVeilRT);
+        m_pVeilRT->bind();
+        pdc->setDepthTestEnabled(true);
+        pdc->setBlendEnabled(true);
+        {
+            Scene::DrawFilter df;
+            df.kind = Scene::DrawFilter::DF_VEIL;
+            df.veil = int(v);
+            Scene::AutoDrawFilter adf(pScene.get(), df);
+            sceneRenderFn();
+        }
+        m_pVeilRT->unbind();
+
+        // 2. Accumulate it (additive into both float targets).
+        pdc->setDepthTestEnabled(false);
+        pdc->setBlendEnabled(true);
+        pdc->setBlendModeAdd(true);
+        const float a = float(veils[v]);
+        m_pVeilAccRT->bind();
+        if (v == 0) m_pVeilAccRT->clear(0.0f, 0.0f, 0.0f, 0.0f);
+        m_pAOPostProc->drawVeilAccum(pdc, m_pVeilRT, a, 0);
+        m_pVeilAccRT->unbind();
+        m_pVeilLogRT->bind();
+        if (v == 0) m_pVeilLogRT->clear(0.0f, 0.0f, 0.0f, 0.0f);
+        m_pAOPostProc->drawVeilAccum(pdc, m_pVeilRT, a, 1);
+        m_pVeilLogRT->unbind();
+        pdc->setBlendModeAdd(false);
+    }
+
+    // 3. Over the background in m_pCompRT (read by the blend, not sampled).
+    m_pCompRT->bind();
+    pdc->setDepthTestEnabled(false);
+    pdc->setBlendEnabled(true);
+    pdc->setBlendModeVeil(true);
+    m_pAOPostProc->drawVeilComposite(pdc, m_pVeilAccRT, m_pVeilLogRT);
+    pdc->setBlendModeVeil(false);
+
+    // 4. The labels drawn on top, over the veils.
+    {
+        Scene::DrawFilter df;
+        df.kind = Scene::DrawFilter::DF_ONTOP_LABELS;
+        Scene::AutoDrawFilter adf(pScene.get(), df);
+        sceneRenderFn();
+    }
+    m_pCompRT->unbind();
+    return true;
+}
+
 bool FrameRenderPipeline::render(gfx::DisplayContext *pdc, const ScenePtr &pScene,
                                  const FrameRenderParams &params,
                                  const std::function<void()> &sceneRenderFn)
@@ -437,12 +525,30 @@ bool FrameRenderPipeline::render(gfx::DisplayContext *pdc, const ScenePtr &pScen
 
         PassTimer timer(pdc, pScene->isRenderTiming());
     gfx::ColorPtr bg = pScene->getBgColor();
-    const float bgA = params.bgTransparent ? 0.0f : 1.0f;
     m_pAOSceneRT->bind();
-    m_pAOSceneRT->clear(float(bg->fr()), float(bg->fg()), float(bg->fb()), bgA);
+    // A transparent background keeps the colour premultiplied by its alpha
+    // (cleared to 0, and the scene blend accumulates the alpha as
+    // a + (1 - a) * dst): the veil composite and the AO composite are linear
+    // in it, and the exporter divides by the alpha at the end.
+    if (params.bgTransparent)
+        m_pAOSceneRT->clear(0.0f, 0.0f, 0.0f, 0.0f);
+    else
+        m_pAOSceneRT->clear(float(bg->fr()), float(bg->fg()), float(bg->fb()), 1.0f);
+    if (params.bgTransparent) pdc->setBlendModeVeil(true);
+    // Translucent renderers composited as veils after the AO composite
+    // (compositeVeils); the background pass leaves them out, and the labels
+    // drawn on top too (they go over the veils).
+    const std::vector<double> veils = pScene->getVeilAlphas();
+    const bool hasVeils = !veils.empty() && m_pCompRT != nullptr;
     pdc->setLightNoClamp(m_bSceneHdr);
-    sceneRenderFn();
+    {
+        Scene::DrawFilter df;
+        if (hasVeils) df.kind = Scene::DrawFilter::DF_BACKGROUND;
+        Scene::AutoDrawFilter adf(pScene.get(), df);
+        sceneRenderFn();
+    }
     pdc->setLightNoClamp(false);
+    if (params.bgTransparent) pdc->setBlendModeVeil(false);
     // Camera modelview the scene was drawn with (world -> eye), for the probe
     // lookup's view -> world reconstruction.
     const qlib::Matrix4D modelView = pdc->getModelViewMat();
@@ -569,11 +675,28 @@ bool FrameRenderPipeline::render(gfx::DisplayContext *pdc, const ScenePtr &pScen
         // GL_BLEND on their output would be discarded.
         pdc->setDepthTestEnabled(false);
         pdc->setBlendEnabled(false);
-        if (postAA) {
+        // With veils the composite always lands in m_pCompRT, where the veils
+        // and the labels on top are added; display, post-AA and a
+        // present-only frame (presentLast) all read that one result.
+        bool veilsDone = false;
+        if (hasVeils) {
             m_pCompRT->bind();
             m_pAOPostProc->drawComposite(pdc, m_pAOSceneRT, pAoDen, aoc, bounceRT(aoc, aoActive));
             m_pCompRT->unbind();
             timer.mark(TP_COMPOSITE);
+            veilsDone = compositeVeils(pdc, pScene, veils, sceneRenderFn);
+            pdc->setDepthTestEnabled(false);
+            pdc->setBlendEnabled(false);
+        }
+        if (veilsDone && !postAA) {
+            st.kind = StageRecord::COPY;
+        } else if (postAA) {
+            if (!veilsDone) {
+                m_pCompRT->bind();
+                m_pAOPostProc->drawComposite(pdc, m_pAOSceneRT, pAoDen, aoc, bounceRT(aoc, aoActive));
+                m_pCompRT->unbind();
+                timer.mark(TP_COMPOSITE);
+            }
 
             if (aaMethod == Scene::AA_SMAA && m_pSmaaEdgeRT != nullptr &&
                 m_pSmaaWeightRT != nullptr) {
@@ -642,8 +765,20 @@ bool FrameRenderPipeline::render(gfx::DisplayContext *pdc, const ScenePtr &pScen
         // fullscreen pass replaces (transparent-bg pixels keep alpha 0). ----
         pdc->setDepthTestEnabled(false);
         pdc->setBlendEnabled(false);
+        bool veilsDone = false;
+        if (hasVeils) {
+            m_pCompRT->bind();
+            m_pAOPostProc->drawComposite(pdc, m_pAOSceneRT, pAoDen, aoc, bounceRT(aoc, aoActive));
+            m_pCompRT->unbind();
+            veilsDone = compositeVeils(pdc, pScene, veils, sceneRenderFn);
+            pdc->setDepthTestEnabled(false);
+            pdc->setBlendEnabled(false);
+        }
         if (outRT != nullptr) outRT->bind();
-        m_pAOPostProc->drawComposite(pdc, m_pAOSceneRT, pAoDen, aoc, bounceRT(aoc, aoActive));
+        if (veilsDone)
+            m_pAOPostProc->drawJitterCompose(pdc, m_pCompRT, 1.0f);
+        else
+            m_pAOPostProc->drawComposite(pdc, m_pAOSceneRT, pAoDen, aoc, bounceRT(aoc, aoActive));
         if (outRT != nullptr) outRT->unbind();
         timer.mark(TP_COMPOSITE);
         pdc->setBlendEnabled(true);

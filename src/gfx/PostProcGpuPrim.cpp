@@ -525,7 +525,7 @@ void PostProcGpuPrim::drawSmaaBlend(DisplayContext *pDC, RenderTarget *srcColorR
 }
 
 void PostProcGpuPrim::drawJitterCompose(DisplayContext *pDC, RenderTarget *srcRT,
-                                       float weight)
+                                       float weight, bool unpremul)
 {
     if (srcRT == nullptr) return;
     if (!ensureDrawElem(pDC)) return;
@@ -546,11 +546,61 @@ void PostProcGpuPrim::drawJitterCompose(DisplayContext *pDC, RenderTarget *srcRT
     m_pJitterComposePO->enable();
     m_pJitterComposePO->setUniform("u_colorTex", RT_TU_COLOR);
     m_pJitterComposePO->setUniformF("u_weight", weight);
+    m_pJitterComposePO->setUniform("u_unpremul", unpremul ? 1 : 0);
 
     pDC->drawElem(*m_pDrawElem);
 
     m_pJitterComposePO->disable();
     srcRT->unbindTextures();
+}
+
+void PostProcGpuPrim::drawVeilAccum(DisplayContext *pDC, RenderTarget *veilRT, float alpha,
+                                    int mode)
+{
+    if (veilRT == nullptr) return;
+    if (!ensureDrawElem(pDC)) return;
+    if (m_pVeilAccumPO == nullptr) {
+        m_pVeilAccumPO =
+            pDC->loadShaderObject("veil_accum", "%%CONFDIR%%/data/shaders/postproc_vert.glsl",
+                                  "%%CONFDIR%%/data/shaders/veil_accum_frag.glsl");
+        if (m_pVeilAccumPO == nullptr) {
+            LOG_DPRINTLN("PostProcGpuPrim> ERROR: cannot load veil_accum shader.");
+            return;
+        }
+    }
+    veilRT->bindColorTex(0, RT_TU_COLOR);
+    m_pVeilAccumPO->enable();
+    m_pVeilAccumPO->setUniform("u_veilTex", RT_TU_COLOR);
+    m_pVeilAccumPO->setUniformF("u_alpha", alpha);
+    m_pVeilAccumPO->setUniform("u_mode", mode);
+    pDC->drawElem(*m_pDrawElem);
+    m_pVeilAccumPO->disable();
+    veilRT->unbindTextures();
+}
+
+void PostProcGpuPrim::drawVeilComposite(DisplayContext *pDC, RenderTarget *accRT,
+                                        RenderTarget *logRT)
+{
+    if (accRT == nullptr || logRT == nullptr) return;
+    if (!ensureDrawElem(pDC)) return;
+    if (m_pVeilCompositePO == nullptr) {
+        m_pVeilCompositePO = pDC->loadShaderObject(
+            "veil_composite", "%%CONFDIR%%/data/shaders/postproc_vert.glsl",
+            "%%CONFDIR%%/data/shaders/veil_composite_frag.glsl");
+        if (m_pVeilCompositePO == nullptr) {
+            LOG_DPRINTLN("PostProcGpuPrim> ERROR: cannot load veil_composite shader.");
+            return;
+        }
+    }
+    accRT->bindColorTex(0, RT_TU_COLOR);
+    logRT->bindColorTex(0, RT_TU_NORMAL);
+    m_pVeilCompositePO->enable();
+    m_pVeilCompositePO->setUniform("u_accTex", RT_TU_COLOR);
+    m_pVeilCompositePO->setUniform("u_logTex", RT_TU_NORMAL);
+    pDC->drawElem(*m_pDrawElem);
+    m_pVeilCompositePO->disable();
+    accRT->unbindTextures();
+    logRT->unbindTextures();
 }
 
 void PostProcGpuPrim::drawHoverMask(DisplayContext *pDC, RenderTarget *pickRT,
@@ -677,6 +727,8 @@ void PostProcGpuPrim::invalidate()
     m_pSmaaWeightPO = nullptr;
     m_pSmaaBlendPO = nullptr;
     m_pJitterComposePO = nullptr;
+    m_pVeilAccumPO = nullptr;
+    m_pVeilCompositePO = nullptr;
 
     // SMAA lookup textures are owned here (unlike the cached shader programs).
     if (m_pSmaaAreaTex != nullptr) {

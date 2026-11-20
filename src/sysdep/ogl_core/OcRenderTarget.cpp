@@ -317,4 +317,17 @@ void OcRenderTarget::blitDepthToDefault()
     CHK_GLERROR("OcRenderTarget::blitDepthToDefault");
 }
 
+void OcRenderTarget::blitDepthTo(gfx::RenderTarget *pDst)
+{
+    auto *pOc = dynamic_cast<OcRenderTarget *>(pDst);
+    if (pOc == nullptr) return;
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, m_nFBO);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, pOc->m_nFBO);
+    glBlitFramebuffer(0, 0, m_nWidth, m_nHeight, 0, 0, pOc->m_nWidth, pOc->m_nHeight,
+                      GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    CHK_GLERROR("OcRenderTarget::blitDepthTo");
+}
+
 }  // namespace sysdep

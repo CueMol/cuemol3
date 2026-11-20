@@ -75,3 +75,14 @@ export function setBlendModeAdd(gl: GL, add: boolean): void {
     if (add) gl.blendFunc(gl.ONE, gl.ONE);
     else gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 }
+
+/**
+ * Select the veil composite blend (true): colour SRC_ALPHA /
+ * ONE_MINUS_SRC_ALPHA, alpha ONE / ONE_MINUS_SRC_ALPHA, so the source alpha
+ * (the veil coverage 1 - T) weighs the colour and adds to the background's
+ * coverage. false restores the default over-blend.
+ */
+export function setBlendModeVeil(gl: GL, veil: boolean): void {
+    if (veil) gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    else gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+}

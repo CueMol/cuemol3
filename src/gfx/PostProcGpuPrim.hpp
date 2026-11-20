@@ -189,6 +189,10 @@ private:
     DataTexture *m_pSmaaSearchTex = nullptr;
     /// Temporal-jitter compose program (sample*weight; accumulate + display).
     ShaderObject *m_pJitterComposePO = nullptr;
+    /// Veil composite programs: accumulation of one veil, composite over the
+    /// background.
+    ShaderObject *m_pVeilAccumPO = nullptr;
+    ShaderObject *m_pVeilCompositePO = nullptr;
     /// Hover highlight programs: mask from the integer pick ID buffer (+
     /// horizontal blur), vertical blur, and the overlay.
     ShaderObject *m_pHoverMaskPO = nullptr;
@@ -280,7 +284,21 @@ public:
     /// bound framebuffer (fullscreen). Used for both the additive accumulate
     /// step (weight 1/N, with additive blend enabled by the caller) and the
     /// normalized display step (weight N/count, no blend).
-    void drawJitterCompose(DisplayContext *pDC, RenderTarget *srcRT, float weight);
+    void drawJitterCompose(DisplayContext *pDC, RenderTarget *srcRT, float weight,
+                           bool unpremul = false);
+
+    /// Veil composite, accumulation: add the veil drawn opaque in veilRT
+    /// (alpha > 0 = covered) with alpha `alpha` into the currently bound
+    /// float target, additive blend set by the caller. mode 0 adds
+    /// (alpha * colour, alpha), mode 1 adds -log(1 - alpha) in R
+    /// (veil_accum_frag.glsl).
+    void drawVeilAccum(DisplayContext *pDC, RenderTarget *veilRT, float alpha, int mode);
+
+    /// Veil composite: blend the accumulated veils (accRT: sum of a * colour,
+    /// sum of a; logRT: sum of -log(1 - a)) over the background in the
+    /// currently bound target, with DisplayContext::setBlendModeVeil set by
+    /// the caller (veil_composite_frag.glsl).
+    void drawVeilComposite(DisplayContext *pDC, RenderTarget *accRT, RenderTarget *logRT);
 
     /// Hover highlight, pass 1: match pickRT's integer ID texels (the pick ID
     /// buffer) against id = (renderer index, encoded element name, encoded

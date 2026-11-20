@@ -331,6 +331,68 @@ namespace qsys {
     /// took effect.
     MaterialLight getMaterialLight(const LString &mat_id) const;
 
+    ////////////////////////////////////////////////////////////
+    // Translucent renderers composited as veils (frame pipeline)
+
+    /// A renderer whose alpha is below 1 - kVeilAlphaEps is a veil: the
+    /// frame pipeline draws it opaque in a pass of its own and composites
+    /// the passes per pixel, as the ray tracer (umbreon) does. Alphas within
+    /// kVeilAlphaEps of a veil's form that veil.
+    static constexpr double kVeilAlphaEps = 1e-4;
+
+    /// Group renderer alphas into veils, in order of first appearance (the
+    /// ray tracer's bucketVeils): veilIdx[i] is the veil of alphas[i], or -1
+    /// for an opaque renderer; veilAlphas[v] is veil v's alpha (its first
+    /// member's).
+    static void assignVeils(const std::vector<double> &alphas, std::vector<int> &veilIdx,
+                            std::vector<double> &veilAlphas);
+
+    /// What display() draws.
+    struct DrawFilter
+    {
+      enum Kind {
+        /// Everything (no veil composite).
+        DF_ALL = 0,
+        /// All but the veils and the labels drawn on top.
+        DF_BACKGROUND,
+        /// One veil (veil = its index), opaque (alpha 1), without labels.
+        DF_VEIL,
+        /// Only the labels drawn on top (Renderer::isLabelOnTop).
+        DF_ONTOP_LABELS,
+      };
+      Kind kind = DF_ALL;
+      int veil = -1;
+    };
+
+    /// The filter of the next display() calls (the frame pipeline sets it
+    /// around its scene draws, see AutoDrawFilter).
+    void setDrawFilter(const DrawFilter &f) { m_drawFilter = f; }
+    const DrawFilter &getDrawFilter() const { return m_drawFilter; }
+
+    /// The alphas of the veils of the visible renderers (index = veil).
+    std::vector<double> getVeilAlphas() const;
+
+    /// Restores the draw filter on scope exit.
+    class AutoDrawFilter
+    {
+    public:
+      AutoDrawFilter(Scene *pScene, const DrawFilter &f) : m_pScene(pScene), m_saved(pScene->getDrawFilter())
+      {
+        m_pScene->setDrawFilter(f);
+      }
+      ~AutoDrawFilter() { m_pScene->setDrawFilter(m_saved); }
+
+    private:
+      Scene *m_pScene;
+      DrawFilter m_saved;
+    };
+
+  private:
+    /// The filter of display() (DrawFilter).
+    DrawFilter m_drawFilter;
+
+  public:
+
     /// Overall light scale (lightBrightness): multiplies the ambient, diffuse
     /// and specular intensities alike, so the image gets brighter or darker
     /// while the shading ratios (the depth cue of the AO) stay the same.
@@ -422,13 +484,13 @@ namespace qsys {
       m_fAASmaaThreshold = v;
     }
 
-    /// True when the scene's render settings require the off-screen frame
-    /// pipeline (AO, spatial post-AA, or temporal jitter); false = legacy
-    /// direct rendering (hardware MSAA on the default framebuffer) suffices.
-    /// AO and AA are independent: any one of them routes the frame through
-    /// the pipeline.
+    /// True when the scene requires the off-screen frame pipeline (AO,
+    /// spatial post-AA, temporal jitter, or a translucent renderer, whose
+    /// veil the pipeline composites); false = direct rendering suffices. Any
+    /// one of them routes the frame through the pipeline.
     bool requiresFramePipeline() const {
-      return m_bAOEnabled || m_nAAMethod != AA_NONE || m_nAAJitterLevel > 0;
+      return m_bAOEnabled || m_nAAMethod != AA_NONE || m_nAAJitterLevel > 0 ||
+             !getVeilAlphas().empty();
     }
 
     /// get source path of this scene

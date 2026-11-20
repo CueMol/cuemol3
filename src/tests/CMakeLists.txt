@@ -110,6 +110,7 @@ add_executable(test_qsys
   qsys/test_scene_ao_compat.cpp
   qsys/test_scene_material_light.cpp
   qsys/test_scene_occluder_gen.cpp
+  qsys/test_scene_veils.cpp
   qsys/test_streammanager.cpp
   qsys/test_stream_manager_search.cpp
   qsys/test_stream_manager_sniff_escalation.cpp

@@ -21,7 +21,7 @@ Scene の AO 方式の一つ。Blender EEVEE Next の Fast GI (visibility bitmas
 |---|---|
 | 方式の切り替え・光の強さ・保存の互換 | `src/qsys/Scene.{qif,hpp,cpp}` |
 | パスの実行・プローブの準備 (`prepareProbes`) | `src/qsys/FrameRenderPipeline.{hpp,cpp}` |
-| プローブの焼き込みと作り直しの判定 | `src/qsys/AmbientProbeVolume.{hpp,cpp}`、`probe_bake_frag.glsl`、`probe_fill_frag.glsl`、形の変更の数 (`Scene::notifyOccluderChanged`) |
+| プローブの焼き込みと作り直しの判定 | `src/qsys/AmbientProbeVolume.{hpp,cpp}`、`probe_bake_frag.glsl`、`probe_fill_frag.glsl`、形の変更の数 (`Scene::notifyOccluderChanged`)。半透明の renderer (veil) は焼き込みにも遮蔽物の球にも入れない ([renderer-group-alpha.md](renderer-group-alpha.md)) |
 | AO パス (GTAO と共通の入口 `PostProcGpuPrim::drawGtao`) | `src/sysdep/ogl_core/gtao_frag.glsl`、`fastgi_bitmask_inc.glsl` |
 | 合成 | `src/sysdep/ogl_core/ao_composite_frag.glsl` |
 | 光の向き・強さ・鏡面の指数 (FogBlock UBO) | `src/sysdep/ogl_core/fog_inc.glsl`、`lighting_inc.glsl`、`src/gfx/ShaderObject.{hpp,cpp}`、`tritium/react-gui/src/renderer/worker/server/gfx/ShaderStore.ts` |

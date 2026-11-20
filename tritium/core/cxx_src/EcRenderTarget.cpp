@@ -188,6 +188,24 @@ void EcRenderTarget::blitDepthToDefault()
     }
 }
 
+void EcRenderTarget::blitDepthTo(gfx::RenderTarget *pDst)
+{
+    auto *pEc = dynamic_cast<EcRenderTarget *>(pDst);
+    if (pEc == nullptr) return;
+    auto pView = getView();
+    if (pView == nullptr) return;
+    auto peer = pView->getPeerObj();
+    auto env = peer.Env();
+    try {
+        peer.Get("blitDepthTo")
+            .As<Napi::Function>()
+            .Call(peer, {Napi::String::New(env, m_fboName.c_str()),
+                         Napi::String::New(env, pEc->m_fboName.c_str())});
+    } catch (const Napi::Error &e) {
+        MB_DPRINTLN("blitDepthTo failed: %s", e.Message().c_str());
+    }
+}
+
 void EcRenderTarget::bindDepthTex(int texUnit)
 {
     auto pView = getView();

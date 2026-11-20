@@ -350,7 +350,9 @@ WebGPU でも形を変えて再発しうるので、移植前に必ず設計へ�
      のブレンドを無効化 (`OcRenderTarget::bind/unbind`)。
    - **WebGL2 注意**: per-draw-buffer のブレンド有効/無効は core に無い
      (`OES/EXT_draw_buffers_indexed` 拡張が必要)。拡張が無ければ「不透明 MRT パス中は
-     `GL_BLEND` 自体を無効化する」「半透明を別パスにする」等の設計が要る。
+     `GL_BLEND` 自体を無効化する」「半透明を別パスにする」等の設計が要る。renderer 単位の
+     半透明は別パス (veil) で描くようになった ([renderer-group-alpha.md](renderer-group-alpha.md))
+     ので、シーンのパスでブレンドされるのは頂点ごとの alpha だけになった。
    - **WebGPU**: ブレンドは render pipeline 記述子で**ターゲット毎**に設定するため、法線
      ターゲットだけ blend 無しにできる (クリーン)。
 

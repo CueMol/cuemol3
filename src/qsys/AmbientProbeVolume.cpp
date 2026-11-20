@@ -64,6 +64,9 @@ void collectSpheres(const ScenePtr &pScene, std::vector<qlib::Vector4D> &sph)
         for (auto ri = pObj->beginRend(); ri != pObj->endRend(); ++ri) {
             RendererPtr pRend = ri->second;
             if (pRend.isnull() || !pRend->isVisible()) continue;
+            // A translucent renderer (a veil) occludes nothing: as in the ray
+            // tracer, it casts no shadow or AO on what it covers.
+            if (pRend->getDefaultAlpha() < 1.0 - Scene::kVeilAlphaEps) continue;
             pRend->collectOcclusionSpheres(sph);
         }
     }
@@ -221,6 +224,10 @@ bool AmbientProbeVolume::update(gfx::DisplayContext *pdc, const ScenePtr &pScene
         const int tx = k % bp.tilesPerRow, ty = k / bp.tilesPerRow;
         pdc->setViewport(qlib::Vector4D(tx * bp.tileSize, ty * bp.tileSize, bp.tileSize,
                                         bp.tileSize));
+        // Without the translucent renderers (veils), as the occluder spheres.
+        Scene::DrawFilter df;
+        df.kind = Scene::DrawFilter::DF_BACKGROUND;
+        Scene::AutoDrawFilter adf(pScene.get(), df);
         pScene->display(pdc);
     }
     m_pDepthAtlas->unbind();

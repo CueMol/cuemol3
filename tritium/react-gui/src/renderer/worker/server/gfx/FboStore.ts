@@ -309,6 +309,23 @@ export class FboStore {
     }
 
     /**
+     * Blit the depth buffer of FBO src into FBO dst (same size and depth
+     * format, DEPTH24_STENCIL8): the veil passes start from the background's
+     * depth this way. Leaves the default framebuffer bound.
+     */
+    blitDepthTo(src: string, dst: string): void {
+        const gl = this._gl;
+        const s = this._fbo_data[src];
+        const d = this._fbo_data[dst];
+        if (!s || !d) return;
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, s.fbo);
+        gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, d.fbo);
+        gl.blitFramebuffer(0, 0, s.w, s.h, 0, 0, d.w, d.h, gl.DEPTH_BUFFER_BIT, gl.NEAREST);
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    }
+
+    /**
      * Blit the named FBO's depth buffer into the default framebuffer (canvas)
      * so on-screen UI overlays z-test against the off-screen scene depth.
      * Restores the previous draw target binding to the default fb.

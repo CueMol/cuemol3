@@ -106,6 +106,12 @@ public:
     /// in the non-AO path. Default is a no-op.
     virtual void blitDepthToDefault() {}
 
+    /// Copy this target's depth attachment (1:1) into pDst's (same size and
+    /// depth format, both created with RT_DEPTH_TEX). The veil passes of the
+    /// frame pipeline start from the background's depth this way, so the
+    /// opaque scene hides what lies behind it. Default is a no-op.
+    virtual void blitDepthTo(RenderTarget *pDst) {}
+
     /// True if an MRT normal attachment was allocated.
     virtual bool hasNormal() const = 0;
 
