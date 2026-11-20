@@ -65,5 +65,20 @@ TEST(SceneMaterialLight, MaterialSetsTheLight)
     // A material without the attributes is not metallic.
     EXPECT_EQ(pScene->getMaterialLight("").metallic, 0.0f);
 
+    // toon1 (POV-Ray: ambient 0, diffuse 0.8): with AO it keeps its flat
+    // tones under the light any material gets, not its POV-Ray finish.
+    const Scene::MaterialLight toonAO = pScene->getMaterialLight("toon1");
+    expectLight(toonAO, 0.2 * Scene::kFastGILightAmbient / Scene::kLegacyLightAmbient,
+                0.8 * Scene::kFastGILightDiffuse / Scene::kLegacyLightDiffuse, 0.0, 0.0);
+    EXPECT_EQ(toonAO.toon, 1.0f);
+    EXPECT_EQ(toonAO.toonPov, 0.0f);
+    // Without AO, as POV-Ray renders it: no global ambient, the diffuse
+    // under kToonLightDiffuse.
+    pScene->setAOEnabled(false);
+    const Scene::MaterialLight toon = pScene->getMaterialLight("toon1");
+    expectLight(toon, 0.0, 0.8 * Scene::kToonLightDiffuse, 0.0, 0.0);
+    EXPECT_EQ(toon.toon, 1.0f);
+    EXPECT_EQ(toon.toonPov, 1.0f);
+
     qsys::SceneManager::getInstance()->destroyScene(pScene->getUID());
 }

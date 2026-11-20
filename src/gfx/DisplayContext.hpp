@@ -86,7 +86,7 @@ private:
     bool m_bLightNoClamp = false;
     float m_lightDir[3] = {1.0f, 1.0f, 1.5f};
     float m_fLightShininess = 32.0f;
-    // metalness, toon bands, Fresnel rim, unused (setLightMaterialExtra)
+    // metalness, toon, Fresnel rim, toonPov (setLightMaterialExtra)
     float m_matExtra[4] = {0.0f, 0.0f, 0.0f, 0.0f};
     ColorPtr m_fogColor;
 
@@ -300,12 +300,14 @@ public:
     /// Specular (Blinn-Phong) exponent of the lit shaders.
     void setLightShininess(float s) { m_fLightShininess = s; }
     /// Material terms beyond the light intensities (FogBlock u_matExtra):
-    /// metalness, toon band count (0 = smooth), Fresnel rim strength.
-    void setLightMaterialExtra(float metallic, float toon, float fresnel)
+    /// metalness, toon (1 = flat tones, 0 = smooth), Fresnel rim strength,
+    /// and toonPov (1 = the toon under POV-Ray's lights and gamma).
+    void setLightMaterialExtra(float metallic, float toon, float fresnel, float toonPov)
     {
         m_matExtra[0] = metallic;
         m_matExtra[1] = toon;
         m_matExtra[2] = fresnel;
+        m_matExtra[3] = toonPov;
     }
     void getLightMaterialExtra(float d[4]) const
     {

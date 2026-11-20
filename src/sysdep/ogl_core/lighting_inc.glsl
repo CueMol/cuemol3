@@ -110,6 +110,30 @@ void directionalLight2(in vec3 normal)
     else
         pf = pow(max(nDotHV, 1e-6), max(shininess, 0.0));
 
+    // Toon (u_matExtra.y > 0): flat tones, as the brilliance-0 finishes of
+    // POV-Ray light every surface facing a light whatever its angle, and a
+    // hard-edged spot where a smooth highlight would pass half its peak.
+    if (u_matExtra.y > 0.5) {
+        float key = (dot(normal, lightSource_position) > 0.0) ? 1.0 : 0.0;
+        if (u_matExtra.w > 0.5) {
+            // Without AO, as POV-Ray renders CueMol's export: the key light
+            // (TOON_KEY of the diffuse light) and a shadowless flash light
+            // from the camera (TOON_FLASH), so the side the key light misses
+            // keeps the flash tone. The spot is the flash light's (its half
+            // vector is the view axis); POV-Ray shows no key light spot.
+            const float TOON_KEY = 0.5 / 1.3;
+            const float TOON_FLASH = 0.8 / 1.3;
+            float flash = (normal.z > 0.0) ? 1.0 : 0.0;
+            nDotVP = TOON_KEY * key + TOON_FLASH * flash;
+            float flashPf = pow(max(normal.z, 1e-6), max(shininess, 0.0));
+            pf = (flash > 0.0 && flashPf > 0.5) ? 1.0 : 0.0;
+        } else {
+            // With AO: two tones and the spot under the usual key light.
+            nDotVP = key;
+            pf = (key > 0.0 && pf > 0.5) ? 1.0 : 0.0;
+        }
+    }
+
     Ambient = vec4(vec3(u_lightAmbient), 0.0);
     Diffuse = vec4(vec3(u_lightDiffuse), 0.0) * nDotVP;
     Specular = vec4(vec3(u_lightSpecular), 0.0) * pf;
@@ -167,6 +191,13 @@ vec4 flight2(in vec3 normal, in vec4 ecPosition, in vec4 in_color)
     g_ambientFraction = clamp(dot(amb, LUM) / max(dot(rgb, LUM), 1e-4), 0.0, 1.0);
     color = vec4(rgb, in_color.a);
     // An HDR scene target keeps the lit colour; the composite tone maps it.
-    if (u_lightNoClamp < 0.5) color = vec4(toneMap(color.rgb), clamp(color.a, 0.0, 1.0));
+    // A toon material clips and gamma-encodes instead, as POV-Ray writes its
+    // image (assumed_gamma 1.0, an sRGB file): the flat tones then match it.
+    if (u_lightNoClamp < 0.5) {
+        if (u_matExtra.w > 0.5)
+            color = vec4(pow(clamp(color.rgb, 0.0, 1.0), vec3(1.0 / 2.2)), clamp(color.a, 0.0, 1.0));
+        else
+            color = vec4(toneMap(color.rgb), clamp(color.a, 0.0, 1.0));
+    }
     return color;
 }

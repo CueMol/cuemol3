@@ -692,7 +692,7 @@ void Scene::display(DisplayContext *pdc)
   const MaterialLight ml = getMaterialLight(LString());
   pdc->setLightIntensities(ml.ambient, ml.diffuse, ml.specular);
   pdc->setLightShininess(ml.shininess);
-  pdc->setLightMaterialExtra(ml.metallic, ml.toon, ml.fresnel);
+  pdc->setLightMaterialExtra(ml.metallic, ml.toon, ml.fresnel, ml.toonPov);
   pdc->setLightDir(kLightDir[0], kLightDir[1], kLightDir[2]);
   pdc->startRender();
 
@@ -816,7 +816,15 @@ Scene::MaterialLight Scene::getMaterialLight(const LString &mat_id) const
     v = pSM->getMaterial(name, gfx::Material::MAT_FRESNEL);
     if (v >= -0.1) fresnel = v;
   }
-  double amb = 0.2 + ka, diff = kd, spec = 0.4 * ks;
+  // Without AO a toon material takes its POV-Ray finish as POV-Ray renders
+  // CueMol's export: no global ambient (toon1 has ambient 0) and the
+  // export's lights (kToonLightDiffuse) on the diffuse. The POV-Ray finish
+  // is a look without AO, so with GTAO or Fast GI the toon only gets its
+  // flat tones (lighting_inc.glsl) under the light any material gets.
+  const bool bToon = toon > 0.0;
+  const bool bToonPov = bToon && !isAOEnabled();
+  double amb = (bToonPov ? 0.0 : 0.2) + ka, diff = kd, spec = 0.4 * ks;
+  if (bToonPov) diff *= kToonLightDiffuse;
 
   // The ambient-dominant light pairs with the Fast GI AO, which darkens the
   // ambient part only: scale the ambient and diffuse of every material so
@@ -834,7 +842,8 @@ Scene::MaterialLight Scene::getMaterialLight(const LString &mat_id) const
   ml.specular = float(spec * bri);
   ml.shininess = float(shin);
   ml.metallic = float(std::clamp(metal, 0.0, 1.0));
-  ml.toon = float(std::max(0.0, std::floor(toon)));
+  ml.toon = bToon ? 1.0f : 0.0f;
+  ml.toonPov = bToonPov ? 1.0f : 0.0f;
   ml.fresnel = float(std::clamp(fresnel, 0.0, 1.0));
   return ml;
 }
@@ -850,7 +859,7 @@ void Scene::displayRendImpl(DisplayContext *pdc, ObjectPtr pObj, RendererPtr pRe
   const MaterialLight ml = getMaterialLight(pRend->getDefaultMaterial());
   pdc->setLightIntensities(ml.ambient, ml.diffuse, ml.specular);
   pdc->setLightShininess(ml.shininess);
-  pdc->setLightMaterialExtra(ml.metallic, ml.toon, ml.fresnel);
+  pdc->setLightMaterialExtra(ml.metallic, ml.toon, ml.fresnel, ml.toonPov);
   pdc->setStyleNames(pRend->getStyleNames());
   
   // transfer the edge settings

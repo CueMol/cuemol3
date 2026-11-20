@@ -23,8 +23,9 @@ layout(std140) uniform FogBlock {
     float u_lightNoClamp;   // offset 44: 1 = do not clamp (HDR scene target)
     vec4 u_lightDir;        // offset 48: .xyz = eye-space direction to the light,
                             // .w = specular exponent
-    vec4 u_matExtra;        // offset 64: .x = metalness, .y = toon bands
-                            // (0 = smooth), .z = Fresnel rim, .w unused
+    vec4 u_matExtra;        // offset 64: .x = metalness, .y = toon (1 =
+                            // flat tones, 0 = smooth), .z = Fresnel rim,
+                            // .w = 1: the toon under POV-Ray's lights and gamma
 };
 
 ////////////////////

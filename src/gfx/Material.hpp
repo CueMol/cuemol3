@@ -46,7 +46,8 @@ public:
     MAT_EMISSION = 4,
     /// Metalness 0-1: the highlight takes the surface colour (WebGL view).
     MAT_METALLIC = 5,
-    /// Toon shading: number of diffuse bands (0 = smooth shading).
+    /// Toon shading as POV-Ray's toon finishes (> 0): flat lit / unlit tones
+    /// and a hard-edged highlight; 0 = smooth shading.
     MAT_TOON = 6,
     /// Fresnel rim strength 0-1 (Schlick), for glazed / ceramic looks.
     MAT_FRESNEL = 7,

@@ -43,7 +43,7 @@ public:
         float lightSpecular;    // offset 40 - specular x material
         float lightNoClamp;     // offset 44 - 1 = keep the lit colour unclamped (HDR)
         float lightDir[4];      // offset 48 - eye-space direction to the light (.xyz), exponent (.w)
-        float matExtra[4];      // offset 64 - metalness, toon bands, Fresnel rim, unused
+        float matExtra[4];      // offset 64 - metalness, toon, Fresnel rim, toonPov
     };
 
     /**

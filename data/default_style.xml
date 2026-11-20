@@ -351,11 +351,13 @@
   <material id="nolighting">
     <def ambient="1.0" diffuse="0.0" specular="0.0" shininess="0.0"/>
   </material>
+  <!-- toon1 / toon2: the POV-Ray toon finishes (brilliance 0; toon2 adds a
+       saturating phong spot), see Scene::getMaterialLight. -->
   <material id="toon1">
-    <def ambient="0.0" diffuse="0.85" specular="0.0" shininess="0.0"/>
+    <def ambient="0.0" diffuse="0.8" specular="0.0" shininess="0.0" toon="1"/>
   </material>
   <material id="toon2">
-    <def ambient="0.0" diffuse="0.85" specular="0.0" shininess="32.0"/>
+    <def ambient="0.3" diffuse="0.5" specular="2.5" shininess="16.0" toon="1"/>
   </material>
   <material id="matte">
     <def ambient="0.3" diffuse="0.6" specular="0.0" shininess="32.0"/>
