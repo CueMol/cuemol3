@@ -180,6 +180,8 @@ void PostProcGpuPrim::drawComposite(DisplayContext *pDC, RenderTarget *sceneRT,
     m_pCompPO->setUniform("u_specOcclusion", consts.specOcclusion ? 1 : 0);
     m_pCompPO->setUniformF("u_lightAmbient", consts.lightAmbient);
     m_pCompPO->setUniformF("u_lightDiffuse", consts.lightDiffuse);
+    m_pCompPO->setUniformF("u_lightDir", consts.lightDir[0], consts.lightDir[1], consts.lightDir[2]);
+    m_pCompPO->setUniform("u_keyShadow", (ambientOnly && consts.keyShadow) ? 1 : 0);
     m_pCompPO->setUniform("u_hasBounce", hasBounce ? 1 : 0);
     m_pCompPO->setUniformF("u_bounceScale",
                            hasBounce ? consts.bounceStrength / std::max(consts.lightAmbient, 1e-3f)
@@ -307,7 +309,11 @@ void PostProcGpuPrim::drawGtao(DisplayContext *pDC, RenderTarget *sceneRT,
                                probe->origin[2]);
         m_pGtaoPO->setUniformF("u_probeBias", probe->bias);
         m_pGtaoPO->setUniformF("u_probeStrength", probe->strength);
+        m_pGtaoPO->setUniformF("u_lightDirEye", probe->lightDir[0], probe->lightDir[1],
+                               probe->lightDir[2]);
     }
+    m_pGtaoPO->setUniformF("u_keyShadow", hasProbe ? probe->keyShadow : 0.0f);
+    m_pGtaoPO->setUniformF("u_keyShadowPower", hasProbe ? probe->keyShadowPower : 1.0f);
     m_pGtaoPO->setUniformF("u_fullPixelSize", consts.fullPixelSize[0], consts.fullPixelSize[1]);
     m_pGtaoPO->setUniformF("u_thicknessNear", consts.thicknessNear);
     // Near-field indirect light (bitmask): the lit scene colour is the

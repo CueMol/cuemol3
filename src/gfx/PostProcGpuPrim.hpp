@@ -78,8 +78,8 @@ struct AoConstants
     /// 2 = the AO buffer's RGB as is (the GTAO pass's normal / depth debug
     /// output). Only used when an AO buffer is supplied.
     int debugView = 0;
-    /// AO integration: 0 = GTAO, 1 = visibility bitmask (EEVEE Next port), and
-    /// the bitmask's constant minimum thickness (view units).
+    /// AO integration: 0 = GTAO, 1 = Fast GI (visibility bitmask, EEVEE Next
+    /// port; qsys::Scene::AOM_FASTGI).
     int aoMethod = 0;
     /// (1/width, 1/height) of the full-resolution output. The bitmask AO sizes
     /// its minimum occluder thickness by the output pixel, not the AO pass
@@ -92,8 +92,11 @@ struct AoConstants
     float bounceStrength = 0.0f;
     float lightAmbient = 1.0f;
     float lightDiffuse = 0.8f;
+    float lightDir[3] = {1.0f, 1.0f, 1.5f};
     /// Darken the highlight by the AO as well (bitmask, ambient-only composite).
     bool specOcclusion = false;
+    /// The AO buffer's B channel holds the key-light visibility (probe shadow).
+    bool keyShadow = false;
 
     /// Fill the camera-derived geometric fields (isOrtho, depthLinearize*,
     /// ndcToView*, viewportPixelSize) from the camera parameters. The AO tuning
@@ -138,6 +141,10 @@ struct AoProbeParams
     /// Probe visibility = mix(1, probe, strength); the AO term is the minimum
     /// of the screen-space and the probe visibility.
     float strength = 1.0f;
+    /// Eye-space direction to the key light, and its shadow strength (0 = off).
+    float lightDir[3] = {1.0f, 1.0f, 1.5f};
+    float keyShadow = 0.0f;
+    float keyShadowPower = 1.0f;
 };
 
 /// Fullscreen post-processing primitive.

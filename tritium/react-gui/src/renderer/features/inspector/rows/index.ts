@@ -32,6 +32,7 @@ export type { FontSelectRowProps } from './FontSelectRow';
 export { DashedStippleRows } from './DashedStippleRows';
 export { CenterUpdateRow } from './CenterUpdateRow';
 export { qualityPresetRow } from './QualityPresetRow';
+export { AoMethodRow } from './AoMethodRow';
 export { LimitDisplayRows, useMolObjectNames } from './LimitDisplayRows';
 export type { BoolSelectRowProps } from './BoolSelectRow';
 export { writeMany } from './multiWrite';

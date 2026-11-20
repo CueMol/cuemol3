@@ -41,6 +41,9 @@ uniform mat4 u_viewToWorld;             // GTAO view space -> world
 uniform vec3 u_probeOrigin;
 uniform float u_probeBias;              // lookup offset along the normal
 uniform float u_probeStrength;          // probe visibility = mix(1, probe, strength)
+uniform vec3 u_lightDirEye;             // eye-space direction to the key light
+uniform float u_keyShadow;              // key-light shadow strength (0 = off)
+uniform float u_keyShadowPower;         // contrast of the key-light shadow
 
 // Bitmask: near-field indirect diffuse light (EEVEE horizon scan radiance).
 // The lit scene colour (fog included) is the radiance of the occluders.
@@ -233,11 +236,11 @@ float pixelDepthThicknessAt(float vsZ, float avgPixRadius)
     return ndcThickness * winmat32 * 0.5;
 }
 
-// Trilinear lookup of the probe atlas at world position pw.
-vec4 sampleProbeAtlas(vec3 pw)
+// Trilinear lookup of the probe atlas at grid position g (probe centres at
+// integer g).
+vec4 sampleProbeGrid(vec3 g)
 {
     vec3 dim = vec3(u_probeDim);
-    vec3 g = (pw - u_probeOrigin) / u_probeSpacing - 0.5;
     g = clamp(g, vec3(0.0), dim - 1.0);
     float z0 = floor(g.z);
     float z1 = min(z0 + 1.0, dim.z - 1.0);
@@ -250,16 +253,55 @@ vec4 sampleProbeAtlas(vec3 pw)
     return mix(s0, s1, fz);
 }
 
+// Trilinear lookup of the probe atlas at world position pw.
+vec4 sampleProbeAtlas(vec3 pw)
+{
+    return sampleProbeGrid((pw - u_probeOrigin) / u_probeSpacing - 0.5);
+}
+
+// Tricubic B-spline lookup at world position pw, from 8 trilinear lookups
+// (Sigg & Hadwiger, GPU Gems 2 ch. 20). The B-spline is C2 across the probe
+// cells and low-passes the probe values, so a zoomed-in surface does not show
+// the grid as blotches the way the trilinear lookup does.
+vec4 sampleProbeAtlasCubic(vec3 pw)
+{
+    vec3 g = (pw - u_probeOrigin) / u_probeSpacing - 0.5;
+    vec3 i = floor(g);
+    vec3 f = g - i;
+    vec3 f2 = f * f;
+    vec3 f3 = f2 * f;
+    vec3 w0 = (1.0 - 3.0 * f + 3.0 * f2 - f3) / 6.0;
+    vec3 w1 = (4.0 - 6.0 * f2 + 3.0 * f3) / 6.0;
+    vec3 w2 = (1.0 + 3.0 * f + 3.0 * f2 - 3.0 * f3) / 6.0;
+    vec3 w3 = f3 / 6.0;
+    vec3 a0 = w0 + w1;
+    vec3 a1 = w2 + w3;
+    vec3 c0 = i - 1.0 + w1 / max(a0, vec3(1e-6));
+    vec3 c1 = i + 1.0 + w3 / max(a1, vec3(1e-6));
+    vec4 r = vec4(0.0);
+    r += a0.x * a0.y * a0.z * sampleProbeGrid(vec3(c0.x, c0.y, c0.z));
+    r += a1.x * a0.y * a0.z * sampleProbeGrid(vec3(c1.x, c0.y, c0.z));
+    r += a0.x * a1.y * a0.z * sampleProbeGrid(vec3(c0.x, c1.y, c0.z));
+    r += a1.x * a1.y * a0.z * sampleProbeGrid(vec3(c1.x, c1.y, c0.z));
+    r += a0.x * a0.y * a1.z * sampleProbeGrid(vec3(c0.x, c0.y, c1.z));
+    r += a1.x * a0.y * a1.z * sampleProbeGrid(vec3(c1.x, c0.y, c1.z));
+    r += a0.x * a1.y * a1.z * sampleProbeGrid(vec3(c0.x, c1.y, c1.z));
+    r += a1.x * a1.y * a1.z * sampleProbeGrid(vec3(c1.x, c1.y, c1.z));
+    return r;
+}
+
 // Distant visibility from the baked probes at world position pw with world
 // normal nw, cosine-weighted (m0 + 2 dot(m1, N)) and mixed by the strength.
-// Plain trilinear lookup: EEVEE's facing / validity weighting of the 8 probes
-// was tried and left out, since with probes 3 A apart (coarser than an atom)
-// it lets the dark probes in the gaps in front of a sunk atom dominate and
-// paints dark smudges on CPK spheres.
-float probeVisibility(vec3 pw, vec3 nw)
+// cubic: the tricubic B-spline lookup (the receiver's own AO term; smooth when
+// zoomed in); false = trilinear (the per-sample bounce, where the cost
+// matters). EEVEE's facing / validity weighting of the 8 probes was tried and
+// left out, since with probes 3 A apart (coarser than an atom) it lets the
+// dark probes in the gaps in front of a sunk atom dominate and paints dark
+// smudges on CPK spheres.
+float probeVisibility(vec3 pw, vec3 nw, bool cubic)
 {
     vec3 pq = pw + nw * u_probeBias;
-    vec4 m = sampleProbeAtlas(pq);
+    vec4 m = cubic ? sampleProbeAtlasCubic(pq) : sampleProbeAtlas(pq);
     return mix(1.0, clamp(m.x + 2.0 * dot(m.yzw, nw), 0.0, 1.0), u_probeStrength);
 }
 
@@ -280,7 +322,7 @@ vec3 occluderRadiance(vec2 uv, float viewZ, vec4 sn, vec3 pG, vec3 nG)
         float f = clamp(2.0 - length(sn.xyz), 0.0, 1.0);
         vec3 pw = (u_viewToWorld * vec4(pG, 1.0)).xyz;
         vec3 nw = normalize(mat3(u_viewToWorld) * nG);
-        lit *= 1.0 - f * (1.0 - probeVisibility(pw, nw));
+        lit *= 1.0 - f * (1.0 - probeVisibility(pw, nw, false));
     }
     return lit;
 }
@@ -613,6 +655,7 @@ void main()
         vec3 vP = vec3(pixCenterPos.xy, -pixCenterPos.z);
         vec3 vN = normalize(vec3(N.xy, -N.z));
         vec3 bounce;
+        float keyVis = 1.0;
         float vis = eeveeVisibility(vP, vN, u_effectRadius, clamp(u_sliceCount, 1, 32),
                                     clamp(u_stepCount, 1, 32), noise, bounce);
         o_Bounce = vec4(bounce, 1.0);
@@ -629,9 +672,24 @@ void main()
             // probes the large cavities.
             vec3 pw = (u_viewToWorld * vec4(pixCenterPos, 1.0)).xyz;
             vec3 nw = normalize(mat3(u_viewToWorld) * N);
-            vis = min(vis, probeVisibility(pw, nw));
+            vec3 pq = pw + nw * u_probeBias;
+            vec4 m = sampleProbeAtlasCubic(pq);
+            vis = min(vis, mix(1.0, clamp(m.x + 2.0 * dot(m.yzw, nw), 0.0, 1.0), u_probeStrength));
+            if (u_keyShadow > 0.0) {
+                // Soft shadow of the key light from the same probes: the L1
+                // reconstruction of the directional visibility, V(L) = m0 +
+                // 3 dot(m1, L), divided by its value over an open plane
+                // (0.5 + 0.75 N.L), which takes the receiver's own half space
+                // out, so a free surface stays lit.
+                vec3 lw = normalize(mat3(u_viewToWorld) *
+                                    vec3(u_lightDirEye.xy, -u_lightDirEye.z));
+                float vl = m.x + 3.0 * dot(m.yzw, lw);
+                float ref = 0.5 + 0.75 * max(dot(nw, lw), 0.0);
+                keyVis = mix(1.0, pow(clamp(vl / ref, 0.0, 1.0), u_keyShadowPower),
+                             u_keyShadow * u_probeStrength);
+            }
         }
-        o_FragColor = vec4(vis, packedEdges, 0.0, 1.0);
+        o_FragColor = vec4(vis, packedEdges, keyVis, 1.0);
         return;
     }
 

@@ -86,9 +86,9 @@ vec4 flight(in vec3 normal, in vec4 ecPosition, in vec4 a_color)
 
 void directionalLight2(in vec3 normal)
 {
-    // Direction and shininess are fixed; intensities come from FogBlock.
-    vec4 u_LightSourcePosition = vec4(1.0, 1.0, 1.5, 0.0);
-    float u_FrontMaterialShininess = 32.0;
+    // Direction, specular exponent and intensities come from FogBlock.
+    vec4 u_LightSourcePosition = vec4(u_lightDir.xyz, 0.0);
+    float u_FrontMaterialShininess = u_lightDir.w;
 
     float nDotVP;  // normal . light direction
     float nDotHV;  // normal . light half vector

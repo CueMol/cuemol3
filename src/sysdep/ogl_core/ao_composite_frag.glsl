@@ -35,6 +35,8 @@ uniform sampler2D u_sceneNormalTex;
 uniform int u_specOcclusion;
 uniform float u_lightAmbient;
 uniform float u_lightDiffuse;
+uniform vec3 u_lightDir;  // eye-space direction to the light (not normalized)
+uniform int u_keyShadow;   // 1 = the AO buffer's B is the key-light visibility
 uniform int u_hasBounce;
 uniform sampler2D u_bounceTex;
 uniform float u_bounceScale;
@@ -143,23 +145,31 @@ void main()
             float f = clamp(2.0 - length(texture(u_sceneNormalTex, v_uv).xyz), 0.0, 1.0);
             vec3 litPart = c.rgb - (1.0 - fogVis) * u_fogColor;
             vec3 outc = c.rgb - litPart * (f * (1.0 - ao));
-            if (u_specOcclusion != 0 && f < 0.999) {
+            if ((u_specOcclusion != 0 || u_keyShadow != 0) && f < 0.999) {
                 // The highlight still in the lit part: the non-ambient part minus
                 // the diffuse part (albedo * diffuse * N.L, the light of
                 // lighting_inc.glsl directionalLight2). Exact when diffuse is 0.
                 vec3 nE = normalize(texture(u_sceneNormalTex, v_uv).xyz);
-                float nDotL = max(dot(nE, normalize(vec3(1.0, 1.0, 1.5))), 0.0);
+                float nDotL = max(dot(nE, normalize(u_lightDir)), 0.0);
                 vec3 albedoAmb = litPart * f;  // albedo * ambient (fog-attenuated)
                 vec3 diff = albedoAmb * (u_lightDiffuse / max(u_lightAmbient, 1e-3)) * nDotL;
                 vec3 spec = max(litPart * (1.0 - f) - diff, vec3(0.0));
                 // Lagarde & de Rousiers 2014 (Moving Frostbite to PBR), also the
                 // legacy EEVEE specular_occlusion: so = saturate(pow(NV + ao,
-                // exp2(-16 r - 1)) - 1 + ao), r = Blinn-Phong 32 as GGX alpha
-                // sqrt(2 / (32 + 2)). The view vector is taken as the eye axis.
+                // exp2(-16 r - 1)) - 1 + ao), r = the Blinn-Phong exponent 16
+                // (Scene::kFastGILightShininess) as GGX alpha sqrt(2 / (16 + 2)).
+                // The view vector is taken as the eye axis.
                 float nDotV = max(nE.z, 0.0);
-                const float rough = 0.2425;
-                float so = clamp(pow(nDotV + ao, exp2(-16.0 * rough - 1.0)) - 1.0 + ao, 0.0, 1.0);
-                outc -= spec * (1.0 - so);
+                const float rough = 0.3333;
+                float so = 1.0;
+                if (u_specOcclusion != 0)
+                    so = clamp(pow(nDotV + ao, exp2(-16.0 * rough - 1.0)) - 1.0 + ao, 0.0, 1.0);
+                // Key-light shadow from the baked probes: occludes the direct
+                // diffuse only. The probe shadow is too smooth for the
+                // highlight (it dims the highlights of exposed atoms too); the
+                // specular occlusion above already removes it in the cavities.
+                float sh = (u_keyShadow != 0) ? texture(u_aoTex, v_uv).b : 1.0;
+                outc -= diff * (1.0 - sh) + spec * (1.0 - so);
             }
             if (u_hasBounce != 0) {
                 // Indirect diffuse: albedo * E, with albedo * ambient = the

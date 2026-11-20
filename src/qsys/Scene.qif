@@ -40,80 +40,65 @@ runtime_class Scene
   property object<AbstractColor$> bgcolor => redirect(getBgColor, setBgColor);
   default bgcolor = gfx::SolidColor::createRGB(0.0, 0.0, 0.0);
 
-  /// Screen-space ambient occlusion (GTAO) enable flag
+  /// Screen-space ambient occlusion enable flag
   property boolean aoEnabled => redirect(isAOEnabled, setAOEnabled);
   default aoEnabled = false;
 
-  /// GTAO occlusion sphere radius (view-space / world units)
+  /// AO occlusion sphere radius / search distance (view-space / world units)
   property real aoRadius => redirect(getAORadius, setAORadius);
-  default aoRadius = 4.0;
+  default aoRadius = 10.0;
 
-  /// GTAO contrast (occlusion = pow(occlusion, aoIntensity))
+  /// GTAO contrast (occlusion = pow(occlusion, aoIntensity)); the bitmask AO
+  /// (aoMethod 1) does not use it
   property real aoIntensity => redirect(getAOIntensity, setAOIntensity);
   default aoIntensity = 2.2;
 
-  /// GTAO number of horizon slices (higher = smoother, slower)
+  /// AO number of slices (higher = smoother, slower). The bitmask AO uses 2
+  /// per temporal-jitter sample once the view is still.
   property integer aoSlices => redirect(getAOSlices, setAOSlices);
-  default aoSlices = 9;
+  default aoSlices = 8;
 
-  /// GTAO number of steps marched per slice (radial samples)
+  /// AO number of steps marched per slice side (radial samples)
   property integer aoSteps => redirect(getAOSteps, setAOSteps);
-  default aoSteps = 3;
+  default aoSteps = 8;
 
-  /// Adaptive half-resolution GTAO: while the camera is moving, compute the AO
+  /// Adaptive half-resolution AO: while the camera is moving, compute the AO
   /// term at half resolution (edge-aware upsampled on composite) for
-  /// responsiveness, then re-render at full resolution once the view is still.
-  /// Off-screen export is always full resolution. Off = always full resolution.
+  /// responsiveness, then re-render at full resolution once the view is still
+  /// (zoomed in, it stays at half resolution). Off-screen export is always
+  /// full resolution. Off = always full resolution.
   property boolean aoHalfRes => redirect(isAOHalfRes, setAOHalfRes);
-  default aoHalfRes = false;
+  default aoHalfRes = true;
 
-  /// AO integration method (not saved; under evaluation): 0 = GTAO,
-  /// 1 = visibility bitmask as in Blender EEVEE Next (aoRadius = search
-  /// distance, aoSlices / aoSteps = slices / samples per side).
-  property integer aoMethod => redirect(getAOMethod, setAOMethod) (nopersist);
-  default aoMethod = 0;
-  /// Visibility bitmask: constant minimum occluder thickness (A; EEVEE
-  /// fast_gi_thickness_near).
-  property real aoThicknessNear => redirect(getAOThicknessNear, setAOThicknessNear) (nopersist);
-  default aoThicknessNear = 3.0;
-  /// Visibility bitmask: strength of the near-field indirect diffuse light
-  /// (the light the occluding surfaces reflect, gathered from the screen as
-  /// EEVEE's horizon scan does). 0 = off.
-  property real aoBounce => redirect(getAOBounce, setAOBounce) (nopersist);
-  default aoBounce = 0.0;
-  /// Visibility bitmask: darken the highlight by the AO too (specular
-  /// occlusion, Frostbite / legacy EEVEE approximation).
-  property boolean aoSpecOcclusion => redirect(isAOSpecOcclusion, setAOSpecOcclusion) (nopersist);
-  default aoSpecOcclusion = true;
-  /// Visibility bitmask: multiply by baked world-space ambient probes (the
-  /// counterpart of EEVEE's volume light probes; rebuilt when the occluder
-  /// spheres change) and their grid spacing (A).
-  property boolean aoProbe => redirect(isAOProbe, setAOProbe) (nopersist);
-  default aoProbe = true;
-  /// Bake: number of directions (<= 64) and depth tile size (pixels).
-  /// 32 / 128 halves the bake time of 64 / 256 with no visible difference
-  /// (2BBV surface: 14 ms vs 40 ms, AO term correlation 0.987).
-  property integer aoProbeDirs => redirect(getAOProbeDirs, setAOProbeDirs) (nopersist);
-  default aoProbeDirs = 32;
-  property integer aoProbeTile => redirect(getAOProbeTile, setAOProbeTile) (nopersist);
-  default aoProbeTile = 128;
-  property real aoProbeSpacing => redirect(getAOProbeSpacing, setAOProbeSpacing) (nopersist);
-  default aoProbeSpacing = 3.0;
-  /// Strength of the probe term: probe visibility = mix(1, probe,
-  /// aoProbeStrength) (0 = no probe darkening, 1 = full); the AO term is the
-  /// minimum of the screen-space and the probe visibility.
-  property real aoProbeStrength => redirect(getAOProbeStrength, setAOProbeStrength) (nopersist);
-  default aoProbeStrength = 1.0;
-  /// Light intensities (not saved; PoC). lightAmbient = ambient total,
-  /// lightSpecular = specular x material. Defaults are the former shader
-  /// constants. With aoMethod 1 the AO darkens the ambient part only (as in
-  /// Blender EEVEE) and the scene colour is kept unclamped until the composite.
-  property real lightAmbient => redirect(getLightAmbient, setLightAmbient) (nopersist);
-  default lightAmbient = 0.4;
-  property real lightDiffuse => redirect(getLightDiffuse, setLightDiffuse) (nopersist);
-  default lightDiffuse = 0.8;
-  property real lightSpecular => redirect(getLightSpecular, setLightSpecular) (nopersist);
-  default lightSpecular = 0.16;
+  /// AO integration method. gtao = GTAO. fastgi = Fast GI, after Blender
+  /// EEVEE's Fast GI Approximation: the visibility bitmask AO (horizon scan;
+  /// aoRadius = search distance, aoSlices / aoSteps = slices / samples per
+  /// side) with its near-field indirect light (aoBounce), combined with baked
+  /// world-space ambient probes (aoProbeStrength) and an ambient-dominant
+  /// light, since the AO darkens the ambient light only. Always saved: a scene
+  /// file without it predates Fast GI and loads as gtao with the former AO
+  /// defaults (Scene::readFrom2).
+  enumdef aoMethod {
+    gtao = 0;
+    fastgi = 1;
+  }
+  property enum aoMethod => redirect(getAOMethod, setAOMethod);
+  default aoMethod = "fastgi";
+  /// Fast GI: strength of the near-field indirect light (the colour the
+  /// neighbouring surfaces reflect into a cavity). 0 = ambient occlusion only.
+  property real aoBounce => redirect(getAOBounce, setAOBounce);
+  default aoBounce = 0.5;
+  /// Fast GI: strength of the baked ambient probes, the occlusion of the large
+  /// cavities (0 = off, no bake; 1 = full). The AO term is the minimum of the
+  /// screen-space and the probe visibility.
+  property real aoProbeStrength => redirect(getAOProbeStrength, setAOProbeStrength);
+  default aoProbeStrength = 0.8;
+
+  /// Overall brightness of the lighting: scales the ambient, diffuse and
+  /// specular light alike (1 = the standard look), so the shading ratios
+  /// and the AO depth cue stay the same. Applies with and without AO.
+  property real lightBrightness => redirect(getLightBrightness, setLightBrightness);
+  default lightBrightness = 1.0;
 
   /// Debug view of the AO stage (not saved). off = the normal image,
   /// ao = the AO term in grayscale, normal = the normal fed to GTAO,
@@ -128,9 +113,9 @@ runtime_class Scene
   property enum aoDebugView => redirect(getAODebugView, setAODebugView) (nopersist);
   default aoDebugView = "off";
 
-  /// Log the per-pass times of the off-screen frame pipeline (not saved;
-  /// debugging). Each pass is followed by a GPU finish, so this slows down
-  /// rendering while on.
+  /// Log the CPU time spent submitting each pass of the off-screen frame
+  /// pipeline and the frame interval (median / max) every 30 frames (not
+  /// saved; debugging).
   property boolean renderTiming => redirect(isRenderTiming, setRenderTiming) (nopersist);
   default renderTiming = false;
 

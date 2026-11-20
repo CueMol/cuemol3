@@ -7,20 +7,22 @@
  * the meaningful subset (the CueMol3 / CueMol2 look, ambient occlusion /
  * GTAO, post-process anti-aliasing, background colour, CMYK colour proofing).
  *
- * The AO and AA pages are deliberately preset-only, one dropdown each: the
- * individual tuning knobs stay in the generic property tree, and a hand edit
- * there reads back into the dropdown as "Custom" rather than being duplicated
- * as rows here.
+ * The AO and AA pages are deliberately preset-only: the individual tuning
+ * knobs stay in the generic property tree, and a hand edit there reads back
+ * into the dropdown as "Custom" rather than being duplicated as rows here.
+ * The AO page also picks the AO method (Fast GI / GTAO), and its preset
+ * ladder follows the method. Fast GI adds its two look knobs that no preset
+ * covers: the indirect light and the baked cavity occlusion.
  *
  * Registered under the key "Scene", which is the typeLabel `getGenericProps`
  * reports for a scene node and therefore what `PropertiesTab` resolves the
  * pages by -- not the lowercase tree node type.
  */
 
-import { isOff } from './predicates'
-import { qualityPresetRow } from '@renderer/features/inspector/rows'
+import { eq, isOff } from './predicates'
+import { AoMethodRow, qualityPresetRow } from '@renderer/features/inspector/rows'
 import { SceneLookRow } from '@renderer/features/inspector/rows/SceneLookRow'
-import { SCENE_AA_QUALITY_AXIS, SCENE_AO_PRESET_AXIS } from '@renderer/data/sceneQualityPresets'
+import { SCENE_AA_QUALITY_AXIS, aoPresetAxisFor } from '@renderer/data/sceneQualityPresets'
 import type { SchemaSectionDef } from './types'
 import type { PropMultiWrite } from '@renderer/features/inspector/rendererPropSections'
 
@@ -41,13 +43,44 @@ export const SCENE_SECTIONS: SchemaSectionDef[] = [
     defaultExpanded: true,
     rows: [
       { kind: 'bool', key: 'aoEnabled', label: 'Enabled' },
+      // Nothing to choose while the effect is off.
+      { kind: 'custom', key: 'ao-method', disabledWhen: isOff('aoEnabled'), Component: AoMethodRow },
       {
         kind: 'custom',
         key: 'ao-preset',
-        // Nothing to preset while the effect is off.
         disabledWhen: isOff('aoEnabled'),
-        Component: qualityPresetRow(SCENE_AO_PRESET_AXIS),
+        Component: qualityPresetRow((ctx) => aoPresetAxisFor(ctx.value('aoMethod'))),
       },
+      {
+        kind: 'slider',
+        key: 'aoBounce',
+        label: 'Indirect light',
+        min: 0,
+        max: 2,
+        step: 0.05,
+        visibleWhen: eq('aoMethod', 'fastgi'),
+        disabledWhen: isOff('aoEnabled'),
+      },
+      {
+        kind: 'slider',
+        key: 'aoProbeStrength',
+        label: 'Baked occlusion',
+        min: 0,
+        max: 1,
+        step: 0.05,
+        visibleWhen: eq('aoMethod', 'fastgi'),
+        disabledWhen: isOff('aoEnabled'),
+      },
+    ],
+  },
+  {
+    // One overall knob: it scales every light alike, so the image gets
+    // brighter or darker while the AO depth cue keeps its strength.
+    key: 'scene-light',
+    title: 'Lighting',
+    defaultExpanded: true,
+    rows: [
+      { kind: 'slider', key: 'lightBrightness', label: 'Brightness', min: 0.5, max: 1.5, step: 0.05 },
     ],
   },
   {

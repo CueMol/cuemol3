@@ -21,6 +21,8 @@ layout(std140) uniform FogBlock {
     float u_lightDiffuse;   // offset 36
     float u_lightSpecular;  // offset 40
     float u_lightNoClamp;   // offset 44: 1 = do not clamp (HDR scene target)
+    vec4 u_lightDir;        // offset 48: .xyz = eye-space direction to the light,
+                            // .w = specular exponent
 };
 
 ////////////////////

@@ -124,19 +124,12 @@ namespace qsys {
     /// Compute the GTAO term at half resolution (edge-aware upsample on composite)
     bool m_bAOHalfRes;
 
-    /// AO integration method and bitmask thickness (see Scene.qif; not saved)
+    /// AO integration method, Fast GI indirect light and probe strength
+    /// (see Scene.qif)
     int m_nAOMethod;
-    double m_fAOThicknessNear;
     double m_fAOBounce;
-    bool m_bAOSpecOcclusion;
-    bool m_bAOProbe;
-    int m_nAOProbeDirs;
-    int m_nAOProbeTile;
-    double m_fAOProbeSpacing;
     double m_fAOProbeStrength;
-    double m_fLightAmbient;
-    double m_fLightDiffuse;
-    double m_fLightSpecular;
+    double m_fLightBrightness;
 
     /// AO debug view (see AODebugView; not saved)
     int m_nAODebugView;
@@ -266,6 +259,45 @@ namespace qsys {
       m_bAOHalfRes = v;
     }
 
+    /// AO integration methods (match the aoMethod enumdef).
+    enum AOMethod {
+      AOM_GTAO = 0,
+      AOM_FASTGI = 1,
+    };
+
+    /// Light intensities while the Fast GI AO is on (ambient total, diffuse,
+    /// specular x material). The AO darkens the ambient part; the diffuse key
+    /// light tells the faces of a shape apart (a cartoon cylinder's side from
+    /// its cap) and is darkened in the cavities by its probe shadow, so a
+    /// strong key does not light the cavities up. Without Fast GI the scene
+    /// keeps the former 0.4 / 0.8 / 0.16, which shade without AO (see
+    /// display()). Both are scaled by lightBrightness.
+    /// (ambient / diffuse 0.7 / 0.65 tuned for the depth cue, x 0.8 for the
+    /// brightness). The highlight is broader (exponent 16) and stronger than
+    /// the former 32 / 0.16 to read as plastic over the ambient-lit colour.
+    static constexpr double kFastGILightAmbient = 0.56;
+    static constexpr double kFastGILightDiffuse = 0.52;
+    static constexpr double kFastGILightSpecular = 0.25;
+    static constexpr double kFastGILightShininess = 16.0;
+    /// The former specular exponent, kept without Fast GI.
+    static constexpr double kLegacyLightShininess = 32.0;
+    /// Eye-space direction to the key light (upper right front), the same
+    /// with and without Fast GI.
+    static constexpr float kLightDir[3] = {1.0f, 1.0f, 1.5f};
+    /// Fast GI: contrast (power of the visibility) of the key light's soft
+    /// shadow from the baked probes (gtao_frag.glsl).
+    static constexpr double kFastGIKeyShadowPower = 2.0;
+
+    /// Overall light scale (lightBrightness): multiplies the ambient, diffuse
+    /// and specular intensities alike, so the image gets brighter or darker
+    /// while the shading ratios (the depth cue of the AO) stay the same.
+    double getLightBrightness() const { return m_fLightBrightness; }
+    void setLightBrightness(double v) {
+      if (m_fLightBrightness == v) return;
+      m_fLightBrightness = v;
+      setUpdateFlag();
+    }
+
     /// AO debug view values (match the aoDebugView enumdef).
     enum AODebugView {
       AODV_OFF = 0,
@@ -274,45 +306,25 @@ namespace qsys {
       AODV_DEPTH = 3,
     };
 
-    /// AO integration method: 0 = GTAO, 1 = visibility bitmask (see Scene.qif)
+    /// AO integration method (AOMethod, see Scene.qif)
     int getAOMethod() const { return m_nAOMethod; }
     void setAOMethod(int v) {
       if (m_nAOMethod == v) return;
       m_nAOMethod = v;
       setUpdateFlag();
     }
-    double getLightAmbient() const { return m_fLightAmbient; }
-    void setLightAmbient(double v) { m_fLightAmbient = v; setUpdateFlag(); }
-    double getLightDiffuse() const { return m_fLightDiffuse; }
-    void setLightDiffuse(double v) { m_fLightDiffuse = v; setUpdateFlag(); }
-    double getLightSpecular() const { return m_fLightSpecular; }
-    void setLightSpecular(double v) { m_fLightSpecular = v; setUpdateFlag(); }
-    int getAOProbeDirs() const { return m_nAOProbeDirs; }
-    void setAOProbeDirs(int v) { m_nAOProbeDirs = v; setUpdateFlag(); }
-    int getAOProbeTile() const { return m_nAOProbeTile; }
-    void setAOProbeTile(int v) { m_nAOProbeTile = v; setUpdateFlag(); }
-    bool isAOProbe() const { return m_bAOProbe; }
-    void setAOProbe(bool v) { m_bAOProbe = v; setUpdateFlag(); }
+    /// Fast GI: strength of the baked ambient probes (0 = no bake)
     double getAOProbeStrength() const { return m_fAOProbeStrength; }
-    void setAOProbeStrength(double v) { m_fAOProbeStrength = v; setUpdateFlag(); }
-    double getAOProbeSpacing() const { return m_fAOProbeSpacing; }
-    void setAOProbeSpacing(double v) { m_fAOProbeSpacing = v; setUpdateFlag(); }
-    bool isAOSpecOcclusion() const { return m_bAOSpecOcclusion; }
-    void setAOSpecOcclusion(bool b) {
-      if (m_bAOSpecOcclusion == b) return;
-      m_bAOSpecOcclusion = b;
+    void setAOProbeStrength(double v) {
+      if (m_fAOProbeStrength == v) return;
+      m_fAOProbeStrength = v;
       setUpdateFlag();
     }
+    /// Fast GI: strength of the near-field indirect light (0 = AO only)
     double getAOBounce() const { return m_fAOBounce; }
     void setAOBounce(double v) {
       if (m_fAOBounce == v) return;
       m_fAOBounce = v;
-      setUpdateFlag();
-    }
-    double getAOThicknessNear() const { return m_fAOThicknessNear; }
-    void setAOThicknessNear(double v) {
-      if (m_fAOThicknessNear == v) return;
-      m_fAOThicknessNear = v;
       setUpdateFlag();
     }
 

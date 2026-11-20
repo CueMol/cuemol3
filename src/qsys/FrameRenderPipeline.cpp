@@ -26,6 +26,17 @@ namespace {
 /// Geometry must stay unchanged this long before the ambient probes are baked
 /// (live path; see FrameRenderParams::deferProbeBake).
 constexpr double kProbeSettleSec = 0.2;
+
+/// Fast GI tuning, fixed (measured on 2BBV against ChimeraX soft lighting):
+/// the occluder thickness the bitmask AO assumes behind each pixel (A; EEVEE
+/// fast_gi_thickness_near; 3 A suits ribbons and CPK alike once the probes
+/// carry the large cavities), and the probe bake: grid spacing (A), number of
+/// directions and depth tile size (32 / 128 bakes 2BBV in ~14 ms and looks the
+/// same as 64 / 256).
+constexpr float kFastGIThicknessNear = 3.0f;
+constexpr double kProbeSpacing = 3.0;
+constexpr int kProbeDirs = 32;
+constexpr int kProbeTile = 128;
 }  // namespace
 
 namespace {
@@ -368,7 +379,7 @@ bool FrameRenderPipeline::render(gfx::DisplayContext *pdc, const ScenePtr &pScen
     // The bitmask AO (aoMethod 1) applies the occlusion to the ambient light
     // only, which needs the lit colour before clamping: render the scene into
     // a float target with the lighting clamp off (the composite clamps).
-    const bool hdr = aoActive && pScene->getAOMethod() == 1;
+    const bool hdr = aoActive && pScene->getAOMethod() == Scene::AOM_FASTGI;
     if (hdr != m_bSceneHdr) {
         m_bSceneHdr = hdr;
         const int w = m_pAOSceneRT->getWidth();
@@ -420,14 +431,20 @@ bool FrameRenderPipeline::render(gfx::DisplayContext *pdc, const ScenePtr &pScen
         // per sample, and the accumulation averages them; 8 samples of 2
         // slices look the same as 8 slices. A full-resolution frame of 8
         // slices costs ~45 ms when atoms fill a zoomed-in view.
-        if (aoc.aoMethod == 1 && params.jitterActive && aoc.sliceCount > 2)
+        if (aoc.aoMethod == Scene::AOM_FASTGI && params.jitterActive && aoc.sliceCount > 2)
             aoc.sliceCount = 2;
-        aoc.thicknessNear = float(pScene->getAOThicknessNear());
+        aoc.thicknessNear = kFastGIThicknessNear;
         aoc.bounceStrength =
-            (aoc.aoMethod == 1) ? float(std::max(0.0, pScene->getAOBounce())) : 0.0f;
-        aoc.lightAmbient = float(pScene->getLightAmbient());
-        aoc.lightDiffuse = float(pScene->getLightDiffuse());
-        aoc.specOcclusion = pScene->isAOSpecOcclusion();
+            (aoc.aoMethod == Scene::AOM_FASTGI) ? float(std::max(0.0, pScene->getAOBounce()))
+                                                 : 0.0f;
+        // The lit colour's intensities (Scene::display), so the composite can
+        // split it into its ambient, diffuse and specular parts.
+        const float bri = float(std::max(0.0, pScene->getLightBrightness()));
+        aoc.lightAmbient = float(Scene::kFastGILightAmbient) * bri;
+        aoc.lightDiffuse = float(Scene::kFastGILightDiffuse) * bri;
+        for (int a = 0; a < 3; ++a) aoc.lightDir[a] = Scene::kLightDir[a];
+        aoc.specOcclusion = true;
+        aoc.keyShadow = true;
         aoc.aoNoiseOffset = params.aoNoiseOffset;
         // AO buffer texel size (= full res, or 2x coarser at half res). The GTAO /
         // denoise passes run at this resolution, so they use it as their pixel size;
@@ -463,12 +480,12 @@ bool FrameRenderPipeline::render(gfx::DisplayContext *pdc, const ScenePtr &pScen
         const gfx::AoProbeParams *pProbe = nullptr;
         m_bProbePending = false;
         m_bProbeBaked = false;
-        if (aoc.aoMethod == 1 && pScene->isAOProbe()) {
+        if (aoc.aoMethod == Scene::AOM_FASTGI && pScene->getAOProbeStrength() > 0.0) {
             if (m_pProbe == nullptr) m_pProbe = MB_NEW AmbientProbeVolume();
             const double prevHash = m_pProbe->getHash();
             const bool ok = m_pProbe->update(
-                pdc, pScene, pScene->getAOProbeSpacing(), m_pAOPostProc, pScene->getAOProbeDirs(),
-                pScene->getAOProbeTile(), params.deferProbeBake ? kProbeSettleSec : 0.0,
+                pdc, pScene, kProbeSpacing, m_pAOPostProc, kProbeDirs, kProbeTile,
+                params.deferProbeBake ? kProbeSettleSec : 0.0,
                 &m_bProbePending);
             m_bProbeBaked = (m_pProbe->getHash() != prevHash);
             if (ok) {
@@ -480,8 +497,16 @@ bool FrameRenderPipeline::render(gfx::DisplayContext *pdc, const ScenePtr &pScen
                 probe.spacing = m_pProbe->getSpacing();
                 probe.viewToWorld = qlib::Matrix4D(modelView.invert() * flipZ);
                 for (int a = 0; a < 3; ++a) probe.origin[a] = m_pProbe->getOrigin()[a];
-                probe.bias = 0.5f * m_pProbe->getSpacing();
+                // Look the probes up one cell out along the normal: half a
+                // cell interpolates the probes inside a thin solid (a 4.6 A
+                // cartoon cylinder) into blotches; further out the lookup
+                // reaches past a silhouette into the neighbours.
+                probe.bias = m_pProbe->getSpacing();
                 probe.strength = float(pScene->getAOProbeStrength());
+                // Soft shadow of the key light from the same probes.
+                for (int a = 0; a < 3; ++a) probe.lightDir[a] = Scene::kLightDir[a];
+                probe.keyShadow = 1.0f;
+                probe.keyShadowPower = float(Scene::kFastGIKeyShadowPower);
                 pProbe = &probe;
             }
         }

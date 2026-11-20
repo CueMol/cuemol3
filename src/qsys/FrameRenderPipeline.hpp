@@ -159,7 +159,7 @@ private:
     /// gathered indirect light for the composite, otherwise nullptr.
     gfx::RenderTarget *bounceRT(const gfx::AoConstants &aoc, bool aoActive) const
     {
-        return (aoActive && aoc.aoMethod == 1 && aoc.bounceStrength > 0.0f &&
+        return (aoActive && aoc.aoMethod == 1 /* Scene::AOM_FASTGI */ && aoc.bounceStrength > 0.0f &&
                 aoc.debugView == 0)
                    ? m_pAoRT
                    : nullptr;
