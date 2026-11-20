@@ -284,7 +284,8 @@ public:
     /// bound framebuffer (fullscreen). Used for both the additive accumulate
     /// step (weight 1/N, with additive blend enabled by the caller) and the
     /// normalized display step (weight N/count, no blend).
-    void drawJitterCompose(DisplayContext *pDC, RenderTarget *srcRT, float weight);
+    void drawJitterCompose(DisplayContext *pDC, RenderTarget *srcRT, float weight,
+                           bool unpremul = false);
 
     /// Veil composite, accumulation: add the veil drawn opaque in veilRT
     /// (alpha > 0 = covered) with alpha `alpha` into the currently bound

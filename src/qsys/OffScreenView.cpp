@@ -102,6 +102,12 @@ void OffScreenView::drawScene()
     const int level = m_nSuperSample;
     const int nSamp = gfx::jitterSampleCount(level);
     const bool jitter = !m_bDepthMode && level > 0 && nSamp > 1;
+    // A transparent background is rendered premultiplied by its alpha and
+    // resolved (divided by the alpha) at the end, through the accumulation
+    // target even with a single sample (the average of premultiplied
+    // samples is the right one).
+    const bool accum = !m_bDepthMode && (jitter || m_bBgTransparent);
+    const int nAccum = jitter ? nSamp : 1;
 
     if (m_bDepthMode) {
         // Depth-visualization capture: plain scene into m_pRT (its depth
@@ -118,7 +124,7 @@ void OffScreenView::drawScene()
         m_pRT->unbind();
         m_pReadRT = m_pRT;
         drawDepthVis(pdc);
-    } else if (jitter) {
+    } else if (accum) {
         // Ensure the float accumulation target and the compose primitive.
         if (m_pAccumRT == nullptr) {
             m_pAccumRT = pdc->createRenderTarget(getWidth(), getHeight(),
@@ -134,17 +140,17 @@ void OffScreenView::drawScene()
     }
 
     if (!m_bDepthMode) {
-        if (jitter && m_pAccumRT != nullptr && m_pPostProc != nullptr) {
-            // Render nSamp sub-pixel-jittered color frames (each with the
+        if (accum && m_pAccumRT != nullptr && m_pPostProc != nullptr) {
+            // Render nAccum sub-pixel-jittered color frames (each with the
             // scene's AO) into m_pRT and average them into the float buffer.
-            const float invN = 1.0f / float(nSamp);
+            const float invN = 1.0f / float(nAccum);
             m_pAccumRT->bind();
             m_pAccumRT->clear(0.0f, 0.0f, 0.0f, 0.0f);
             m_pAccumRT->unbind();
 
-            for (int i = 0; i < nSamp; ++i) {
+            for (int i = 0; i < nAccum; ++i) {
                 double jpx = 0.0, jpy = 0.0;
-                gfx::jitterOffset(level, i, jpx, jpy);
+                if (jitter) gfx::jitterOffset(level, i, jpx, jpy);
                 setJitterOffsetPx(jpx, jpy);
                 setUpProjMat(getWidth(), getHeight());  // jittered frustum
                 // Rotate the GTAO noise per sample (R1 sequence) so the grain
@@ -166,7 +172,7 @@ void OffScreenView::drawScene()
             }
             setJitterOffsetPx(0.0, 0.0);
             MB_DPRINTLN("OffScreenView> jitter SS export (level=%d, %d samples)",
-                        level, nSamp);
+                        level, nAccum);
 
             // Resolve the RGBA16F accumulation buffer into the RGBA8 target so
             // it can be read back as UNSIGNED_BYTE (reading a float color
@@ -178,7 +184,7 @@ void OffScreenView::drawScene()
             m_pRT->bind();
             pdc->setDepthTestEnabled(false);
             pdc->setBlendEnabled(false);
-            m_pPostProc->drawJitterCompose(pdc, m_pAccumRT, 1.0f);
+            m_pPostProc->drawJitterCompose(pdc, m_pAccumRT, 1.0f, m_bBgTransparent);
             pdc->setBlendEnabled(true);
             pdc->setDepthTestEnabled(true);
             m_pRT->unbind();

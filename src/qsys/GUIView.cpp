@@ -1530,11 +1530,18 @@ bool GUIView::renderAOColorFrame(DisplayContext *pdc, const ScenePtr &pScene,
 
     // Plain scene (AO off / unavailable) -> outRT.
     gfx::ColorPtr bg = pScene->getBgColor();
-    const float bg_a = bgTransparent ? 0.0f : 1.0f;
     outRT->bind();
     setUpModelMat(MM_NORMAL);
-    outRT->clear(float(bg->fr()), float(bg->fg()), float(bg->fb()), bg_a);
+    // A transparent background keeps the colour premultiplied by its alpha
+    // (see FrameRenderPipeline::render); the exporter divides at the end.
+    if (bgTransparent) {
+        outRT->clear(0.0f, 0.0f, 0.0f, 0.0f);
+        pdc->setBlendModeVeil(true);
+    } else {
+        outRT->clear(float(bg->fr()), float(bg->fg()), float(bg->fb()), 1.0f);
+    }
     pScene->display(pdc);
+    if (bgTransparent) pdc->setBlendModeVeil(false);
     outRT->unbind();
     return false;
 }

@@ -525,9 +525,16 @@ bool FrameRenderPipeline::render(gfx::DisplayContext *pdc, const ScenePtr &pScen
 
         PassTimer timer(pdc, pScene->isRenderTiming());
     gfx::ColorPtr bg = pScene->getBgColor();
-    const float bgA = params.bgTransparent ? 0.0f : 1.0f;
     m_pAOSceneRT->bind();
-    m_pAOSceneRT->clear(float(bg->fr()), float(bg->fg()), float(bg->fb()), bgA);
+    // A transparent background keeps the colour premultiplied by its alpha
+    // (cleared to 0, and the scene blend accumulates the alpha as
+    // a + (1 - a) * dst): the veil composite and the AO composite are linear
+    // in it, and the exporter divides by the alpha at the end.
+    if (params.bgTransparent)
+        m_pAOSceneRT->clear(0.0f, 0.0f, 0.0f, 0.0f);
+    else
+        m_pAOSceneRT->clear(float(bg->fr()), float(bg->fg()), float(bg->fb()), 1.0f);
+    if (params.bgTransparent) pdc->setBlendModeVeil(true);
     // Translucent renderers composited as veils after the AO composite
     // (compositeVeils); the background pass leaves them out, and the labels
     // drawn on top too (they go over the veils).
@@ -541,6 +548,7 @@ bool FrameRenderPipeline::render(gfx::DisplayContext *pdc, const ScenePtr &pScen
         sceneRenderFn();
     }
     pdc->setLightNoClamp(false);
+    if (params.bgTransparent) pdc->setBlendModeVeil(false);
     // Camera modelview the scene was drawn with (world -> eye), for the probe
     // lookup's view -> world reconstruction.
     const qlib::Matrix4D modelView = pdc->getModelViewMat();

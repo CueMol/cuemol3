@@ -525,7 +525,7 @@ void PostProcGpuPrim::drawSmaaBlend(DisplayContext *pDC, RenderTarget *srcColorR
 }
 
 void PostProcGpuPrim::drawJitterCompose(DisplayContext *pDC, RenderTarget *srcRT,
-                                       float weight)
+                                       float weight, bool unpremul)
 {
     if (srcRT == nullptr) return;
     if (!ensureDrawElem(pDC)) return;
@@ -546,6 +546,7 @@ void PostProcGpuPrim::drawJitterCompose(DisplayContext *pDC, RenderTarget *srcRT
     m_pJitterComposePO->enable();
     m_pJitterComposePO->setUniform("u_colorTex", RT_TU_COLOR);
     m_pJitterComposePO->setUniformF("u_weight", weight);
+    m_pJitterComposePO->setUniform("u_unpremul", unpremul ? 1 : 0);
 
     pDC->drawElem(*m_pDrawElem);
 
