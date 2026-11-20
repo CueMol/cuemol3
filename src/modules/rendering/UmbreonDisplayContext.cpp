@@ -119,13 +119,15 @@ namespace {
   // Resolve a CueMol material name. False for an unknown name (the caller
   // falls back to "default").
   //
-  // The ported values are the principled equivalents of the POV finishes this
-  // used to parse -- default_style.xml's `type="pov"` defs run through the
-  // bench's toPrincipledMaterial mapping, whose POV-roughness leg is
-  // r_pbr = sqrt(sqrt(2 / (1/r_pov + 2))):
+  // The ported values started as the principled equivalents of the POV
+  // finishes this used to parse -- default_style.xml's `type="pov"` defs run
+  // through the bench's toPrincipledMaterial mapping, whose POV-roughness leg
+  // is r_pbr = sqrt(sqrt(2 / (1/r_pov + 2))):
   //   default     <- ambient .2 diffuse .8 specular .4 roughness .01
   //   matte       <- finish { ambient 0.3 } (diffuse-only: the exact class)
   //   diff_metal  <- POV F_MetalA,  spec_metal <- POV F_MetalD
+  // default, plastic, matte_plastic and the two metals were then tuned by eye
+  // to match the WebGL view of the same names (see the rows).
   // The five procedural-texture names carried a bare `texture{T_*}` with no
   // finish block, so they fell back to the default plastic finish -- chrome
   // rendered as plastic. umbreon has no procedural texture, so an exact port
@@ -139,12 +141,14 @@ namespace {
     };
     static const PbrEntry kPbr[] = {
         // ported from a POV finish
-        {"default", 0.20f, 0.80f, 0.0f, 0.3742032f, 0.40f, 0.00f},
-        // polished plastic / ceramic: the same finish as default
-        {"plastic", 0.20f, 0.80f, 0.0f, 0.3742032f, 0.40f, 0.00f},
+        // default / plastic (polished plastic, ceramic) and matte_plastic:
+        // tuned by eye against the WebGL view (the ported default, specular
+        // 0.4 roughness 0.374, gave too faint a highlight, and a matte plastic
+        // ported from POV looked the same as matte).
+        {"default", 0.20f, 0.80f, 0.0f, 0.25f, 0.80f, 0.00f},
+        {"plastic", 0.20f, 0.80f, 0.0f, 0.25f, 0.80f, 0.00f},
         {"matte", 0.30f, 0.80f, 0.0f, 0.5000000f, 0.00f, 0.00f},
-        // matte plastic: POV specular 0.15 roughness 0.08 by the same mapping
-        {"matte_plastic", 0.20f, 0.80f, 0.0f, 0.6094183f, 0.15f, 0.00f},
+        {"matte_plastic", 0.20f, 0.80f, 0.0f, 0.45f, 0.60f, 0.00f},
         // TODO: add an "aniso_diff_metal" sibling -- brushed metal, driven by
         // pbr.anisotropy (+ pbr.anisotropyRotation, in turns: 0 = brushed
         // along the axis, 0.25 = a circumferential/lathe brush). The reviewed
@@ -158,8 +162,13 @@ namespace {
         // mesh surfaces stay isotropic until a per-vertex tangent attribute
         // exists, so the material is inert on the mesh-based renderers and
         // only shows on ball-and-stick.
-        {"diff_metal", 0.35f, 0.30f, 1.0f, 0.5491005f, 0.80f, 0.10f},
-        {"spec_metal", 0.15f, 0.60f, 1.0f, 0.3742032f, 0.80f, 0.65f},
+        // The metals keep part of a diffuse lobe (metallic below 1): a full
+        // metal has none, and without a traced environment (GI off) its
+        // reflection is the flat background, so against a black background
+        // everything off the highlight went black. spec_metal also drops the
+        // POV reflection scalar for the coloured F0 term.
+        {"diff_metal", 0.35f, 0.30f, 0.6f, 0.5491005f, 0.80f, 0.10f},
+        {"spec_metal", 0.15f, 0.60f, 0.7f, 0.3742032f, 0.80f, 0.00f},
         // authored: no POV finish to port from (approximate by intent)
         {"metallic_chrome", 0.20f, 0.80f, 1.0f, 0.05f, 0.50f, 0.00f},
         {"metallic_copper", 0.20f, 0.80f, 1.0f, 0.15f, 0.50f, 0.00f},

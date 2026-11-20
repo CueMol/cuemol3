@@ -45,7 +45,17 @@ OpenGL 用の値と見た目 (鏡面の実効値 = specular × 0.4):
 
 - **material を指定しない renderer** (`""`) は `default` で描く。style に無い名前も `default` と同じ値 (`Scene::kDefaultMaterial*`) になる。CueMol2 は未指定に組み込みの値を使い、`default` (鏡面 0) と見た目が違っていたが、inspector の「なし」と `default` が同じに見えるように揃えた。
 - **プラスチックと金属の分け方**: ハイライトはどれも白い (下地の色に染まらない)。そのため、プラスチックは「色 (拡散) が主で、ハイライトは添える程度」、金属は「色を弱め、ハイライトを強く」という配分の違いで分けている。艶消し (指数 16) と磨き (指数 48〜77) はハイライトの広さで分ける。ハイライトが広く弱いと、白くても艶消しの金属 (サテン) に見える。
-- **POV-Ray とレイトレーサー**: `plastic` と `matte_plastic` には POV-Ray 用の定義 (`plastic` は `default` と同じ finish、`matte_plastic` は specular 0.15・roughness 0.08) と、umbreon の表の行 (POV-Ray の値を表の既存の換算で直したもの) がある。どちらの経路でも、未定義の名前は `default` で描かれる。
+- **POV-Ray**: `plastic` は `default` と同じ finish、`matte_plastic` は specular 0.15・roughness 0.08。未定義の名前は `default` で描かれる。
+- **レイトレーサー (umbreon)**: `lookupMaterial` の表 (principled BSDF) を、WebGL の同じ名前の見た目に目視で合わせてある。POV-Ray の値を換算しただけの値では、`default` のハイライトが弱く、`matte_plastic` が `matte` と同じに見え、金属 (metallic 1) は拡散が無く黒い背景を映して黒いシミになったため。
+
+| id | metallic | roughness | specular | diffuse | reflection |
+|---|---|---|---|---|---|
+| `default` / `plastic` | 0 | 0.25 | 0.8 | 0.8 | 0 |
+| `matte_plastic` | 0 | 0.45 | 0.6 | 0.8 | 0 |
+| `diff_metal` | 0.6 | 0.55 | 0.8 | 0.3 | 0.1 |
+| `spec_metal` | 0.7 | 0.37 | 0.8 | 0.6 | 0 |
+
+  金属は metallic を 1 未満にして拡散を一部残す。umbreon の反射は、GI ありでは鏡の向きに 1 本だけ光線を飛ばし、当たった面の直接光と空の分だけを持ち帰る (その面の間接光は持ち帰らない)。GI なしでは反射を追わず、背景の色をそのまま映す (`reflection × 背景` または `F0 × 背景`)。どちらも周りが暗いと金属の映り込みが黒くなる。
 
 ## 3. 名前から光への換算 (`Scene::getMaterialLight`)
 
