@@ -303,13 +303,19 @@ namespace qsys {
     /// shadow from the baked probes (gtao_frag.glsl).
     static constexpr double kFastGIKeyShadowPower = 2.0;
 
-    /// Light intensities and specular exponent (FogBlock) of one material.
+    /// Light intensities, specular exponent and the extra terms (FogBlock)
+    /// of one material.
     struct MaterialLight
     {
       float ambient;
       float diffuse;
       float specular;
       float shininess;
+      /// Metalness 0-1, toon band count (0 = smooth), Fresnel rim 0-1
+      /// (gfx::Material::MAT_METALLIC / MAT_TOON / MAT_FRESNEL).
+      float metallic = 0.0f;
+      float toon = 0.0f;
+      float fresnel = 0.0f;
     };
 
     /// The light a renderer of material mat_id is lit with: the material's

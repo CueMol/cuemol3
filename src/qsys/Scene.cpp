@@ -7,6 +7,9 @@
 
 #include <common.h>
 
+#include <algorithm>
+#include <cmath>
+
 #include "Scene.hpp"
 #include "SceneEventCaster.hpp"
 #include "ObjLoadEditInfo.hpp"
@@ -689,6 +692,7 @@ void Scene::display(DisplayContext *pdc)
   const MaterialLight ml = getMaterialLight(LString());
   pdc->setLightIntensities(ml.ambient, ml.diffuse, ml.specular);
   pdc->setLightShininess(ml.shininess);
+  pdc->setLightMaterialExtra(ml.metallic, ml.toon, ml.fresnel);
   pdc->setLightDir(kLightDir[0], kLightDir[1], kLightDir[2]);
   pdc->startRender();
 
@@ -789,6 +793,8 @@ Scene::MaterialLight Scene::getMaterialLight(const LString &mat_id) const
   // look the same.
   double ka = kDefaultMaterialAmbient, kd = kDefaultMaterialDiffuse,
          ks = kDefaultMaterialSpecular, shin = kDefaultMaterialShininess;
+  // The extra terms of the WebGL view (0 = the plain Blinn-Phong look).
+  double metal = 0.0, toon = 0.0, fresnel = 0.0;
   {
     // Look the name up in this scene's styles (display() has already pushed
     // the context; pushing it again is harmless).
@@ -803,6 +809,12 @@ Scene::MaterialLight Scene::getMaterialLight(const LString &mat_id) const
     if (v >= -0.1) ks = v;
     v = pSM->getMaterial(name, gfx::Material::MAT_SHININESS);
     if (v >= -0.1) shin = v;
+    v = pSM->getMaterial(name, gfx::Material::MAT_METALLIC);
+    if (v >= -0.1) metal = v;
+    v = pSM->getMaterial(name, gfx::Material::MAT_TOON);
+    if (v >= -0.1) toon = v;
+    v = pSM->getMaterial(name, gfx::Material::MAT_FRESNEL);
+    if (v >= -0.1) fresnel = v;
   }
   double amb = 0.2 + ka, diff = kd, spec = 0.4 * ks;
 
@@ -821,6 +833,9 @@ Scene::MaterialLight Scene::getMaterialLight(const LString &mat_id) const
   ml.diffuse = float(diff * bri);
   ml.specular = float(spec * bri);
   ml.shininess = float(shin);
+  ml.metallic = float(std::clamp(metal, 0.0, 1.0));
+  ml.toon = float(std::max(0.0, std::floor(toon)));
+  ml.fresnel = float(std::clamp(fresnel, 0.0, 1.0));
   return ml;
 }
 
@@ -835,6 +850,7 @@ void Scene::displayRendImpl(DisplayContext *pdc, ObjectPtr pObj, RendererPtr pRe
   const MaterialLight ml = getMaterialLight(pRend->getDefaultMaterial());
   pdc->setLightIntensities(ml.ambient, ml.diffuse, ml.specular);
   pdc->setLightShininess(ml.shininess);
+  pdc->setLightMaterialExtra(ml.metallic, ml.toon, ml.fresnel);
   pdc->setStyleNames(pRend->getStyleNames());
   
   // transfer the edge settings

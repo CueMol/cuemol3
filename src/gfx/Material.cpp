@@ -16,6 +16,9 @@ using namespace gfx;
 #define MAT_SPECULAR_DEFAULT 0.0
 #define MAT_SHININESS_DEFAULT 0.0
 #define MAT_EMISSION_DEFAULT 0.0
+#define MAT_METALLIC_DEFAULT 0.0
+#define MAT_TOON_DEFAULT 0.0
+#define MAT_FRESNEL_DEFAULT 0.0
 
 Material::Material()
 {
@@ -24,6 +27,9 @@ Material::Material()
   m_sysmat[MAT_SPECULAR] = MAT_SPECULAR_DEFAULT;
   m_sysmat[MAT_SHININESS] = MAT_SHININESS_DEFAULT;
   m_sysmat[MAT_EMISSION] = MAT_EMISSION_DEFAULT;
+  m_sysmat[MAT_METALLIC] = MAT_METALLIC_DEFAULT;
+  m_sysmat[MAT_TOON] = MAT_TOON_DEFAULT;
+  m_sysmat[MAT_FRESNEL] = MAT_FRESNEL_DEFAULT;
 
   m_bHasSysVal = false;
   m_bHasDepVal = false;
@@ -31,13 +37,14 @@ Material::Material()
 
 void Material::setSysValue(int nID, double value)
 {
-  MB_ASSERT(MAT_AMBIENT<=nID && nID<=MAT_EMISSION);
+  MB_ASSERT(MAT_AMBIENT<=nID && nID<MAT_NVALUES);
   m_sysmat[nID] = value;
   m_bHasSysVal = true;
 }
 
 double Material::getSysValue(int nID) const
 {
+  MB_ASSERT(MAT_AMBIENT<=nID && nID<MAT_NVALUES);
   return m_sysmat[nID];
 }
 
@@ -80,6 +87,15 @@ void Material::writeTo(qlib::LDom2Node *pNode) const
     }
     if (!qlib::isNear4(m_sysmat[MAT_SPECULAR], MAT_SPECULAR_DEFAULT)) {
       pCNode->setStrAttr("specular", LString::fromReal(m_sysmat[MAT_SPECULAR]));
+    }
+    if (!qlib::isNear4(m_sysmat[MAT_METALLIC], MAT_METALLIC_DEFAULT)) {
+      pCNode->setStrAttr("metallic", LString::fromReal(m_sysmat[MAT_METALLIC]));
+    }
+    if (!qlib::isNear4(m_sysmat[MAT_TOON], MAT_TOON_DEFAULT)) {
+      pCNode->setStrAttr("toon", LString::fromReal(m_sysmat[MAT_TOON]));
+    }
+    if (!qlib::isNear4(m_sysmat[MAT_FRESNEL], MAT_FRESNEL_DEFAULT)) {
+      pCNode->setStrAttr("fresnel", LString::fromReal(m_sysmat[MAT_FRESNEL]));
     }
     // TO DO: impl
   }

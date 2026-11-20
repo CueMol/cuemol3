@@ -44,11 +44,18 @@ public:
     MAT_SPECULAR = 2,
     MAT_SHININESS = 3,
     MAT_EMISSION = 4,
+    /// Metalness 0-1: the highlight takes the surface colour (WebGL view).
+    MAT_METALLIC = 5,
+    /// Toon shading: number of diffuse bands (0 = smooth shading).
+    MAT_TOON = 6,
+    /// Fresnel rim strength 0-1 (Schlick), for glazed / ceramic looks.
+    MAT_FRESNEL = 7,
+    MAT_NVALUES = 8,
   };
 
 private:
   /// System's material definitions
-  double m_sysmat[5];
+  double m_sysmat[MAT_NVALUES];
 
   /// Renderer specific definitions
   qlib::MapTable<LString> m_depmat;

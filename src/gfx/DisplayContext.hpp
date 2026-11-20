@@ -86,6 +86,8 @@ private:
     bool m_bLightNoClamp = false;
     float m_lightDir[3] = {1.0f, 1.0f, 1.5f};
     float m_fLightShininess = 32.0f;
+    // metalness, toon bands, Fresnel rim, unused (setLightMaterialExtra)
+    float m_matExtra[4] = {0.0f, 0.0f, 0.0f, 0.0f};
     ColorPtr m_fogColor;
 
     /// Screen-space ambient occlusion (GTAO)
@@ -297,6 +299,18 @@ public:
     }
     /// Specular (Blinn-Phong) exponent of the lit shaders.
     void setLightShininess(float s) { m_fLightShininess = s; }
+    /// Material terms beyond the light intensities (FogBlock u_matExtra):
+    /// metalness, toon band count (0 = smooth), Fresnel rim strength.
+    void setLightMaterialExtra(float metallic, float toon, float fresnel)
+    {
+        m_matExtra[0] = metallic;
+        m_matExtra[1] = toon;
+        m_matExtra[2] = fresnel;
+    }
+    void getLightMaterialExtra(float d[4]) const
+    {
+        for (int i = 0; i < 4; ++i) d[i] = m_matExtra[i];
+    }
     bool isLightNoClamp() const { return m_bLightNoClamp; }
 
     // Screen-space ambient occlusion (GTAO)
