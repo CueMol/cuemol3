@@ -160,7 +160,7 @@ void main()
             // The light of this pixel's material: diffuse / ambient, the
             // specular roughness and the ambient intensity.
             float diffPerAmb = u_lightDiffuse / max(u_lightAmbient, 1e-3);
-            float rough = 0.1593;  // exponent 76.8, Scene::kDefaultMaterialShininess
+            float rough = 0.3333;  // exponent 16, Scene::kDefaultMaterialShininess
             float ambient = u_lightAmbient;
             if (u_hasMaterial != 0) {
                 vec4 mat = texture(u_sceneMaterialTex, v_uv);

@@ -331,12 +331,12 @@
   <!-- ========== default material definition (for OpenGL view) ========== -->
   <!-- default: also the material of a renderer without one (CueMol3), and
        the built-in values for an undefined name (Scene::kDefaultMaterial*).
-       Polished plastic: a small white highlight on a diffuse-dominant
-       colour. -->
+       Matte plastic, the same values as matte_plastic. -->
   <material id="default">
-    <def ambient="0.2" diffuse="0.8" specular="0.7" shininess="76.8"/>
+    <def ambient="0.2" diffuse="0.8" specular="0.3" shininess="16.0"/>
   </material>
-  <!-- plastic: polished plastic / ceramic, the same values as default. -->
+  <!-- plastic: polished plastic / ceramic, a small white highlight on a
+       diffuse-dominant colour. -->
   <material id="plastic">
     <def ambient="0.2" diffuse="0.8" specular="0.7" shininess="76.8"/>
   </material>
@@ -392,7 +392,7 @@ texture {
   finish {
    ambient 0.2
    diffuse 0.8  brilliance 1.0
-   specular 0.4  roughness 0.01
+   specular 0.15  roughness 0.08
   }
   pigment { color rgbt @COLOR@ }
 }

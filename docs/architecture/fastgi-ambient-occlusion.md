@@ -50,7 +50,7 @@ Fast GI のときの光の強さ (material `default` のとき。`Scene::kFastGI
 |---|---|---|
 | 環境光 | 0.56 | 0.4 |
 | 拡散 (key light) | 0.52 | 0.8 |
-| 鏡面 / 指数 | material の値 (`default` は 0.28 / 76.8) | 同じ |
+| 鏡面 / 指数 | material の値 (`default` は 0.12 / 16) | 同じ |
 | key light の向き (eye 空間) | (1, 1, 1.5) 右上手前 | 同じ |
 
 光の強さは renderer の material から決まり、Fast GI では環境光と拡散だけを上の比率で換算する ([renderer-material.md](renderer-material.md))。

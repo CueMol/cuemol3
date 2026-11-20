@@ -288,14 +288,14 @@ namespace qsys {
     static constexpr double kLegacyLightAmbient = 0.4;
     static constexpr double kLegacyLightDiffuse = 0.8;
     /// Values of the material "default" (data/default_style.xml), also used
-    /// for a material name no style defines: polished plastic, a small white
-    /// highlight (specular 0.7 x the light's 0.4 = 0.28, exponent 76.8) on a
-    /// diffuse-dominant colour. A broad highlight (exponent 16) reads as
-    /// matte metal instead (the material "diff_metal").
+    /// for a material name no style defines: matte plastic (the material
+    /// "matte_plastic"), a weak broad white highlight (specular 0.3 x the
+    /// light's 0.4 = 0.12, exponent 16) on a diffuse-dominant colour. Polished
+    /// plastic ("plastic", exponent 76.8) shines too much for a default.
     static constexpr double kDefaultMaterialAmbient = 0.2;
     static constexpr double kDefaultMaterialDiffuse = 0.8;
-    static constexpr double kDefaultMaterialSpecular = 0.7;
-    static constexpr double kDefaultMaterialShininess = 76.8;
+    static constexpr double kDefaultMaterialSpecular = 0.3;
+    static constexpr double kDefaultMaterialShininess = 16.0;
     /// Eye-space direction to the key light (upper right front), the same
     /// with and without Fast GI.
     static constexpr float kLightDir[3] = {1.0f, 1.0f, 1.5f};

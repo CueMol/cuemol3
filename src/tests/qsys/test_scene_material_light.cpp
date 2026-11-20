@@ -35,11 +35,11 @@ TEST(SceneMaterialLight, MaterialSetsTheLight)
     sfile.loadFile(LString(CUEMOL2_DATA_DIR) + "/default_style.xml", pScene->getUID());
     pScene->setAOEnabled(false);
 
-    // No material is the material "default", "plastic" is defined with the
-    // same values, and a name no style defines gets them too.
+    // No material is the material "default", "matte_plastic" is defined with
+    // the same values, and a name no style defines gets them too.
     const double kSpec = 0.4 * Scene::kDefaultMaterialSpecular;
     const double kShin = Scene::kDefaultMaterialShininess;
-    for (const char *name : {"", "default", "plastic", "no_such_material"})
+    for (const char *name : {"", "default", "matte_plastic", "no_such_material"})
         expectLight(pScene->getMaterialLight(name), Scene::kLegacyLightAmbient,
                     Scene::kLegacyLightDiffuse, kSpec, kShin);
     // nolighting (ambient 1, diffuse 0, specular 0): the global ambient 0.2 on

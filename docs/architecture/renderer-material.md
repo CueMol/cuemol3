@@ -33,8 +33,8 @@ OpenGL 用の値と見た目 (鏡面の実効値 = specular × 0.4):
 
 | id | 見た目 | ambient | diffuse | specular (実効値) | shininess |
 |---|---|---|---|---|---|
-| `default` | 磨いたプラスチック・陶器 | 0.2 | 0.8 | 0.7 (0.28) | 76.8 |
-| `plastic` | `default` と同じ | 0.2 | 0.8 | 0.7 (0.28) | 76.8 |
+| `default` | 艶消しプラスチック (`matte_plastic` と同じ) | 0.2 | 0.8 | 0.3 (0.12) | 16 |
+| `plastic` | 磨いたプラスチック・陶器 | 0.2 | 0.8 | 0.7 (0.28) | 76.8 |
 | `matte_plastic` | 艶消しプラスチック | 0.2 | 0.8 | 0.3 (0.12) | 16 |
 | `matte` | ハイライトなし | 0.3 | 0.6 | 0 | 32 |
 | `diff_metal` | 艶消し金属 | 0.2 | 0.5 | 0.625 (0.25) | 16 |
@@ -43,15 +43,15 @@ OpenGL 用の値と見た目 (鏡面の実効値 = specular × 0.4):
 | `shadow` | 拡散なし | 0.75 | 0 | 0 | 0 |
 | `nolighting` | 照明なし (地図の contour の style) | 1.0 | 0 | 0 | 0 |
 
-- **material を指定しない renderer** (`""`) は `default` で描く。style に無い名前も `default` と同じ値 (`Scene::kDefaultMaterial*`) になる。CueMol2 は未指定に組み込みの値を使い、`default` (鏡面 0) と見た目が違っていたが、inspector の「なし」と `default` が同じに見えるように揃えた。
+- **material を指定しない renderer** (`""`) は `default` で描く。style に無い名前も `default` と同じ値 (`Scene::kDefaultMaterial*`) になる。CueMol2 は未指定に組み込みの値を使い、`default` (鏡面 0) と見た目が違っていたが、inspector の「なし」と `default` が同じに見えるように揃えた。既定は艶消しプラスチックにした。磨いたプラスチック (`plastic`) を既定にすると、テカりすぎた。
 - **プラスチックと金属の分け方**: ハイライトはどれも白い (下地の色に染まらない)。そのため、プラスチックは「色 (拡散) が主で、ハイライトは添える程度」、金属は「色を弱め、ハイライトを強く」という配分の違いで分けている。艶消し (指数 16) と磨き (指数 48〜77) はハイライトの広さで分ける。ハイライトが広く弱いと、白くても艶消しの金属 (サテン) に見える。
-- **POV-Ray**: `plastic` は `default` と同じ finish、`matte_plastic` は specular 0.15・roughness 0.08。未定義の名前は `default` で描かれる。
-- **レイトレーサー (umbreon)**: `lookupMaterial` の表 (principled BSDF) を、WebGL の同じ名前の見た目に目視で合わせてある。POV-Ray の値を換算しただけの値では、`default` のハイライトが弱く、`matte_plastic` が `matte` と同じに見え、金属 (metallic 1) は拡散が無く黒い背景を映して黒いシミになったため。
+- **POV-Ray**: `default` と `matte_plastic` は specular 0.15・roughness 0.08、`plastic` は specular 0.4・roughness 0.01 (以前の `default` の finish)。未定義の名前は `default` で描かれる。
+- **レイトレーサー (umbreon)**: `lookupMaterial` の表 (principled BSDF) を、WebGL の同じ名前の見た目に目視で合わせてある。POV-Ray の値を換算しただけの値では、磨いたプラスチックのハイライトが弱く、`matte_plastic` が `matte` と同じに見え、金属 (metallic 1) は拡散が無く黒い背景を映して黒いシミになったため。
 
 | id | metallic | roughness | specular | diffuse | reflection |
 |---|---|---|---|---|---|
-| `default` / `plastic` | 0 | 0.25 | 0.8 | 0.8 | 0 |
-| `matte_plastic` | 0 | 0.45 | 0.6 | 0.8 | 0 |
+| `plastic` | 0 | 0.25 | 0.8 | 0.8 | 0 |
+| `default` / `matte_plastic` | 0 | 0.45 | 0.6 | 0.8 | 0 |
 | `diff_metal` | 0.6 | 0.55 | 0.8 | 0.3 | 0.1 |
 | `spec_metal` | 0.7 | 0.37 | 0.8 | 0.6 | 0 |
 
@@ -94,7 +94,7 @@ Fast GI のときは、環境光と拡散だけを `default` が `Scene::kFastGI
 Fast GI の合成は scene の色を環境光・拡散・鏡面に分け直す (環境光の分に AO、拡散にプローブの影、鏡面に鏡面の遮蔽)。分け方は「拡散 / 環境光」の比と鏡面の粗さに依存し、material が renderer ごとに違うと Scene の 1 組の値では合わない。
 
 - Fast GI のときだけ、scene の描画先に RGBA8 の 3 枚目の添付 (`RT_MATERIAL_RGBA8`) を足す。ライティングするシェーダは描いている renderer の光を書く (`encodeMaterial`): r = 拡散 / 環境光、b = 環境光 (どちらも `x / (1 + x)` で 0〜1 に収める)、g = 指数 n を GGX の alpha に直した粗さ `sqrt(2 / (n + 2))`、a = 1。法線の `.w` は scene パスのブレンドで背景と混ざるので使えない。
-- 合成は a が 1 の画素ではこの値を使い、照明なしの描画 (a = 0) では Scene の値 (`u_lightAmbient` / `u_lightDiffuse`、指数 76.8 の粗さ 0.1593) を使う。照り返し (間接光) の albedo も、その画素の環境光の強さで割って求める。
+- 合成は a が 1 の画素ではこの値を使い、照明なしの描画 (a = 0) では Scene の値 (`u_lightAmbient` / `u_lightDiffuse`、指数 16 の粗さ 0.3333) を使う。照り返し (間接光) の albedo も、その画素の環境光の強さで割って求める。
 - WebGL (`FboStore` / `EcRenderTarget`) とデスクトップ GL (`OcRenderTarget`) の両方の描画先に対応している。
 
 ## 7. 既知の制限

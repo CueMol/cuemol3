@@ -141,11 +141,12 @@ namespace {
     };
     static const PbrEntry kPbr[] = {
         // ported from a POV finish
-        // default / plastic (polished plastic, ceramic) and matte_plastic:
-        // tuned by eye against the WebGL view (the ported default, specular
-        // 0.4 roughness 0.374, gave too faint a highlight, and a matte plastic
-        // ported from POV looked the same as matte).
-        {"default", 0.20f, 0.80f, 0.0f, 0.25f, 0.80f, 0.00f},
+        // plastic (polished plastic, ceramic) and matte_plastic, which
+        // default equals: tuned by eye against the WebGL view (the ported
+        // POV plastic, specular 0.4 roughness 0.374, gave too faint a
+        // highlight, and a matte plastic ported from POV looked the same as
+        // matte).
+        {"default", 0.20f, 0.80f, 0.0f, 0.45f, 0.60f, 0.00f},
         {"plastic", 0.20f, 0.80f, 0.0f, 0.25f, 0.80f, 0.00f},
         {"matte", 0.30f, 0.80f, 0.0f, 0.5000000f, 0.00f, 0.00f},
         {"matte_plastic", 0.20f, 0.80f, 0.0f, 0.45f, 0.60f, 0.00f},
