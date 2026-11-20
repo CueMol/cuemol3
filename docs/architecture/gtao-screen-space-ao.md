@@ -8,6 +8,10 @@ libcuemol2 の OpenGL (core profile) バックエンドに実装した、リア�
 
 対象ブランチ: `gtao_mrt_normal_0606` (depth-only の Phase 1 は別途 develop マージ済み)。
 
+Scene の既定の AO 方式は、のちに Fast GI (visibility bitmask と焼き込みプローブ) になった
+([fastgi-ambient-occlusion.md](fastgi-ambient-occlusion.md))。GTAO は `aoMethod = gtao` で選べ、
+パイプライン・MRT 法線・半解像度・AA (本書 §1〜§4.7) は両方式で共通。
+
 ---
 
 ## 1. 全体パイプライン
@@ -375,6 +379,8 @@ output location も確認。これらで「location は正しい→書き込み�
 ## 6. Scene プロパティ (チューニング可能化)
 
 `.qsc` にシリアライズされる Scene プロパティで調整可能 (UI で preset 化可能)。
+下表の AO の既定値は GTAO が既定だったときのもの。今の既定値 (Fast GI 向け) と、`aoMethod` の
+無い古いファイルをこの値で読む互換は [fastgi-ambient-occlusion.md](fastgi-ambient-occlusion.md) §2。
 
 | プロパティ | 既定 | 意味 |
 |---|---|---|

@@ -149,6 +149,11 @@ architecture, it belongs here.
   CLI configuration (`BUILD_OPENGL_SYSDEP=FALSE`, `TTYView` factory) instead
   of stopping in `sysdep`; the `ENABLE_X11_SYSDEP` escape hatch for the port,
   and why tritium (which brings its own `ElecView`) is unaffected.
+- [Fast GI (visibility bitmask AO と焼き込みプローブ)](fastgi-ambient-occlusion.md) (日本語) --
+  Scene の既定の AO 方式。EEVEE Next にならった visibility bitmask の画面 AO、AO を環境光だけに掛ける光の扱い
+  (HDR の scene 色、鏡面の遮蔽、照り返し)、3 A 格子の焼き込みプローブ (GPU の焼き込み、形が止まってからの焼き直し、
+  時間 AA のやり直し、3 次 B-spline の読み出し)、プローブから作る key light の柔らかい影、明るさのつまみ、
+  `aoMethod` の無い古い qsc を GTAO で読む互換、調整の経緯と採らなかった案。
 - [GTAO Screen-Space AO](gtao-screen-space-ao.md) (日本語) -- リアルタイム
   GTAO のパイプライン、projection 由来の view-space 復元と GL 座標系、MRT
   geometry 法線、Apple Metal-GL の MRT/ブレンドのハマりどころ、tritium
