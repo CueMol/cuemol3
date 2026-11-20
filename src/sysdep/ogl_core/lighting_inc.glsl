@@ -101,10 +101,13 @@ void directionalLight2(in vec3 normal)
 
     // float shininess = u_light.shininess;
     float shininess = u_FrontMaterialShininess;
+    // pow(0, y) is undefined for y <= 0 (NaN on GPUs), and materials such as
+    // nolighting and shadow have shininess 0: keep the base above 0 (a
+    // fixed-function pow(x, 0) = 1 for every x).
     if (nDotVP == 0.0)
         pf = 0.0;
     else
-        pf = pow(nDotHV, shininess);
+        pf = pow(max(nDotHV, 1e-6), max(shininess, 0.0));
 
     Ambient = vec4(vec3(u_lightAmbient), 0.0);
     Diffuse = vec4(vec3(u_lightDiffuse), 0.0) * nDotVP;
