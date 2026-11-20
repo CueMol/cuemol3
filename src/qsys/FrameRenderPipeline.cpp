@@ -359,6 +359,46 @@ bool FrameRenderPipeline::presentLast(gfx::DisplayContext *pdc)
     return true;
 }
 
+const gfx::AoProbeParams *FrameRenderPipeline::prepareProbes(gfx::DisplayContext *pdc,
+                                                             const ScenePtr &pScene,
+                                                             int aoMethod,
+                                                             const qlib::Matrix4D &modelView,
+                                                             bool deferBake,
+                                                             gfx::AoProbeParams &probe)
+{
+    m_bProbePending = false;
+    m_bProbeBaked = false;
+    if (!(aoMethod == Scene::AOM_FASTGI && pScene->getAOProbeStrength() > 0.0)) return nullptr;
+
+    if (m_pProbe == nullptr) m_pProbe = MB_NEW AmbientProbeVolume();
+    const double prevHash = m_pProbe->getHash();
+    const bool ok = m_pProbe->update(pdc, pScene, kProbeSpacing, m_pAOPostProc, kProbeDirs,
+                                     kProbeTile, deferBake ? kProbeSettleSec : 0.0,
+                                     &m_bProbePending);
+    m_bProbeBaked = (m_pProbe->getHash() != prevHash);
+    if (!ok) return nullptr;
+
+    // GTAO view space has viewZ > 0 forward; the eye space looks down -Z.
+    qlib::Matrix4D flipZ;
+    flipZ.aij(3, 3) = -1.0;
+    probe.atlas = m_pProbe->getAtlas();
+    for (int a = 0; a < 3; ++a) probe.dim[a] = m_pProbe->getDim()[a];
+    probe.spacing = m_pProbe->getSpacing();
+    probe.viewToWorld = qlib::Matrix4D(modelView.invert() * flipZ);
+    for (int a = 0; a < 3; ++a) probe.origin[a] = m_pProbe->getOrigin()[a];
+    // Look the probes up one cell out along the normal: half a cell
+    // interpolates the probes inside a thin solid (a 4.6 A cartoon cylinder)
+    // into blotches; further out the lookup reaches past a silhouette into the
+    // neighbours.
+    probe.bias = m_pProbe->getSpacing();
+    probe.strength = float(pScene->getAOProbeStrength());
+    // Soft shadow of the key light from the same probes.
+    for (int a = 0; a < 3; ++a) probe.lightDir[a] = Scene::kLightDir[a];
+    probe.keyShadow = 1.0f;
+    probe.keyShadowPower = float(Scene::kFastGIKeyShadowPower);
+    return &probe;
+}
+
 bool FrameRenderPipeline::render(gfx::DisplayContext *pdc, const ScenePtr &pScene,
                                  const FrameRenderParams &params,
                                  const std::function<void()> &sceneRenderFn)
@@ -477,39 +517,9 @@ bool FrameRenderPipeline::render(gfx::DisplayContext *pdc, const ScenePtr &pScen
         // Updated before the AO target is bound: a (re)bake binds its own
         // targets and unbinding them returns to the default framebuffer.
         gfx::AoProbeParams probe;
-        const gfx::AoProbeParams *pProbe = nullptr;
-        m_bProbePending = false;
-        m_bProbeBaked = false;
-        if (aoc.aoMethod == Scene::AOM_FASTGI && pScene->getAOProbeStrength() > 0.0) {
-            if (m_pProbe == nullptr) m_pProbe = MB_NEW AmbientProbeVolume();
-            const double prevHash = m_pProbe->getHash();
-            const bool ok = m_pProbe->update(
-                pdc, pScene, kProbeSpacing, m_pAOPostProc, kProbeDirs, kProbeTile,
-                params.deferProbeBake ? kProbeSettleSec : 0.0,
-                &m_bProbePending);
-            m_bProbeBaked = (m_pProbe->getHash() != prevHash);
-            if (ok) {
-                // GTAO view space has viewZ > 0 forward; the eye space looks down -Z.
-                qlib::Matrix4D flipZ;
-                flipZ.aij(3, 3) = -1.0;
-                probe.atlas = m_pProbe->getAtlas();
-                for (int a = 0; a < 3; ++a) probe.dim[a] = m_pProbe->getDim()[a];
-                probe.spacing = m_pProbe->getSpacing();
-                probe.viewToWorld = qlib::Matrix4D(modelView.invert() * flipZ);
-                for (int a = 0; a < 3; ++a) probe.origin[a] = m_pProbe->getOrigin()[a];
-                // Look the probes up one cell out along the normal: half a
-                // cell interpolates the probes inside a thin solid (a 4.6 A
-                // cartoon cylinder) into blotches; further out the lookup
-                // reaches past a silhouette into the neighbours.
-                probe.bias = m_pProbe->getSpacing();
-                probe.strength = float(pScene->getAOProbeStrength());
-                // Soft shadow of the key light from the same probes.
-                for (int a = 0; a < 3; ++a) probe.lightDir[a] = Scene::kLightDir[a];
-                probe.keyShadow = 1.0f;
-                probe.keyShadowPower = float(Scene::kFastGIKeyShadowPower);
-                pProbe = &probe;
-            }
-        }
+        const gfx::AoProbeParams *pProbe = prepareProbes(
+            pdc, pScene, aoc.aoMethod, modelView, params.deferProbeBake, probe);
+
         // 3. GTAO pass: read the scene depth, write AO + packed edges.
         m_pAoRT->bind();
         m_pAoRT->clear(1.0f, 1.0f, 1.0f, 1.0f);

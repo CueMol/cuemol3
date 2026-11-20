@@ -183,6 +183,16 @@ private:
     /// caller sets depth test / blend off around it.
     void presentStage(gfx::DisplayContext *pdc, const StageRecord &st);
 
+    /// Bake (or keep) the ambient probes of the bitmask AO and fill `probe`
+    /// for the AO pass. Sets m_bProbePending / m_bProbeBaked for this frame
+    /// (see isProbeBakePending / isProbeBaked). Called before the AO target is
+    /// bound: a (re)bake binds its own targets, and unbinding them returns to
+    /// the default framebuffer.
+    /// @return &probe when the probes are used this frame, otherwise nullptr.
+    const gfx::AoProbeParams *prepareProbes(gfx::DisplayContext *pdc, const ScenePtr &pScene,
+                                            int aoMethod, const qlib::Matrix4D &modelView,
+                                            bool deferBake, gfx::AoProbeParams &probe);
+
     /// Baked world-space ambient probes for the bitmask AO (owned, lazily
     /// created).
     class AmbientProbeVolume *m_pProbe = nullptr;
