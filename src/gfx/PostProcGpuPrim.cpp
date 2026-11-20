@@ -149,6 +149,9 @@ void PostProcGpuPrim::drawComposite(DisplayContext *pDC, RenderTarget *sceneRT,
         sceneRT->bindDepthTex(RT_TU_DEPTH);    // scene depth for the upsample
     }
     if (ambientOnly) sceneRT->bindColorTex(1, RT_TU_NOISE);  // normal + ambient fraction
+    // Material of each pixel (unit 5; the SMAA search texture is not in use).
+    const bool hasMaterial = ambientOnly && sceneRT->hasMaterial();
+    if (hasMaterial) sceneRT->bindColorTex(2, RT_TU_SMAA_SEARCH);
     // Gathered indirect light (the AO pass target's second attachment).
     const bool hasBounce = ambientOnly && bounceRT != nullptr && bounceRT->hasNormal();
     if (hasBounce) bounceRT->bindColorTex(1, RT_TU_SMAA_AREA);
@@ -177,6 +180,8 @@ void PostProcGpuPrim::drawComposite(DisplayContext *pDC, RenderTarget *sceneRT,
     m_pCompPO->setUniform("u_ambientOnly", ambientOnly ? 1 : 0);
     m_pCompPO->setUniform("u_sceneNormalTex", RT_TU_NOISE);
     m_pCompPO->setUniform("u_bounceTex", RT_TU_SMAA_AREA);
+    m_pCompPO->setUniform("u_sceneMaterialTex", RT_TU_SMAA_SEARCH);
+    m_pCompPO->setUniform("u_hasMaterial", hasMaterial ? 1 : 0);
     m_pCompPO->setUniform("u_specOcclusion", consts.specOcclusion ? 1 : 0);
     m_pCompPO->setUniformF("u_lightAmbient", consts.lightAmbient);
     m_pCompPO->setUniformF("u_lightDiffuse", consts.lightDiffuse);

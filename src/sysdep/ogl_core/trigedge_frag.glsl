@@ -28,6 +28,8 @@ layout(location = 0) out vec4 o_FragColor;
 // MRT eye-space normal for GTAO (sentinel (0,0,0) -> reconstruct from depth).
 // vec4 to match o_FragColor (Apple Metal GL mishandles mixed vec4/vec3 MRT).
 layout(location = 1) out vec4 o_Normal;
+// MRT material for the Fast GI composite (fog_inc.glsl encodeMaterial; 0 = none).
+layout(location = 2) out vec4 o_Material;
 
 void main(void)
 {
@@ -39,6 +41,7 @@ void main(void)
     // Otherwise the offset hull is mistaken for real geometry and perturbs the AO
     // around edges (e.g. crease mode darkening near the outline).
     o_Normal = vec4(0.0, 0.0, 0.0, 1.0);
+    o_Material = vec4(0.0);
 
     if (u_silh == 1) {
         gl_FragDepth = 0.9999;

@@ -29,6 +29,7 @@ const RT_COLOR_NEAREST = 0x04;
 const RT_NORMAL_RGBA16F = 0x08;
 const RT_COLOR_RGBA16F = 0x10;
 const RT_COLOR_RGBA32UI = 0x20;
+const RT_MATERIAL_RGBA8 = 0x40;
 
 type GL = WebGL2RenderingContext;
 
@@ -37,6 +38,8 @@ interface FboEntry {
     colorTex: WebGLTexture;
     depthTex: WebGLTexture | null;
     normalTex: WebGLTexture | null;
+    /** MRT material attachment 2 (RGBA8), with the normal one only. */
+    materialTex: WebGLTexture | null;
     /** Color attachment 0 is RGBA32UI (GPU ID-buffer pick target). */
     integer: boolean;
     w: number;
@@ -95,6 +98,8 @@ export class FboStore {
      *   RT_COLOR_NEAREST (0x04) -> NEAREST color filtering (else LINEAR)
      *   RT_DEPTH_TEX     (0x02) -> sampleable DEPTH24_STENCIL8 depth texture
      *   RT_NORMAL_RGBA16F(0x08) -> RGBA16F MRT normal at color attachment 1
+     *   RT_MATERIAL_RGBA8(0x40) -> RGBA8 MRT material at color attachment 2
+     *                              (with RT_NORMAL_RGBA16F only)
      * Float (RGBA16F) attachments require EXT_color_buffer_float. Returns
      * false if the framebuffer is incomplete.
      */
@@ -110,6 +115,7 @@ export class FboStore {
         const nearest = (flags & RT_COLOR_NEAREST) !== 0 || colorInt;
         const wantDepth = (flags & RT_DEPTH_TEX) !== 0;
         const wantNormal = (flags & RT_NORMAL_RGBA16F) !== 0;
+        const wantMaterial = wantNormal && (flags & RT_MATERIAL_RGBA8) !== 0;
         // Integer textures are not filterable: always NEAREST.
         const colorFilter = nearest ? gl.NEAREST : gl.LINEAR;
 
@@ -160,6 +166,22 @@ export class FboStore {
                                     gl.TEXTURE_2D, normalTex, 0);
         }
 
+        // MRT material attachment 2 (RGBA8), the material of each pixel's lit
+        // colour for the Fast GI composite. NEAREST: packed data.
+        let materialTex: WebGLTexture | null = null;
+        if (wantMaterial) {
+            materialTex = gl.createTexture()!;
+            gl.bindTexture(gl.TEXTURE_2D, materialTex);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0,
+                          gl.RGBA, gl.UNSIGNED_BYTE, null);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT2,
+                                    gl.TEXTURE_2D, materialTex, 0);
+        }
+
         // Depth attachment (sampleable), only when RT_DEPTH_TEX is set.
         //
         // DEPTH24_STENCIL8, not DEPTH_COMPONENT24: blitDepthToDefault requires
@@ -184,9 +206,11 @@ export class FboStore {
                                     gl.TEXTURE_2D, depthTex, 0);
         }
 
-        gl.drawBuffers(wantNormal
-            ? [gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]
-            : [gl.COLOR_ATTACHMENT0]);
+        gl.drawBuffers(wantMaterial
+            ? [gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2]
+            : wantNormal
+                ? [gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]
+                : [gl.COLOR_ATTACHMENT0]);
 
         const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -197,17 +221,20 @@ export class FboStore {
             console.error(`createFramebuffer ${name} incomplete: 0x${status.toString(16)}`);
             gl.deleteTexture(colorTex);
             if (normalTex) gl.deleteTexture(normalTex);
+            if (materialTex) gl.deleteTexture(materialTex);
             if (depthTex) gl.deleteTexture(depthTex);
             gl.deleteFramebuffer(fbo);
             return false;
         }
 
         this._fbo_data[name] = {
-            fbo, colorTex, depthTex, normalTex, integer: colorInt, w: width, h: height,
+            fbo, colorTex, depthTex, normalTex, materialTex, integer: colorInt,
+            w: width, h: height,
         };
         console.log(`createFramebuffer OK: ${name} ${width}x${height} ` +
                     `color=${colorInt ? 'RGBA32UI' : colorFloat ? 'RGBA16F' : 'RGBA8'} ` +
-                    `depth=${depthTex !== null} normal=${normalTex !== null}`);
+                    `depth=${depthTex !== null} normal=${normalTex !== null} ` +
+                    `material=${materialTex !== null}`);
         return true;
     }
 
@@ -255,6 +282,8 @@ export class FboStore {
         if (bound && bound.normalTex) {
             gl.clearBufferfv(gl.COLOR, 0, [r, g, b, a]);
             gl.clearBufferfv(gl.COLOR, 1, [0.0, 0.0, 0.0, 0.0]);
+            // (0,0,0,0) = no material: the composite uses the scene light.
+            if (bound.materialTex) gl.clearBufferfv(gl.COLOR, 2, [0.0, 0.0, 0.0, 0.0]);
             if (bound.depthTex) gl.clearBufferfv(gl.DEPTH, 0, [1.0]);
             return;
         }
@@ -263,7 +292,7 @@ export class FboStore {
     }
 
     /**
-     * Bind an FBO attachment ('color' | 'depth' | 'normal') as a sampler
+     * Bind an FBO attachment ('color' | 'depth' | 'normal' | 'material') as a sampler
      * texture on the given texture unit.
      */
     bindFBOTexture(name: string, which: string, texUnit: number): void {
@@ -272,6 +301,7 @@ export class FboStore {
         if (!info) throw `framebuffer ${name} not found`;
         const tex = which === 'depth' ? info.depthTex
                   : which === 'normal' ? info.normalTex
+                  : which === 'material' ? info.materialTex
                   : info.colorTex;
         if (!tex) return;
         gl.activeTexture(gl.TEXTURE0 + texUnit);
@@ -341,6 +371,7 @@ export class FboStore {
         if (!info) return false;
         gl.deleteTexture(info.colorTex);
         if (info.normalTex) gl.deleteTexture(info.normalTex);
+        if (info.materialTex) gl.deleteTexture(info.materialTex);
         if (info.depthTex) gl.deleteTexture(info.depthTex);
         gl.deleteFramebuffer(info.fbo);
         delete this._fbo_data[name];

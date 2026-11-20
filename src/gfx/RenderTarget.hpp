@@ -34,6 +34,10 @@ enum RTFlags
     /// NEAREST; clear() writes (0,0,0,0) regardless of its arguments). Used by
     /// the GPU ID-buffer pick pass; read back with readColorUInt().
     RT_COLOR_RGBA32UI = 0x20,
+    /// MRT material color attachment 2 (RGBA8, NEAREST): the material of each
+    /// pixel's lit colour, for the Fast GI composite (fog_inc.glsl
+    /// encodeMaterial). Only together with RT_NORMAL_RGBA16F.
+    RT_MATERIAL_RGBA8 = 0x40,
 };
 
 /// Conventional texture-unit assignments shared by post-processing passes.
@@ -104,6 +108,9 @@ public:
 
     /// True if an MRT normal attachment was allocated.
     virtual bool hasNormal() const = 0;
+
+    /// True if an MRT material attachment (RT_MATERIAL_RGBA8) was allocated.
+    virtual bool hasMaterial() const { return false; }
 
     virtual int getWidth() const = 0;
     virtual int getHeight() const = 0;

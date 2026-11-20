@@ -29,6 +29,8 @@ layout(location = 0) out vec4 o_FragColor;
 // Its length is 2 - (ambient fraction of the lit colour), see lighting_inc.glsl.
 // vec4 to match o_FragColor (Apple Metal GL mishandles mixed vec4/vec3 MRT).
 layout(location = 1) out vec4 o_Normal;
+// MRT material for the Fast GI composite (fog_inc.glsl encodeMaterial; 0 = none).
+layout(location = 2) out vec4 o_Material;
 
 void main(void)
 {
@@ -39,4 +41,5 @@ void main(void)
     o_Normal = (dot(v_ecNormal, v_ecNormal) > 1e-12)
                    ? vec4(normalize(v_ecNormal) * (2.0 - clamp(v_ambFrac, 0.0, 1.0)), 1.0)
                    : vec4(0.0, 0.0, 0.0, 1.0);
+    o_Material = (enable_lighting != 0) ? encodeMaterial() : vec4(0.0);
 }

@@ -27,6 +27,20 @@ layout(std140) uniform FogBlock {
 
 ////////////////////
 
+// Material of the lit colour for the Fast GI composite (MRT attachment 2,
+// ao_composite_frag.glsl): the light of the renderer being drawn, which the
+// scene sets per renderer from its material (Scene::getMaterialLight).
+// r = diffuse / ambient and b = ambient, each as x / (1 + x) to fit [0, 1);
+// g = the roughness of the Blinn-Phong exponent n as GGX alpha
+// sqrt(2 / (n + 2)); a = 1 (0 = no material, cleared).
+vec4 encodeMaterial()
+{
+    float ka = max(u_lightAmbient, 1e-3);
+    float r = u_lightDiffuse / ka;
+    float rough = sqrt(2.0 / (max(u_lightDir.w, 0.0) + 2.0));
+    return vec4(r / (1.0 + r), rough, ka / (1.0 + ka), 1.0);
+}
+
 vec4 fragFogColor(in vec4 color, in float frag_alpha, in float fogCoord)
 {
     float fog = (u_fogEnd - fogCoord) * u_fogScale;
