@@ -115,6 +115,36 @@ void directionalLight2(in vec3 normal)
     Specular = vec4(vec3(u_lightSpecular), 0.0) * pf;
 }
 
+// Environment seen in a mirror direction (eye space): a sky gradient along
+// the camera up axis, bright above and dark below. The dark side stands for
+// what a metal mirrors in the ray tracer below and behind it (its neighbours'
+// shaded sides and the background), which gives a metal its contrast.
+const vec3 ENV_SKY = vec3(1.2);
+const vec3 ENV_GROUND = vec3(0.15);
+
+// Reflection of the environment by a metal (u_matExtra.x = metalness). Real
+// metals get most of their look from what they mirror, not from the one
+// light's highlight; without it a metal reads as dark plastic. The mirror
+// direction picks the sky gradient, blurred toward its mean as the surface
+// gets rougher (the GGX alpha of the specular exponent), and the metal's
+// colour tints it. It is scaled by the ambient light, which stands for the
+// sky's brightness, so it follows lightBrightness and the AO method. In the
+// Fast GI composite it falls in the non-ambient part, where the specular
+// occlusion darkens it in the cavities.
+vec3 envReflection(vec3 normal, vec3 albedo)
+{
+    float metal = u_matExtra.x;
+    if (metal <= 0.0) return vec3(0.0);
+    vec3 r = reflect(vec3(0.0, 0.0, -1.0), normal);
+    // Rougher surfaces blur the horizon: a wider blend band, not a flat mean.
+    // The band never gets sharp: a mirror-sharp horizon cuts a sphere in two.
+    float alpha = sqrt(2.0 / (max(u_lightDir.w, 0.0) + 2.0));
+    float band = max(alpha, 0.5);
+    float t = smoothstep(-band, band, r.y);
+    vec3 sky = mix(ENV_GROUND, ENV_SKY, t);
+    return metal * albedo * sky * u_lightAmbient;
+}
+
 vec4 flight2(in vec3 normal, in vec4 ecPosition, in vec4 in_color)
 {
     vec4 color;
@@ -123,8 +153,16 @@ vec4 flight2(in vec3 normal, in vec4 ecPosition, in vec4 in_color)
 
     // Intensities: u_lightAmbient = ambient total (0.4 = the former light-model
     // 0.2 + light 0.2), u_lightSpecular = specular x material (0.16 = 0.4 x 0.4).
-    vec3 amb = Ambient.rgb * in_color.rgb;
-    vec3 rgb = amb + Diffuse.rgb * in_color.rgb + Specular.rgb;
+    // A metal (u_matExtra.x = metalness) scatters little light diffusely,
+    // as in the principled BSDF the ray tracer uses: the ambient and diffuse
+    // parts drop by (1 - metalness), and the highlight takes part of its
+    // colour (the light's own highlight stays near white at its core, as in
+    // the ray tracer, where it saturates).
+    float metal = clamp(u_matExtra.x, 0.0, 1.0);
+    vec3 amb = Ambient.rgb * in_color.rgb * (1.0 - metal);
+    vec3 specColor = mix(vec3(1.0), in_color.rgb, 0.5 * metal);
+    vec3 rgb = amb + Diffuse.rgb * in_color.rgb * (1.0 - metal) +
+               Specular.rgb * specColor + envReflection(normal, in_color.rgb);
     const vec3 LUM = vec3(0.2126, 0.7152, 0.0722);
     g_ambientFraction = clamp(dot(amb, LUM) / max(dot(rgb, LUM), 1e-4), 0.0, 1.0);
     color = vec4(rgb, in_color.a);

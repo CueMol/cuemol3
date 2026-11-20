@@ -53,11 +53,17 @@ TEST(SceneMaterialLight, MaterialSetsTheLight)
     pScene->setAOMethod(Scene::AOM_FASTGI);
     expectLight(pScene->getMaterialLight(""), Scene::kFastGILightAmbient,
                 Scene::kFastGILightDiffuse, kSpec, kShin);
-    // diff_metal: ambient 0.2, diffuse 0.5, specular 0.625, exponent 16.
-    expectLight(pScene->getMaterialLight("diff_metal"),
-                0.4 * Scene::kFastGILightAmbient / Scene::kLegacyLightAmbient,
-                0.5 * Scene::kFastGILightDiffuse / Scene::kLegacyLightDiffuse, 0.4 * 0.625,
+    // diff_metal: ambient 0.2, diffuse 0.5, specular 1.25, exponent 16, and
+    // the metalness 0.6 from its <def> attribute (no toon bands, no rim).
+    const Scene::MaterialLight metal = pScene->getMaterialLight("diff_metal");
+    expectLight(metal, 0.4 * Scene::kFastGILightAmbient / Scene::kLegacyLightAmbient,
+                0.5 * Scene::kFastGILightDiffuse / Scene::kLegacyLightDiffuse, 0.4 * 1.25,
                 16.0);
+    EXPECT_NEAR(metal.metallic, 0.6, 1e-5);
+    EXPECT_EQ(metal.toon, 0.0f);
+    EXPECT_EQ(metal.fresnel, 0.0f);
+    // A material without the attributes is not metallic.
+    EXPECT_EQ(pScene->getMaterialLight("").metallic, 0.0f);
 
     qsys::SceneManager::getInstance()->destroyScene(pScene->getUID());
 }

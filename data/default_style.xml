@@ -366,10 +366,10 @@
        diff_metal: matte (brushed) metal, a broad highlight.
        spec_metal: polished metal, a strong tight highlight. -->
   <material id="diff_metal">
-    <def ambient="0.2" diffuse="0.5" specular="0.625" shininess="16.0"/>
+    <def ambient="0.2" diffuse="0.5" specular="1.25" shininess="16.0" metallic="0.6"/>
   </material>
   <material id="spec_metal">
-    <def ambient="0.2" diffuse="0.3" specular="1.0" shininess="48.0"/>
+    <def ambient="0.2" diffuse="0.3" specular="2.5" shininess="48.0" metallic="0.7"/>
   </material>
   
   <!-- ========== default material definition (for POV-Ray) ========== -->
