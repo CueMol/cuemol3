@@ -43,6 +43,7 @@
 | [261108-map-surface-dust-plan.md](261108-map-surface-dust-plan.md) | 地図の等値面の小さな破片を隠す (`MapSurfRenderer` の `dust_size` / `dust_metric`、ChX の `surface dust`) | **未実装 / 着手の条件あり** (libcuemol2 の変更。GUI での有用性を確かめてから) |
 | [261108-clip-planes-and-caps-plan.md](261108-clip-planes-and-caps-plan.md) | ChimeraX と同等の clipping plane (near / far / front / back、renderer ごとの切り替え) と、切った表面の断面の蓋。シェーダーの `discard`、CPU で作る蓋、外部レンダラー (umbreon の front / back) | **未実装 / 着手の条件あり** (libcuemol2 の変更) |
 | [261118-depth-perception-plan.md](261118-depth-perception-plan.md) | 分子表面の立体感を ChimeraX に近づける: AO の半径 (パラメータのみ) -> 光の配分と AO を環境光だけに掛ける -> 広い半径の visibility bitmask -> bent normal -> 原子密度ボリューム。段階ごとに 2BBV で目視し、十分なら以降を保留 | **未実装** |
+| [261120-fastgi-refactoring-plan.md](261120-fastgi-refactoring-plan.md) | FastGI の画像・処理時間を維持する GLSL とプローブ準備処理の整理 | **未着手** |
 
 ## 実装済み (旧ルールで残っているもの)
 
