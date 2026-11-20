@@ -39,6 +39,9 @@ vec3 probeDir(int k)
 void main()
 {
     ivec2 tc = ivec2(gl_FragCoord.xy);
+    // Atlas layout (texel (x + z * nx, y)): shared with
+    // AmbientProbeVolume::update (atlas size), probe_fill_frag.glsl and
+    // gtao_frag.glsl sampleProbeGrid; change them together.
     int z = tc.x / u_dim.x;
     int x = tc.x - z * u_dim.x;
     int y = tc.y;

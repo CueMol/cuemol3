@@ -22,6 +22,9 @@ void main()
         o_FragColor = c;
         return;
     }
+    // Atlas layout (texel (x + z * nx, y), also in the neighbour fetch below):
+    // shared with AmbientProbeVolume::update (atlas size), probe_bake_frag.glsl
+    // and gtao_frag.glsl sampleProbeGrid; change them together.
     int z = tc.x / u_dim.x;
     int x = tc.x - z * u_dim.x;
     int y = tc.y;

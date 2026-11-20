@@ -172,6 +172,10 @@ bool AmbientProbeVolume::update(gfx::DisplayContext *pdc, const ScenePtr &pScene
     if (m_pDepthAtlas != nullptr && m_pDepthAtlas->getWidth() != A) m_pDepthAtlas->resize(A, A);
     if (m_pDepthAtlas == nullptr)
         m_pDepthAtlas = pdc->createRenderTarget(A, A, gfx::RT_COLOR_RGBA8 | gfx::RT_DEPTH_TEX);
+    // Atlas layout: probe (x, y, z) is texel (x + z * nx, y), the z slices side
+    // by side. Assumed as well by probe_bake_frag.glsl / probe_fill_frag.glsl
+    // (integer texel <-> probe) and gtao_frag.glsl sampleProbeGrid (filtered
+    // lookup, z split into two slices); change them together.
     const int aw = m_dim[0] * m_dim[2], ah = m_dim[1];
     // LINEAR: the AO pass reads the atlas with bilinear filtering within a
     // slice (the bake / fill passes use texelFetch, which ignores the filter).

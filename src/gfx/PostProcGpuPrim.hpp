@@ -230,9 +230,6 @@ public:
                        RenderTarget *aoRT, const AoConstants &consts,
                        RenderTarget *bounceRT = nullptr);
 
-    /// Read sceneRT's depth texture, reconstruct view-space depth/position with
-    /// the given constants, and draw the GTAO term into the currently bound
-    /// framebuffer (fullscreen). debugMode: 0 = AO, 1 = normal, 2 = depth.
     /// GPU probe bake: for every probe of the atlas being drawn (the bound
     /// framebuffer), test the 64 light-view depths in depthAtlasRT.
     void drawProbeBake(DisplayContext *pDC, RenderTarget *depthAtlasRT,
@@ -240,6 +237,13 @@ public:
     /// GPU probe bake: fill probes inside atoms from their valid neighbours.
     void drawProbeFill(DisplayContext *pDC, RenderTarget *srcRT, const ProbeBakeParams &bp);
 
+    /// Read sceneRT's depth texture, reconstruct view-space depth/position with
+    /// the given constants, and draw the AO term into the currently bound
+    /// framebuffer (fullscreen). debugMode: 0 = AO, 1 = normal, 2 = depth.
+    /// The shared screen-space AO pass of both methods: GTAO and Fast GI (the
+    /// visibility bitmask with its baked probes and bounce) both go through
+    /// this entry and gtao_frag.glsl, which branches on consts.aoMethod
+    /// (u_method).
     void drawGtao(DisplayContext *pDC, RenderTarget *sceneRT,
                   const AoConstants &consts, int debugMode,
                   const AoProbeParams *probe = nullptr);

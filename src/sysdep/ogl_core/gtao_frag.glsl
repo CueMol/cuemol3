@@ -217,7 +217,9 @@ float pixelDepthThicknessAt(float vsZ, float avgPixRadius)
 }
 
 // Trilinear lookup of the probe atlas at grid position g (probe centres at
-// integer g).
+// integer g). Atlas layout (texel (x + z * nx, y)): shared with
+// AmbientProbeVolume::update (atlas size), probe_bake_frag.glsl and
+// probe_fill_frag.glsl; change them together.
 vec4 sampleProbeGrid(vec3 g)
 {
     vec3 dim = vec3(u_probeDim);
