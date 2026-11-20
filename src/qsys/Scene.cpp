@@ -1155,6 +1155,18 @@ bool Scene::removeListener(int nid)
 
 void Scene::fireSceneEvent(SceneEvent &ev)
 {
+  switch (ev.getType()) {
+  case SceneEvent::SCE_OBJ_ADDED:
+  case SceneEvent::SCE_OBJ_REMOVING:
+  case SceneEvent::SCE_REND_ADDED:
+  case SceneEvent::SCE_REND_REMOVING:
+  case SceneEvent::SCE_SCENE_CLEARALL:
+    notifyOccluderChanged();
+    break;
+  default:
+    break;
+  }
+
   m_pEvtCaster->replicaFire(ev);
 
   ScrEventManager *pSEM = ScrEventManager::getInstance();
@@ -1216,6 +1228,9 @@ void Scene::propChanged(qlib::LPropEvent &ev)
 
 void Scene::objectChanged(ObjectEvent &ev)
 {
+  // Atoms moved (MD playback, morphing, editing) or were added or removed,
+  // or an object property (visible, xformMat, ...) changed.
+  notifyOccluderChanged();
   if (ev.getType()==ObjectEvent::OBE_CHANGED) {
     // objchg may require redrawing
     setUpdateFlag();
@@ -1228,6 +1243,9 @@ void Scene::objectChanged(ObjectEvent &ev)
 
 void Scene::rendererChanged(RendererEvent &ev)
 {
+  // A renderer property (visible, selection, width, contour level, ...)
+  // changed.
+  notifyOccluderChanged();
   if (ev.getType()==RendererEvent::RNE_CHANGED) {
     // objchg may require redrawing
     setUpdateFlag();

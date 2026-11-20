@@ -137,6 +137,10 @@ namespace qsys {
     /// Log per-pass frame pipeline times (not saved)
     bool m_bRenderTiming;
 
+    /// Counts the changes that can alter the drawn geometry (see
+    /// notifyOccluderChanged); the ambient probes rebake when it moves.
+    unsigned int m_nOccluderGen = 0;
+
     /// Post-process anti-aliasing method (see AAMethod enum below)
     int m_nAAMethod;
 
@@ -334,6 +338,14 @@ namespace qsys {
       setUpdateFlag();
       m_nAODebugView = v;
     }
+
+    /// The drawn geometry may have changed: atoms moved or were added or
+    /// removed, an object or renderer was added, removed, shown, hidden or
+    /// edited. Called from the object / renderer / scene event dispatch and
+    /// from the renderers' display cache invalidation, so a camera move alone
+    /// never calls it. AmbientProbeVolume rebakes when the count moves.
+    void notifyOccluderChanged() { ++m_nOccluderGen; }
+    unsigned int getOccluderGen() const { return m_nOccluderGen; }
 
     /// Log per-pass frame pipeline times (not saved)
     bool isRenderTiming() const { return m_bRenderTiming; }
