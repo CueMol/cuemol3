@@ -6,6 +6,7 @@
 #pragma once
 
 #include "fog_inc.glsl"
+#include "tonemap_inc.glsl"
 
 // Fraction of the lit colour that comes from the ambient light (luminance), so
 // the composite can apply the AO to the ambient light only (direct light is
@@ -127,6 +128,7 @@ vec4 flight2(in vec3 normal, in vec4 ecPosition, in vec4 in_color)
     const vec3 LUM = vec3(0.2126, 0.7152, 0.0722);
     g_ambientFraction = clamp(dot(amb, LUM) / max(dot(rgb, LUM), 1e-4), 0.0, 1.0);
     color = vec4(rgb, in_color.a);
-    if (u_lightNoClamp < 0.5) color = clamp(color, 0.0, 1.0);
+    // An HDR scene target keeps the lit colour; the composite tone maps it.
+    if (u_lightNoClamp < 0.5) color = vec4(toneMap(color.rgb), clamp(color.a, 0.0, 1.0));
     return color;
 }

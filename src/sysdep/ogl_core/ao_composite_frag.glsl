@@ -9,6 +9,8 @@
 // similarity to the full-res pixel, so the AO does not bleed across silhouettes
 // (no halo around objects).
 
+#include "tonemap_inc.glsl"
+
 uniform sampler2D u_colorTex;
 uniform sampler2D u_aoTex;       // AO term in R (half or full resolution)
 uniform sampler2D u_depthTex;    // full-res scene depth
@@ -204,7 +206,9 @@ void main()
                 // ambient part over this pixel's ambient intensity.
                 outc += litPart * f * (u_bounceScale * u_lightAmbient / max(ambient, 1e-3)) * e;
             }
-            o_FragColor = clamp(vec4(outc, c.a), 0.0, 1.0);
+            // The HDR scene colour leaves its range here (lighting_inc.glsl
+            // flight2 does it for an LDR target).
+            o_FragColor = vec4(toneMap(outc), clamp(c.a, 0.0, 1.0));
             return;
         }
         ao = mix(1.0, ao, fogVis);
