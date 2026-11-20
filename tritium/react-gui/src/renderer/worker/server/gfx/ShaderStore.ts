@@ -18,8 +18,8 @@ const MODEL_MAT_SIZE = 4 * 4 * FLOAT_SIZE;
 const PROJ_MAT_SIZE = 4 * 4 * FLOAT_SIZE;
 
 // FogBlock (fog_inc.glsl): fog (8 floats) + light intensities (4 floats) +
-// light direction (4 floats).
-const LIGHT_UBO_SIZE = 16 * FLOAT_SIZE;
+// light direction (4 floats) + material extras (4 floats).
+const LIGHT_UBO_SIZE = 20 * FLOAT_SIZE;
 
 type GL = WebGL2RenderingContext;
 

@@ -53,11 +53,37 @@ TEST(SceneMaterialLight, MaterialSetsTheLight)
     pScene->setAOMethod(Scene::AOM_FASTGI);
     expectLight(pScene->getMaterialLight(""), Scene::kFastGILightAmbient,
                 Scene::kFastGILightDiffuse, kSpec, kShin);
-    // diff_metal: ambient 0.2, diffuse 0.5, specular 0.625, exponent 16.
-    expectLight(pScene->getMaterialLight("diff_metal"),
-                0.4 * Scene::kFastGILightAmbient / Scene::kLegacyLightAmbient,
-                0.5 * Scene::kFastGILightDiffuse / Scene::kLegacyLightDiffuse, 0.4 * 0.625,
+    // diff_metal: ambient 0.2, diffuse 0.5, specular 1.25, exponent 16, and
+    // the metalness 0.6 from its <def> attribute (no toon bands, no rim).
+    const Scene::MaterialLight metal = pScene->getMaterialLight("diff_metal");
+    expectLight(metal, 0.4 * Scene::kFastGILightAmbient / Scene::kLegacyLightAmbient,
+                0.5 * Scene::kFastGILightDiffuse / Scene::kLegacyLightDiffuse, 0.4 * 1.25,
                 16.0);
+    EXPECT_NEAR(metal.metallic, 0.6, 1e-5);
+    EXPECT_EQ(metal.toon, 0.0f);
+    EXPECT_EQ(metal.fresnel, 0.0f);
+    // nolighting is lit by the ambient light alone and gets no AO, so Fast GI
+    // keeps its light as without AO.
+    expectLight(pScene->getMaterialLight("nolighting"), 1.2, 0.0, 0.0, 0.0);
+    // A material without the attributes is not metallic.
+    EXPECT_EQ(pScene->getMaterialLight("").metallic, 0.0f);
+    // ceramic: the Fresnel rim strength 3 from its <def> attribute.
+    EXPECT_NEAR(pScene->getMaterialLight("ceramic").fresnel, 3.0, 1e-5);
+
+    // toon1 (POV-Ray: ambient 0, diffuse 0.8): with AO it keeps its flat
+    // tones under the light any material gets, not its POV-Ray finish.
+    const Scene::MaterialLight toonAO = pScene->getMaterialLight("toon1");
+    expectLight(toonAO, 0.2 * Scene::kFastGILightAmbient / Scene::kLegacyLightAmbient,
+                0.8 * Scene::kFastGILightDiffuse / Scene::kLegacyLightDiffuse, 0.0, 0.0);
+    EXPECT_EQ(toonAO.toon, 1.0f);
+    EXPECT_EQ(toonAO.toonPov, 0.0f);
+    // Without AO, as POV-Ray renders it: no global ambient, the diffuse
+    // under kToonLightDiffuse.
+    pScene->setAOEnabled(false);
+    const Scene::MaterialLight toon = pScene->getMaterialLight("toon1");
+    expectLight(toon, 0.0, 0.8 * Scene::kToonLightDiffuse, 0.0, 0.0);
+    EXPECT_EQ(toon.toon, 1.0f);
+    EXPECT_EQ(toon.toonPov, 1.0f);
 
     qsys::SceneManager::getInstance()->destroyScene(pScene->getUID());
 }

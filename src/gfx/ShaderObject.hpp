@@ -29,7 +29,7 @@ public:
     // code and the corresponding GLSL uniform blocks.
 
     /**
-     * std140 FogBlock layout (binding=1, 32 bytes).
+     * std140 FogBlock layout (binding=1, 80 bytes).
      * Must match the FogBlock uniform block defined in fog_inc.glsl.
      */
     struct FogBlock {
@@ -43,6 +43,7 @@ public:
         float lightSpecular;    // offset 40 - specular x material
         float lightNoClamp;     // offset 44 - 1 = keep the lit colour unclamped (HDR)
         float lightDir[4];      // offset 48 - eye-space direction to the light (.xyz), exponent (.w)
+        float matExtra[4];      // offset 64 - metalness, toon, Fresnel rim, toonPov
     };
 
     /**

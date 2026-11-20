@@ -28,6 +28,7 @@ void ShaderObject::setupFog(DisplayContext *pdc)
     data.lightSpecular = pdc->getLightSpecular();
     data.lightNoClamp = pdc->isLightNoClamp() ? 1.0f : 0.0f;
     pdc->getLightDir(data.lightDir);
+    pdc->getLightMaterialExtra(data.matExtra);
 
     updateFogUBO(&data, sizeof(data));
 }

@@ -147,7 +147,10 @@ namespace {
         // highlight, and a matte plastic ported from POV looked the same as
         // matte).
         {"default", 0.20f, 0.80f, 0.0f, 0.45f, 0.60f, 0.00f},
-        {"plastic", 0.20f, 0.80f, 0.0f, 0.25f, 0.80f, 0.00f},
+        {"plastic", 0.20f, 0.80f, 0.0f, 0.36f, 0.60f, 0.00f},
+        // ceramic: a sharper and stronger highlight; the principled
+        // specular's own Fresnel lifts the rim, as the WebGL glaze rim does.
+        {"ceramic", 0.20f, 0.80f, 0.0f, 0.25f, 1.00f, 0.00f},
         {"matte", 0.30f, 0.80f, 0.0f, 0.5000000f, 0.00f, 0.00f},
         {"matte_plastic", 0.20f, 0.80f, 0.0f, 0.45f, 0.60f, 0.00f},
         // TODO: add an "aniso_diff_metal" sibling -- brushed metal, driven by

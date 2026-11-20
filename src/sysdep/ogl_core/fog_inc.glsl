@@ -23,6 +23,9 @@ layout(std140) uniform FogBlock {
     float u_lightNoClamp;   // offset 44: 1 = do not clamp (HDR scene target)
     vec4 u_lightDir;        // offset 48: .xyz = eye-space direction to the light,
                             // .w = specular exponent
+    vec4 u_matExtra;        // offset 64: .x = metalness, .y = toon (1 =
+                            // flat tones, 0 = smooth), .z = Fresnel rim,
+                            // .w = 1: the toon under POV-Ray's lights and gamma
 };
 
 ////////////////////
@@ -32,13 +35,16 @@ layout(std140) uniform FogBlock {
 // scene sets per renderer from its material (Scene::getMaterialLight).
 // r = diffuse / ambient and b = ambient, each as x / (1 + x) to fit [0, 1);
 // g = the roughness of the Blinn-Phong exponent n as GGX alpha
-// sqrt(2 / (n + 2)); a = 1 (0 = no material, cleared).
+// sqrt(2 / (n + 2)); a = 1, or 0.75 for a material lit by the ambient light
+// alone (no diffuse, no specular: nolighting, shadow), which is a flat look
+// the composite leaves without AO (0 = no material, cleared).
 vec4 encodeMaterial()
 {
     float ka = max(u_lightAmbient, 1e-3);
     float r = u_lightDiffuse / ka;
     float rough = sqrt(2.0 / (max(u_lightDir.w, 0.0) + 2.0));
-    return vec4(r / (1.0 + r), rough, ka / (1.0 + ka), 1.0);
+    bool ambientOnly = u_lightDiffuse <= 0.0 && u_lightSpecular <= 0.0;
+    return vec4(r / (1.0 + r), rough, ka / (1.0 + ka), ambientOnly ? 0.75 : 1.0);
 }
 
 vec4 fragFogColor(in vec4 color, in float frag_alpha, in float fogCoord)

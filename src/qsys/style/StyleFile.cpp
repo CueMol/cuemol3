@@ -432,6 +432,19 @@ void StyleFile::loadMaterial(LDom2Node *pNode, StyleSet *pSet)
       if (value.toRealNum(&dvalue))
         if (!pSet->putMaterial(mat_id, Material::MAT_EMISSION, dvalue))
           MB_DPRINTLN("Cannot put material (%s)", mat_id.c_str());
+      // CueMol3 WebGL view: metalness, toon bands and Fresnel rim.
+      value = pChNode->getStrAttr("metallic");
+      if (value.toRealNum(&dvalue))
+        if (!pSet->putMaterial(mat_id, Material::MAT_METALLIC, dvalue))
+          MB_DPRINTLN("Cannot put material (%s)", mat_id.c_str());
+      value = pChNode->getStrAttr("toon");
+      if (value.toRealNum(&dvalue))
+        if (!pSet->putMaterial(mat_id, Material::MAT_TOON, dvalue))
+          MB_DPRINTLN("Cannot put material (%s)", mat_id.c_str());
+      value = pChNode->getStrAttr("fresnel");
+      if (value.toRealNum(&dvalue))
+        if (!pSet->putMaterial(mat_id, Material::MAT_FRESNEL, dvalue))
+          MB_DPRINTLN("Cannot put material (%s)", mat_id.c_str());
     }
   }
   

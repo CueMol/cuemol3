@@ -296,6 +296,10 @@ namespace qsys {
     static constexpr double kDefaultMaterialDiffuse = 0.8;
     static constexpr double kDefaultMaterialSpecular = 0.3;
     static constexpr double kDefaultMaterialShininess = 16.0;
+    /// Diffuse light of a toon material: the total light of CueMol's POV-Ray
+    /// export (_light_inten 1.3: key light 0.5 + flash light 0.8, split
+    /// between them in lighting_inc.glsl), so the view matches POV-Ray.
+    static constexpr double kToonLightDiffuse = 1.3;
     /// Eye-space direction to the key light (upper right front), the same
     /// with and without Fast GI.
     static constexpr float kLightDir[3] = {1.0f, 1.0f, 1.5f};
@@ -303,13 +307,21 @@ namespace qsys {
     /// shadow from the baked probes (gtao_frag.glsl).
     static constexpr double kFastGIKeyShadowPower = 2.0;
 
-    /// Light intensities and specular exponent (FogBlock) of one material.
+    /// Light intensities, specular exponent and the extra terms (FogBlock)
+    /// of one material.
     struct MaterialLight
     {
       float ambient;
       float diffuse;
       float specular;
       float shininess;
+      /// Metalness 0-1, toon (1 = flat tones, 0 = smooth), Fresnel rim 0-1
+      /// (gfx::Material::MAT_METALLIC / MAT_TOON / MAT_FRESNEL).
+      float metallic = 0.0f;
+      float toon = 0.0f;
+      float fresnel = 0.0f;
+      /// 1 = light the toon as POV-Ray renders its finish (without AO only).
+      float toonPov = 0.0f;
     };
 
     /// The light a renderer of material mat_id is lit with: the material's

@@ -7,6 +7,9 @@
 
 #include <common.h>
 
+#include <algorithm>
+#include <cmath>
+
 #include "Scene.hpp"
 #include "SceneEventCaster.hpp"
 #include "ObjLoadEditInfo.hpp"
@@ -689,6 +692,7 @@ void Scene::display(DisplayContext *pdc)
   const MaterialLight ml = getMaterialLight(LString());
   pdc->setLightIntensities(ml.ambient, ml.diffuse, ml.specular);
   pdc->setLightShininess(ml.shininess);
+  pdc->setLightMaterialExtra(ml.metallic, ml.toon, ml.fresnel, ml.toonPov);
   pdc->setLightDir(kLightDir[0], kLightDir[1], kLightDir[2]);
   pdc->startRender();
 
@@ -789,6 +793,8 @@ Scene::MaterialLight Scene::getMaterialLight(const LString &mat_id) const
   // look the same.
   double ka = kDefaultMaterialAmbient, kd = kDefaultMaterialDiffuse,
          ks = kDefaultMaterialSpecular, shin = kDefaultMaterialShininess;
+  // The extra terms of the WebGL view (0 = the plain Blinn-Phong look).
+  double metal = 0.0, toon = 0.0, fresnel = 0.0;
   {
     // Look the name up in this scene's styles (display() has already pushed
     // the context; pushing it again is harmless).
@@ -803,15 +809,32 @@ Scene::MaterialLight Scene::getMaterialLight(const LString &mat_id) const
     if (v >= -0.1) ks = v;
     v = pSM->getMaterial(name, gfx::Material::MAT_SHININESS);
     if (v >= -0.1) shin = v;
+    v = pSM->getMaterial(name, gfx::Material::MAT_METALLIC);
+    if (v >= -0.1) metal = v;
+    v = pSM->getMaterial(name, gfx::Material::MAT_TOON);
+    if (v >= -0.1) toon = v;
+    v = pSM->getMaterial(name, gfx::Material::MAT_FRESNEL);
+    if (v >= -0.1) fresnel = v;
   }
-  double amb = 0.2 + ka, diff = kd, spec = 0.4 * ks;
+  // Without AO a toon material takes its POV-Ray finish as POV-Ray renders
+  // CueMol's export: no global ambient (toon1 has ambient 0) and the
+  // export's lights (kToonLightDiffuse) on the diffuse. The POV-Ray finish
+  // is a look without AO, so with GTAO or Fast GI the toon only gets its
+  // flat tones (lighting_inc.glsl) under the light any material gets.
+  const bool bToon = toon > 0.0;
+  const bool bToonPov = bToon && !isAOEnabled();
+  double amb = (bToonPov ? 0.0 : 0.2) + ka, diff = kd, spec = 0.4 * ks;
+  if (bToonPov) diff *= kToonLightDiffuse;
 
   // The ambient-dominant light pairs with the Fast GI AO, which darkens the
   // ambient part only: scale the ambient and diffuse of every material so
   // that "default" gets the kFastGILight* values. The specular and the
   // exponent stay the material's, so the balance of highlight and colour
   // that makes it read as plastic or metal does not change with the mode.
-  if (isAOEnabled() && getAOMethod() == AOM_FASTGI) {
+  // A material lit by the ambient light alone (nolighting, shadow) gets no
+  // AO (fog_inc.glsl encodeMaterial), so it keeps its light as without AO.
+  const bool bFlat = diff <= 0.0 && spec <= 0.0;
+  if (!bFlat && isAOEnabled() && getAOMethod() == AOM_FASTGI) {
     amb *= kFastGILightAmbient / kLegacyLightAmbient;
     diff *= kFastGILightDiffuse / kLegacyLightDiffuse;
   }
@@ -821,6 +844,10 @@ Scene::MaterialLight Scene::getMaterialLight(const LString &mat_id) const
   ml.diffuse = float(diff * bri);
   ml.specular = float(spec * bri);
   ml.shininess = float(shin);
+  ml.metallic = float(std::clamp(metal, 0.0, 1.0));
+  ml.toon = bToon ? 1.0f : 0.0f;
+  ml.toonPov = bToonPov ? 1.0f : 0.0f;
+  ml.fresnel = float(std::max(fresnel, 0.0));
   return ml;
 }
 
@@ -835,6 +862,7 @@ void Scene::displayRendImpl(DisplayContext *pdc, ObjectPtr pObj, RendererPtr pRe
   const MaterialLight ml = getMaterialLight(pRend->getDefaultMaterial());
   pdc->setLightIntensities(ml.ambient, ml.diffuse, ml.specular);
   pdc->setLightShininess(ml.shininess);
+  pdc->setLightMaterialExtra(ml.metallic, ml.toon, ml.fresnel, ml.toonPov);
   pdc->setStyleNames(pRend->getStyleNames());
   
   // transfer the edge settings

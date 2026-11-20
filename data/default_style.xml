@@ -340,6 +340,12 @@
   <material id="plastic">
     <def ambient="0.2" diffuse="0.8" specular="0.7" shininess="76.8"/>
   </material>
+  <!-- ceramic: glazed ceramic, a sharper highlight than plastic and a
+       Fresnel rim (the glaze mirroring the surroundings toward the
+       silhouette). -->
+  <material id="ceramic">
+    <def ambient="0.2" diffuse="0.8" specular="1.0" shininess="160.0" fresnel="3.0"/>
+  </material>
   <!-- matte_plastic: a weak broad white highlight on a diffuse-dominant
        colour (diff_metal has a weaker diffuse under a stronger one). -->
   <material id="matte_plastic">
@@ -351,11 +357,13 @@
   <material id="nolighting">
     <def ambient="1.0" diffuse="0.0" specular="0.0" shininess="0.0"/>
   </material>
+  <!-- toon1 / toon2: the POV-Ray toon finishes (brilliance 0; toon2 adds a
+       saturating phong spot), see Scene::getMaterialLight. -->
   <material id="toon1">
-    <def ambient="0.0" diffuse="0.85" specular="0.0" shininess="0.0"/>
+    <def ambient="0.0" diffuse="0.8" specular="0.0" shininess="0.0" toon="1"/>
   </material>
   <material id="toon2">
-    <def ambient="0.0" diffuse="0.85" specular="0.0" shininess="32.0"/>
+    <def ambient="0.3" diffuse="0.5" specular="2.5" shininess="16.0" toon="1"/>
   </material>
   <material id="matte">
     <def ambient="0.3" diffuse="0.6" specular="0.0" shininess="32.0"/>
@@ -366,10 +374,10 @@
        diff_metal: matte (brushed) metal, a broad highlight.
        spec_metal: polished metal, a strong tight highlight. -->
   <material id="diff_metal">
-    <def ambient="0.2" diffuse="0.5" specular="0.625" shininess="16.0"/>
+    <def ambient="0.2" diffuse="0.5" specular="1.25" shininess="16.0" metallic="0.6"/>
   </material>
   <material id="spec_metal">
-    <def ambient="0.2" diffuse="0.3" specular="1.0" shininess="48.0"/>
+    <def ambient="0.2" diffuse="0.3" specular="2.5" shininess="48.0" metallic="0.7"/>
   </material>
   
   <!-- ========== default material definition (for POV-Ray) ========== -->
@@ -408,6 +416,22 @@ texture {
    ambient 0.2
    diffuse 0.8  brilliance 1.0
    specular 0.4  roughness 0.01
+  }
+  pigment { color rgbt @COLOR@ }
+}
+]]>
+    </def>
+  </material>
+
+  <material id="ceramic">
+    <def type="pov">
+<![CDATA[
+texture {
+  finish {
+   ambient 0.2
+   diffuse 0.8  brilliance 1.0
+   specular 0.6  roughness 0.005
+   reflection { 0.02, 0.3 falloff 5 }
   }
   pigment { color rgbt @COLOR@ }
 }
