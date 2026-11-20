@@ -55,6 +55,13 @@ import { RENDER_QUALITY_CUSTOM } from '@renderer/data/renderSettings'
 import { getRendererPropSections } from '@renderer/features/inspector/rendererPropSections'
 import { PropertiesTab } from '@renderer/features/inspector/PropertiesTab'
 
+/** A Scene section by key (not by position, which moves as sections are added). */
+function sceneSection(key: string) {
+  const section = SCENE_SECTIONS.find((s) => s.key === key)
+  if (!section) throw new Error(`no scene section ${key}`)
+  return section
+}
+
 function entry(over: Partial<GenericPropEntry>): GenericPropEntry {
   return {
     key: '',
@@ -122,6 +129,7 @@ describe('Scene section registry', () => {
     const sections = getRendererPropSections('Scene')
     expect(sections.map((s) => s.title)).toEqual([
       'Ambient occlusion',
+      'Lighting',
       'Anti-aliasing',
       'Background',
       'Color proofing',
@@ -134,7 +142,7 @@ describe('the scene ambient-occlusion page', () => {
   it('renders Enabled + Preset only; the tuning knobs have no rows', () => {
     const { container, unmount } = mountTree(
       <SchemaSection
-        section={SCENE_SECTIONS[0]}
+        section={sceneSection('scene-ao')}
         rendererType="Scene"
         entries={fullEntries()}
         onSet={vi.fn()}
@@ -157,7 +165,7 @@ describe('the scene ambient-occlusion page', () => {
   it('keeps the Enabled toggle active while AO is off', () => {
     const { container, unmount } = mountTree(
       <SchemaSection
-        section={SCENE_SECTIONS[0]}
+        section={sceneSection('scene-ao')}
         rendererType="Scene"
         entries={fullEntries(false)}
         onSet={vi.fn()}
@@ -178,7 +186,7 @@ describe('the scene anti-aliasing page', () => {
   it('renders the Quality dropdown only; method / jitter / threshold have no rows', () => {
     const { container, unmount } = mountTree(
       <SchemaSection
-        section={SCENE_SECTIONS[1]}
+        section={sceneSection('scene-aa')}
         rendererType="Scene"
         entries={fullEntries()}
         onSet={vi.fn()}
@@ -253,7 +261,7 @@ describe('Scene quality presets', () => {
     const onSetMany = vi.fn()
     const { container, unmount } = mountTree(
       <SchemaSection
-        section={SCENE_SECTIONS[0]}
+        section={sceneSection('scene-ao')}
         rendererType="Scene"
         entries={fullEntries()}
         onSet={onSet}
@@ -288,7 +296,7 @@ describe('Scene quality presets', () => {
     const onSetMany = vi.fn()
     const { container, unmount } = mountTree(
       <SchemaSection
-        section={SCENE_SECTIONS[0]}
+        section={sceneSection('scene-ao')}
         rendererType="Scene"
         entries={entries}
         onSet={vi.fn()}
@@ -315,7 +323,7 @@ describe('Scene quality presets', () => {
   it('disables the AO Preset while AO is off; the AA Quality stays enabled', () => {
     const ao = mountTree(
       <SchemaSection
-        section={SCENE_SECTIONS[0]}
+        section={sceneSection('scene-ao')}
         rendererType="Scene"
         entries={fullEntries(false)}
         onSet={vi.fn()}
@@ -331,7 +339,7 @@ describe('Scene quality presets', () => {
 
     const aa = mountTree(
       <SchemaSection
-        section={SCENE_SECTIONS[1]}
+        section={sceneSection('scene-aa')}
         rendererType="Scene"
         entries={fullEntries(false)}
         onSet={vi.fn()}
@@ -352,7 +360,7 @@ describe('Scene quality presets', () => {
     const onSetMany = vi.fn()
     const { container, unmount } = mountTree(
       <SchemaSection
-        section={SCENE_SECTIONS[1]}
+        section={sceneSection('scene-aa')}
         rendererType="Scene"
         entries={fullEntries()}
         onSet={onSet}
@@ -385,7 +393,7 @@ describe('Scene quality presets', () => {
     )
     const { container, unmount } = mountTree(
       <SchemaSection
-        section={SCENE_SECTIONS[1]}
+        section={sceneSection('scene-aa')}
         rendererType="Scene"
         entries={entries}
         onSet={vi.fn()}
@@ -406,7 +414,7 @@ describe('the scene background page', () => {
   it('renders the background Color row', () => {
     const { container, unmount } = mountTree(
       <SchemaSection
-        section={SCENE_SECTIONS[2]}
+        section={sceneSection('scene-bg')}
         rendererType="Scene"
         entries={fullEntries()}
         onSet={vi.fn()}
@@ -426,7 +434,7 @@ describe('the scene colour-proofing page', () => {
     const onSetMany = vi.fn()
     const { container, unmount } = mountTree(
       <SchemaSection
-        section={SCENE_SECTIONS[3]}
+        section={sceneSection('scene-proof')}
         rendererType="Scene"
         entries={fullEntries()}
         onSet={onSet}
@@ -454,7 +462,7 @@ describe('the scene colour-proofing page', () => {
     )
     const { container, unmount } = mountTree(
       <SchemaSection
-        section={SCENE_SECTIONS[3]}
+        section={sceneSection('scene-proof')}
         rendererType="Scene"
         entries={withProfile}
         onSet={onSet}
