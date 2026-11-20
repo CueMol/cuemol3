@@ -290,19 +290,25 @@ vec4 sampleProbeAtlasCubic(vec3 pw)
     return r;
 }
 
-// Distant visibility from the baked probes at world position pw with world
-// normal nw, cosine-weighted (m0 + 2 dot(m1, N)) and mixed by the strength.
-// cubic: the tricubic B-spline lookup (the receiver's own AO term; smooth when
-// zoomed in); false = trilinear (the per-sample bounce, where the cost
-// matters). EEVEE's facing / validity weighting of the 8 probes was tried and
-// left out, since with probes 3 A apart (coarser than an atom) it lets the
-// dark probes in the gaps in front of a sunk atom dominate and paints dark
-// smudges on CPK spheres.
-float probeVisibility(vec3 pw, vec3 nw, bool cubic)
+// Distant visibility from the probe moments m = (m0, m1.xyz) at world normal
+// nw, cosine-weighted (m0 + 2 dot(m1, N); 1 unoccluded, 1 on an open flat
+// surface) and mixed by the strength. EEVEE's facing / validity weighting of
+// the 8 probes was tried and left out, since with probes 3 A apart (coarser
+// than an atom) it lets the dark probes in the gaps in front of a sunk atom
+// dominate and paints dark smudges on CPK spheres.
+float probeMomentVisibility(vec4 m, vec3 nw)
+{
+    return mix(1.0, clamp(m.x + 2.0 * dot(m.yzw, nw), 0.0, 1.0), u_probeStrength);
+}
+
+// Distant visibility at world position pw with world normal nw from the
+// trilinear lookup, for the per-sample bounce, where the cost matters (the
+// receiver's own AO term uses the tricubic lookup in main()).
+float probeVisibility(vec3 pw, vec3 nw)
 {
     vec3 pq = pw + nw * u_probeBias;
-    vec4 m = cubic ? sampleProbeAtlasCubic(pq) : sampleProbeAtlas(pq);
-    return mix(1.0, clamp(m.x + 2.0 * dot(m.yzw, nw), 0.0, 1.0), u_probeStrength);
+    vec4 m = sampleProbeAtlas(pq);
+    return probeMomentVisibility(m, nw);
 }
 
 // Radiance of the occluding surface at uv: the lit scene colour with the
@@ -322,7 +328,7 @@ vec3 occluderRadiance(vec2 uv, float viewZ, vec4 sn, vec3 pG, vec3 nG)
         float f = clamp(2.0 - length(sn.xyz), 0.0, 1.0);
         vec3 pw = (u_viewToWorld * vec4(pG, 1.0)).xyz;
         vec3 nw = normalize(mat3(u_viewToWorld) * nG);
-        lit *= 1.0 - f * (1.0 - probeVisibility(pw, nw, false));
+        lit *= 1.0 - f * (1.0 - probeVisibility(pw, nw));
     }
     return lit;
 }
@@ -662,19 +668,19 @@ void main()
         // Linear visibility, as EEVEE stores it (saturate(result), no power).
         vis = clamp(vis, 0.0, 1.0);
         if (u_hasProbe != 0) {
-            // Distant visibility from the probes, cosine-weighted around the
-            // normal: m0 + 2 dot(m1, N) (1 unoccluded, 1 on an open flat
-            // surface). Both terms estimate the same sky visibility, so take
-            // the smaller one: multiplying them (as EEVEE multiplies the probe
-            // irradiance by the near-field visibility) counts the near
-            // occluders twice, since the 3 A probes see them too. The screen
-            // term keeps the contact detail the grid cannot resolve, the
-            // probes the large cavities.
+            // Distant visibility from the probes (tricubic B-spline lookup,
+            // smooth when zoomed in; see probeMomentVisibility). Both terms
+            // estimate the same sky visibility, so take the smaller one:
+            // multiplying them (as EEVEE multiplies the probe irradiance by
+            // the near-field visibility) counts the near occluders twice,
+            // since the 3 A probes see them too. The screen term keeps the
+            // contact detail the grid cannot resolve, the probes the large
+            // cavities.
             vec3 pw = (u_viewToWorld * vec4(pixCenterPos, 1.0)).xyz;
             vec3 nw = normalize(mat3(u_viewToWorld) * N);
             vec3 pq = pw + nw * u_probeBias;
             vec4 m = sampleProbeAtlasCubic(pq);
-            vis = min(vis, mix(1.0, clamp(m.x + 2.0 * dot(m.yzw, nw), 0.0, 1.0), u_probeStrength));
+            vis = min(vis, probeMomentVisibility(m, nw));
             if (u_keyShadow > 0.0) {
                 // Soft shadow of the key light from the same probes: the L1
                 // reconstruction of the directional visibility, V(L) = m0 +
