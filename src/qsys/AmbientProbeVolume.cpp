@@ -28,6 +28,14 @@ AmbientProbeVolume::~AmbientProbeVolume()
 
 void AmbientProbeVolume::release()
 {
+    releaseTargets();
+    // Bake again on the next update.
+    m_bKeyValid = false;
+    m_bPending = false;
+}
+
+void AmbientProbeVolume::releaseTargets()
+{
     if (m_pDepthAtlas != nullptr) {
         delete m_pDepthAtlas;
         m_pDepthAtlas = nullptr;
@@ -39,7 +47,6 @@ void AmbientProbeVolume::release()
         }
     }
     m_nResultRT = -1;
-    m_hash = 0.0;
 }
 
 gfx::RenderTarget *AmbientProbeVolume::getAtlas() const
@@ -62,17 +69,6 @@ void collectSpheres(const ScenePtr &pScene, std::vector<qlib::Vector4D> &sph)
     }
 }
 
-double sphereHash(const std::vector<qlib::Vector4D> &sph, double spacing, double mode)
-{
-    double hash = double(sph.size()) + spacing * 7.31 + mode * 11.7;
-    for (size_t i = 0; i < sph.size(); ++i) {
-        const auto &v = sph[i];
-        const double k = double(i % 97 + 1);
-        hash += k * (v.x() * 1.31 + v.y() * 1.73 + v.z() * 2.17 + v.w() * 3.07);
-    }
-    return hash;
-}
-
 /// The probe direction set: must match probe_bake_frag.glsl (probeDir).
 void probeDir(int k, int nd, double d[3])
 {
@@ -92,37 +88,22 @@ bool AmbientProbeVolume::update(gfx::DisplayContext *pdc, const ScenePtr &pScene
 {
     if (pPending != nullptr) *pPending = false;
     if (pPostProc == nullptr) return false;
+    // The baked probes depend on the scene geometry, which the scene's
+    // occluder generation follows (a camera move leaves it alone, so the
+    // live path does nothing per frame), and on the bake settings.
+    const unsigned int gen = pScene->getOccluderGen();
+    const double settings = spacing * 7.31 + numDirs * 0.013 + tileSize * 0.0071;
+    if (m_bKeyValid && gen == m_bakedGen && settings == m_bakedSettings)
+        return getAtlas() != nullptr;
     const double now = std::chrono::duration<double>(
                            std::chrono::steady_clock::now().time_since_epoch())
                            .count();
-    // Live path: collecting and hashing the occluders costs 2-3 ms of CPU for
-    // ~15k atoms, too much for every frame of a camera move. While the baked
-    // probes are current and no change is pending, look again only every
-    // kRecheckSec (a change is then baked kRecheckSec + settleSec late).
-    constexpr double kRecheckSec = 0.1;
-    if (settleSec > 0.0 && getAtlas() != nullptr && m_pendingHash == 0.0 &&
-        now - m_lastCheck < kRecheckSec) {
-        return true;
-    }
-    m_lastCheck = now;
-    std::vector<qlib::Vector4D> sph;
-    collectSpheres(pScene, sph);
-    if (sph.empty()) {
-        release();
-        return false;
-    }
-    const double hash = sphereHash(sph, spacing, 1.0 + numDirs * 0.013 + tileSize * 0.0071);
-    if (getAtlas() != nullptr && hash == m_hash) {
-        // Back at the baked geometry: forget a pending change, so a later
-        // change starts its settle time afresh.
-        m_pendingHash = 0.0;
-        return true;
-    }
     if (settleSec > 0.0) {
-        // The occluders changed: draw without the probes until they have
-        // stayed the same for settleSec, then bake once.
-        if (hash != m_pendingHash) {
-            m_pendingHash = hash;
+        // The geometry changed: draw without the probes until it has stayed
+        // the same for settleSec, then bake once.
+        if (!m_bPending || gen != m_pendingGen) {
+            m_bPending = true;
+            m_pendingGen = gen;
             m_pendingSince = now;
         }
         if (now - m_pendingSince < settleSec) {
@@ -130,7 +111,24 @@ bool AmbientProbeVolume::update(gfx::DisplayContext *pdc, const ScenePtr &pScene
             return false;
         }
     }
+    m_bPending = false;
+    m_bKeyValid = true;
+    m_bakedGen = gen;
+    m_bakedSettings = settings;
+
+    // The occluder spheres give the grid bounds. Collecting them evaluates
+    // every renderer's selection over its atoms (~60 ms for the 5 default
+    // renderers of a 59k-atom structure), so it runs only here, once per bake.
     const auto t0 = std::chrono::steady_clock::now();
+    std::vector<qlib::Vector4D> sph;
+    collectSpheres(pScene, sph);
+    if (sph.empty()) {
+        // Nothing to bake; stays so until the geometry changes.
+        releaseTargets();
+        return false;
+    }
+    const double collectMs =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
 
     // Grid placement: the bounds of the spheres plus 2 probes.
     const double h = spacing;
@@ -186,7 +184,7 @@ bool AmbientProbeVolume::update(gfx::DisplayContext *pdc, const ScenePtr &pScene
             rt->resize(aw, ah);
     }
     if (m_pDepthAtlas == nullptr || m_pProbeRT[0] == nullptr || m_pProbeRT[1] == nullptr) {
-        release();
+        releaseTargets();
         return false;
     }
 
@@ -246,14 +244,14 @@ bool AmbientProbeVolume::update(gfx::DisplayContext *pdc, const ScenePtr &pScene
     pdc->setBlendEnabled(true);
     pdc->setDepthTestEnabled(true);
     m_nResultRT = cur;
-    m_hash = hash;
+    ++m_nBakeCount;
 
     const double ms =
         std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
-    LOG_DPRINTLN("AO probes (GPU, %s): %d spheres, %dx%dx%d probes of %.1f A, baked in %.0f ms "
-                 "(CPU side, GPU not awaited)",
-                 settleSec > 0.0 ? "live" : "export", int(sph.size()), m_dim[0], m_dim[1],
-                 m_dim[2], spacing, ms);
+    LOG_DPRINTLN("AO probes (GPU, %s): %d spheres (collected in %.0f ms), %dx%dx%d probes of "
+                 "%.1f A, baked in %.0f ms (CPU side, GPU not awaited)",
+                 settleSec > 0.0 ? "live" : "export", int(sph.size()), collectMs, m_dim[0],
+                 m_dim[1], m_dim[2], spacing, ms);
     return true;
 }
 

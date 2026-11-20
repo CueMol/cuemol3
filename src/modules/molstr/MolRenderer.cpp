@@ -43,6 +43,7 @@ MolRenderer::~MolRenderer()
 void MolRenderer::setSelection(SelectionPtr pSel)
 {
   m_pSel = pSel;
+  m_bOccAidsValid = false;
 }
 
 SelectionPtr MolRenderer::getSelection() const
@@ -86,6 +87,11 @@ void MolRenderer::propChanged(qlib::LPropEvent &ev)
 
 void MolRenderer::objectChanged(qsys::ObjectEvent &ev)
 {
+  // Atoms added, removed or renamed may change what the selection matches.
+  if (ev.getType()==qsys::ObjectEvent::OBE_CHANGED &&
+      !ev.getDescr().equals("atomsMoved"))
+    m_bOccAidsValid = false;
+
   if (ev.getType()==qsys::ObjectEvent::OBE_PROPCHG) {
     qlib::LPropEvent *pPE = ev.getPropEvent();
     if (pPE) {
@@ -271,13 +277,35 @@ ColorPtr MolRenderer::evalMolColor(ColorPtr pCol, ColorPtr pCol2)
 
 }
 
+const std::vector<int> &MolRenderer::occlusionAtomIDs() const
+{
+  MolCoordPtr pMol = getClientMol();
+  if (pMol.isnull()) {
+    m_occAids.clear();
+    m_bOccAidsValid = false;
+    return m_occAids;
+  }
+  const int nAtoms = pMol->getAtomSize();
+  if (!m_bOccAidsValid || nAtoms != m_nOccMolAtoms) {
+    m_occAids.clear();
+    AtomIterator iter(pMol, getSelection());
+    for (iter.first(); iter.hasMore(); iter.next())
+      m_occAids.push_back(iter.getID());
+    m_occAids.shrink_to_fit();
+    m_bOccAidsValid = true;
+    m_nOccMolAtoms = nAtoms;
+  }
+  return m_occAids;
+}
+
 void MolRenderer::collectOcclusionSpheres(std::vector<qlib::Vector4D> &out) const
 {
   MolCoordPtr pMol = getClientMol();
   if (pMol.isnull()) return;
-  AtomIterator iter(pMol, getSelection());
-  for (iter.first(); iter.hasMore(); iter.next()) {
-    MolAtomPtr pAtom = pMol->getAtom(iter.getID());
+  const std::vector<int> &aids = occlusionAtomIDs();
+  out.reserve(out.size() + aids.size());
+  for (int aid : aids) {
+    MolAtomPtr pAtom = pMol->getAtom(aid);
     if (pAtom.isnull()) continue;
     qlib::Vector4D v = pAtom->getPos();
     v.w() = 1.8;

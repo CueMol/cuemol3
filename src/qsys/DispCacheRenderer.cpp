@@ -51,9 +51,13 @@ void DispCacheRenderer::invalidateDisplayCache()
 {
   // Display cache invalidated
   //   --> the scene to be redrawn
+  //   --> and the ambient probes to be rebaked (a style change reaches
+  //       the renderers without a renderer event)
   ScenePtr pScene = getScene();
-  if (!pScene.isnull())
+  if (!pScene.isnull()) {
     pScene->setUpdateFlag();
+    pScene->notifyOccluderChanged();
+  }
 }
 
 ////////////////////////////

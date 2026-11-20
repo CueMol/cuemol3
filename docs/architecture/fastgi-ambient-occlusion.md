@@ -21,7 +21,7 @@ Scene の AO 方式の一つ。Blender EEVEE Next の Fast GI (visibility bitmas
 |---|---|
 | 方式の切り替え・光の強さ・保存の互換 | `src/qsys/Scene.{qif,hpp,cpp}` |
 | パスの実行・プローブの準備 (`prepareProbes`) | `src/qsys/FrameRenderPipeline.{hpp,cpp}` |
-| プローブの焼き込みと作り直しの判定 | `src/qsys/AmbientProbeVolume.{hpp,cpp}`、`probe_bake_frag.glsl`、`probe_fill_frag.glsl` |
+| プローブの焼き込みと作り直しの判定 | `src/qsys/AmbientProbeVolume.{hpp,cpp}`、`probe_bake_frag.glsl`、`probe_fill_frag.glsl`、形の変更の数 (`Scene::notifyOccluderChanged`) |
 | AO パス (GTAO と共通の入口 `PostProcGpuPrim::drawGtao`) | `src/sysdep/ogl_core/gtao_frag.glsl`、`fastgi_bitmask_inc.glsl` |
 | 合成 | `src/sysdep/ogl_core/ao_composite_frag.glsl` |
 | 光の向き・強さ・鏡面の指数 (FogBlock UBO) | `src/sysdep/ogl_core/fog_inc.glsl`、`lighting_inc.glsl`、`src/gfx/ShaderObject.{hpp,cpp}`、`tritium/react-gui/src/renderer/worker/server/gfx/ShaderStore.ts` |
@@ -74,7 +74,9 @@ Fast GI のときの光の強さ (`Scene::kFastGILight*`、`lightBrightness` 倍
 `AmbientProbeVolume` が、画面外や裏側の形も含む大きな遮蔽を世界座標の格子に焼く (EEVEE の volume light probe に当たる)。画面の AO は画面に写った形しか見ないので、サブユニット間の大きな暗がりはこちらが受け持つ。
 
 - **焼き込み** (GPU): 分子を囲む球の外から 32 方向 (Fibonacci 球) の正射影で深度を描き、128 px のタイルを並べたアトラスに入れる。3 Å 格子の各プローブについて、各方向で手前に面が無ければ見える、として平均の可視性 m0 と可視性で重み付けた方向の平均 m1 を RGBA16F に書く。原子の中のプローブ (m0 = 0) は周りの有効な値で埋める (6 回の往復)。格子は z の層を横に並べた 2D アトラス (テクセル `(x + z * nx, y)`)。この配置は C++ のアトラスの大きさ、bake、fill、`sampleProbeGrid` の 4 か所が前提にしている (各所のコメントが互いを指す)。
-- **作り直しの判定**: renderer が渡す遮蔽物の球 (`collectOcclusionSpheres`) のハッシュが変わったら焼き直す。ライブ表示では、形が変わっている間は焼かずにプローブなしで描き、同じ形が 0.2 s 続いたら 1 回焼く (`kProbeSettleSec`)。焼いた形に戻ったら保留を取り消す。保留中は描画を続ける。焼き込みが済んでいて保留も無い間は、球の収集とハッシュ (1.5 万原子で 2〜3 ms) を 0.1 s に 1 回に間引く。画像の書き出しは待たずにその場で焼く。
+- **作り直しの判定**: Scene が形の変わった回数 (`getOccluderGen`) を数え、焼いたときから動いていたら焼き直す。数えるのは、object と renderer のイベント (`Scene::objectChanged` / `rendererChanged`: 原子の移動・追加・削除、表示の切り替え、renderer の設定)、object と renderer の追加・削除 (`fireSceneEvent`)、表示キャッシュの無効化 (`DispCacheRenderer::invalidateDisplayCache`: renderer イベントを通らない style の変更)。カメラの操作はどれも通らないので、回転中は毎フレームの判定が整数の比較だけになる。ライブ表示では、形が変わっている間は焼かずにプローブなしで描き、0.2 s 変更が来なかったら 1 回焼く (`kProbeSettleSec`)。保留中は描画を続ける。画像の書き出しは待たずにその場で焼く。
+- **格子の範囲**: renderer が渡す遮蔽物の球 (`collectOcclusionSpheres`) の範囲に 2 格子足す。球は焼くときにだけ集める。以前は球のハッシュで形の変化を調べていて、焼き込みが済んでいても 0.1 s ごとに収集が走り、Windows で 1AON を回すと 41 fps に落ちた (今は 60 fps)。範囲を分子全体の箱にすれば収集は安くなるが、大きな分子の一部だけを描くと格子が分子全体に広がるので採らなかった。
+- **球の収集のキャッシュ**: 収集の重い部分は各 renderer の selection を全原子に掛けることなので (5.9 万原子で renderer 1 つあたり 11 ms 程度)、`MolRenderer::occlusionAtomIDs` が一致した原子の ID を覚えておき、座標だけ読み直す。ID を捨てるのは selection が変わったとき (`setSelection`)、`atomsMoved` 以外の `OBE_CHANGED` が来たとき (原子の追加・削除など)、原子数が変わったとき。原子の移動では捨てない (renderer の coordinate texture の経路も、原子が動く間は selection を評価し直さない)。4V6X の焼き直しで収集は 292 ms から 8 ms になった。読み込み直後や構造を編集した直後の 1 回は作り直しの分だけ重い。テスト: `src/tests/modules/molstr/test_occlusion_spheres.cpp`。
 - **時間 AA との関係**: 焼き直すと画が変わるので、`FrameRenderPipeline::isProbeBaked()` が true のフレームの後、`GUIView` は AA の蓄積をサンプル 0 からやり直す。以前ここが無く、蓄積済みのサンプルと混ざって画面が明るくなりすぎた。
 - **読み出し**: 受光点は法線方向に 1 格子 (3 Å) ずらした位置を 3 次 B-spline (3 線形の読み出し 8 回、Sigg & Hadwiger) で読む。3 線形で半格子ずらしただけでは、細い円柱 (cartoon のヘリックス) の中のプローブを拾って煤けた斑点が出た。照り返しの遮蔽面は 1 サンプルごとに読むので、安い 3 線形のまま。
 - **画面の AO との合わせ方**: `min(画面の AO, mix(1, clamp(m0 + 2 m1.N), aoProbeStrength))`。積にすると、近くの遮蔽物を画面の AO とプローブの両方で数えて暗くなりすぎる。EEVEE の 8 プローブの向き・有効性の重み付けは、格子が原子より粗く CPK に暗い斑点を作るので入れていない。
@@ -87,7 +89,7 @@ Fast GI のときの光の強さ (`Scene::kFastGILight*`、`lightBrightness` 倍
 
 ## 7. 既知の制限
 
-- 焼き直しの判定は遮蔽物の球 (原子の座標と半径) だけを見るので、原子の集合が変わらない表示の変更 (リボンの太さなど) では焼き直さない。
+- 形の変わらない変更 (色など) でも、イベントが来れば 1 回焼き直す。
 - 画像の書き出しは別のパイプラインで、毎回焼き直す。
 - 格子は 3 Å で、それより細かい遮蔽は画面の AO に頼る。
 

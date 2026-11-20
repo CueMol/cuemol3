@@ -129,8 +129,9 @@ namespace qsys {
     virtual void displayLabels(DisplayContext *pdc);
 
     /// Append the spheres this renderer draws as world-space occluders for the
-    /// baked ambient occlusion probes: (x, y, z) = centre, w = radius.
-    /// Default: none.
+    /// baked ambient occlusion probes: (x, y, z) = centre, w = radius. They
+    /// set the probe grid bounds, collected once per bake (the bake itself
+    /// draws the real geometry). Default: none.
     virtual void collectOcclusionSpheres(std::vector<qlib::Vector4D> &out) const {}
 
     //////////

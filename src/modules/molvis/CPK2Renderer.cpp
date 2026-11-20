@@ -252,9 +252,10 @@ void CPK2Renderer::collectOcclusionSpheres(std::vector<qlib::Vector4D> &out) con
   MolCoordPtr pMol = getClientMol();
   if (pMol.isnull()) return;
   CPK2Renderer *pThis = const_cast<CPK2Renderer *>(this);
-  AtomIterator iter(pMol, getSelection());
-  for (iter.first(); iter.hasMore(); iter.next()) {
-    MolAtomPtr pAtom = pMol->getAtom(iter.getID());
+  const std::vector<int> &aids = occlusionAtomIDs();
+  out.reserve(out.size() + aids.size());
+  for (int aid : aids) {
+    MolAtomPtr pAtom = pMol->getAtom(aid);
     if (pAtom.isnull()) continue;
     qlib::Vector4D v = pAtom->getPos();
     v.w() = pThis->getVdWRadius(pAtom);
