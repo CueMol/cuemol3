@@ -88,6 +88,9 @@ TEST_F(SceneOccluderGenTest, GeometryChangesMoveIt)
         m_pObj->attachRenderer(pRend);
     }));
     EXPECT_TRUE(moves([&] { pRend->setPropBool("visible", false); }));
+    // An alpha change moves the renderer between a veil and the background,
+    // which the probes leave out or bake.
+    EXPECT_TRUE(moves([&] { pRend->setPropReal("alpha", 0.5); }));
     EXPECT_TRUE(moves([&] { m_pObj->setPropBool("visible", false); }));
     // What MolCoord::fireAtomsMoved sends (MD playback, morphing).
     EXPECT_TRUE(moves([&] {
