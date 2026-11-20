@@ -373,11 +373,11 @@ const gfx::AoProbeParams *FrameRenderPipeline::prepareProbes(gfx::DisplayContext
     if (!(aoMethod == Scene::AOM_FASTGI && pScene->getAOProbeStrength() > 0.0)) return nullptr;
 
     if (m_pProbe == nullptr) m_pProbe = MB_NEW AmbientProbeVolume();
-    const double prevHash = m_pProbe->getHash();
+    const unsigned int prevBakes = m_pProbe->getBakeCount();
     const bool ok = m_pProbe->update(pdc, pScene, kProbeSpacing, m_pAOPostProc, kProbeDirs,
                                      kProbeTile, deferBake ? kProbeSettleSec : 0.0,
                                      &m_bProbePending);
-    m_bProbeBaked = (m_pProbe->getHash() != prevHash);
+    m_bProbeBaked = (m_pProbe->getBakeCount() != prevBakes);
     if (!ok) return nullptr;
 
     // GTAO view space has viewZ > 0 forward; the eye space looks down -Z.
