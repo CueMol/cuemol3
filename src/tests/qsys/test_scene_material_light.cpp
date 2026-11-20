@@ -62,6 +62,9 @@ TEST(SceneMaterialLight, MaterialSetsTheLight)
     EXPECT_NEAR(metal.metallic, 0.6, 1e-5);
     EXPECT_EQ(metal.toon, 0.0f);
     EXPECT_EQ(metal.fresnel, 0.0f);
+    // nolighting is lit by the ambient light alone and gets no AO, so Fast GI
+    // keeps its light as without AO.
+    expectLight(pScene->getMaterialLight("nolighting"), 1.2, 0.0, 0.0, 0.0);
     // A material without the attributes is not metallic.
     EXPECT_EQ(pScene->getMaterialLight("").metallic, 0.0f);
     // ceramic: the Fresnel rim strength 3 from its <def> attribute.

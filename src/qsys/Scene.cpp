@@ -831,7 +831,10 @@ Scene::MaterialLight Scene::getMaterialLight(const LString &mat_id) const
   // that "default" gets the kFastGILight* values. The specular and the
   // exponent stay the material's, so the balance of highlight and colour
   // that makes it read as plastic or metal does not change with the mode.
-  if (isAOEnabled() && getAOMethod() == AOM_FASTGI) {
+  // A material lit by the ambient light alone (nolighting, shadow) gets no
+  // AO (fog_inc.glsl encodeMaterial), so it keeps its light as without AO.
+  const bool bFlat = diff <= 0.0 && spec <= 0.0;
+  if (!bFlat && isAOEnabled() && getAOMethod() == AOM_FASTGI) {
     amb *= kFastGILightAmbient / kLegacyLightAmbient;
     diff *= kFastGILightDiffuse / kLegacyLightDiffuse;
   }

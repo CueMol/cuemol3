@@ -149,7 +149,18 @@ void main()
             o_FragColor = vec4(vec3(mix(1.0, ao, fogVis)), 1.0);
             return;
         }
+        // A material lit by the ambient light alone (nolighting, shadow;
+        // fog_inc.glsl encodeMaterial a = 0.75) is a flat look: no AO.
+        bool noAO = false;
+        if (u_hasMaterial != 0) {
+            float ma = texture(u_sceneMaterialTex, v_uv).a;
+            noAO = ma > 0.5 && ma < 0.9;
+        }
         if (u_ambientOnly != 0) {
+            if (noAO) {
+                o_FragColor = vec4(toneMap(c.rgb), clamp(c.a, 0.0, 1.0));
+                return;
+            }
             // As in Blender / ChimeraX the fog (depth cue) comes after the
             // lighting: take the fog out, darken the ambient part of the lit
             // colour by the AO, and put the fog back. c = mix(fog, lit, fogVis),
@@ -211,7 +222,7 @@ void main()
             o_FragColor = vec4(toneMap(outc), clamp(c.a, 0.0, 1.0));
             return;
         }
-        ao = mix(1.0, ao, fogVis);
+        ao = noAO ? 1.0 : mix(1.0, ao, fogVis);
         o_FragColor = clamp(vec4(c.rgb * ao, c.a), 0.0, 1.0);
     } else {
         o_FragColor = c;

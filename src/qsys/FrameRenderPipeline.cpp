@@ -220,9 +220,10 @@ void FrameRenderPipeline::createSceneRT(gfx::DisplayContext *pdc, int w, int h,
     int flags = (m_bSceneHdr ? gfx::RT_COLOR_RGBA16F : gfx::RT_COLOR_RGBA8) |
                 gfx::RT_DEPTH_TEX;
     if (aoEnabled) flags |= gfx::RT_NORMAL_RGBA16F;
-    // Fast GI: the material of each pixel, so the composite can split the lit
-    // colour of every renderer's material (fog_inc.glsl encodeMaterial).
-    if (aoEnabled && m_bSceneHdr) flags |= gfx::RT_MATERIAL_RGBA8;
+    // The material of each pixel (fog_inc.glsl encodeMaterial): Fast GI splits
+    // the lit colour of every renderer's material with it, and both AO methods
+    // leave out the pixels of a material lit by the ambient light alone.
+    if (aoEnabled) flags |= gfx::RT_MATERIAL_RGBA8;
     m_pAOSceneRT = pdc->createRenderTarget(w, h, flags);
 }
 

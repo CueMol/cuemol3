@@ -71,7 +71,7 @@ CueMol2 の OpenGL 表示 (`OglDisplayContext::setMaterImpl`) と同じ読み方
 - 鏡面 = 0.4 (光の鏡面の強さ) × material の specular
 - 指数 = material の shininess
 
-Fast GI のときは、環境光と拡散だけを `default` が `Scene::kFastGILight*` (0.56 / 0.52) になる比率で換算する (環境光 ×1.4、拡散 ×0.65)。Fast GI では AO を環境光にだけ掛けるため、環境光を主にした光にしてある。鏡面と指数は換算しない。以前は鏡面も換算していたが (×1.56)、`diff_metal` が Fast GI でだけ鏡面 > 拡散になって金属らしく見えるなど、方式を変えると material の性格が変わったため、換算をやめた。最後に 3 つの強さすべてに `lightBrightness` を掛ける。
+Fast GI のときは、環境光と拡散だけを `default` が `Scene::kFastGILight*` (0.56 / 0.52) になる比率で換算する (環境光 ×1.4、拡散 ×0.65)。Fast GI では AO を環境光にだけ掛けるため、環境光を主にした光にしてある。鏡面と指数は換算しない。以前は鏡面も換算していたが (×1.56)、`diff_metal` が Fast GI でだけ鏡面 > 拡散になって金属らしく見えるなど、方式を変えると material の性格が変わったため、換算をやめた。環境光だけで照らす material (拡散も鏡面も 0、`nolighting`・`shadow`) は AO を掛けない (§6) ので、換算もしない。最後に 3 つの強さすべてに `lightBrightness` を掛ける。
 
 `Scene::display` は、material を持たない描画 (renderer の外) のために `""` の光を入れ、`displayRendImpl` が renderer ごとに入れ直す。検索は renderer ごとに毎フレーム走る (`StyleMgr` の検索、キャッシュはしていない)。
 
@@ -102,8 +102,9 @@ Fast GI のときは、環境光と拡散だけを `default` が `Scene::kFastGI
 
 Fast GI の合成は scene の色を環境光・拡散・鏡面に分け直す (環境光の分に AO、拡散にプローブの影、鏡面に鏡面の遮蔽)。分け方は「拡散 / 環境光」の比と鏡面の粗さに依存し、material が renderer ごとに違うと Scene の 1 組の値では合わない。
 
-- Fast GI のときだけ、scene の描画先に RGBA8 の 3 枚目の添付 (`RT_MATERIAL_RGBA8`) を足す。ライティングするシェーダは描いている renderer の光を書く (`encodeMaterial`): r = 拡散 / 環境光、b = 環境光 (どちらも `x / (1 + x)` で 0〜1 に収める)、g = 指数 n を GGX の alpha に直した粗さ `sqrt(2 / (n + 2))`、a = 1。法線の `.w` は scene パスのブレンドで背景と混ざるので使えない。
+- AO があるとき (GTAO・Fast GI)、scene の描画先に RGBA8 の 3 枚目の添付 (`RT_MATERIAL_RGBA8`) を足す。ライティングするシェーダは描いている renderer の光を書く (`encodeMaterial`): r = 拡散 / 環境光、b = 環境光 (どちらも `x / (1 + x)` で 0〜1 に収める)、g = 指数 n を GGX の alpha に直した粗さ `sqrt(2 / (n + 2))`、a = 1 (環境光だけで照らす material は 0.75)。法線の `.w` は scene パスのブレンドで背景と混ざるので使えない。
 - 合成は a が 1 の画素ではこの値を使い、照明なしの描画 (a = 0) では Scene の値 (`u_lightAmbient` / `u_lightDiffuse`、指数 16 の粗さ 0.3333) を使う。照り返し (間接光) の albedo も、その画素の環境光の強さで割って求める。
+- **AO を掛けない material**: a が 0.75 の画素 (環境光だけで照らす material: `nolighting`・`shadow`) は、GTAO でも Fast GI でも AO を掛けない (Fast GI は照り返しも足さない)。これらは平らな色の表現 (地図の等高線は `nolighting`) で、AO を掛けると環境光だけの陰影が付いて立体に見えてしまうため。拡散と鏡面がどちらも 0 であることで決めるので、material に印を足す必要はない。
 - WebGL (`FboStore` / `EcRenderTarget`) とデスクトップ GL (`OcRenderTarget`) の両方の描画先に対応している。
 
 ## 7. 既知の制限
