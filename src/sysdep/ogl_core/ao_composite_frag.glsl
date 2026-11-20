@@ -158,7 +158,7 @@ void main()
             // The light of this pixel's material: diffuse / ambient, the
             // specular roughness and the ambient intensity.
             float diffPerAmb = u_lightDiffuse / max(u_lightAmbient, 1e-3);
-            float rough = 0.3333;
+            float rough = 0.1593;  // exponent 76.8, Scene::kDefaultMaterialShininess
             float ambient = u_lightAmbient;
             if (u_hasMaterial != 0) {
                 vec4 mat = texture(u_sceneMaterialTex, v_uv);
@@ -182,8 +182,8 @@ void main()
                 // Lagarde & de Rousiers 2014 (Moving Frostbite to PBR):
                 // so = saturate(pow(NV + ao,
                 // exp2(-16 r - 1)) - 1 + ao), r = the Blinn-Phong exponent as
-                // GGX alpha sqrt(2 / (n + 2)) (the material's, or 16 =
-                // Scene::kFastGILightShininess without one).
+                // GGX alpha sqrt(2 / (n + 2)) (the material's, or that of
+                // Scene::kDefaultMaterialShininess without one).
                 // The view vector is taken as the eye axis.
                 float nDotV = max(nE.z, 0.0);
                 float so = 1.0;

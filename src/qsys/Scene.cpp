@@ -782,12 +782,13 @@ Scene::MaterialLight Scene::getMaterialLight(const LString &mat_id) const
 {
   // CueMol2's OpenGL view (OglDisplayContext::setMaterImpl) gave the material
   // values to its light: ambient on top of a global ambient of 0.2, a
-  // material specular of 0.4, and built-in values 0.2 / 0.8 / 0.4 / 32 for a
-  // name it did not find. The built-in values give the former light,
-  // kLegacyLight* (0.4 / 0.8 / 0.16 / 32). A renderer without a material
-  // takes the one named "default" (unlike CueMol2, which gave it the built-in
-  // values), so the two always look the same.
-  double ka = 0.2, kd = 0.8, ks = 0.4, shin = 32.0;
+  // light specular of 0.4, and built-in values for a name it did not find.
+  // Here the built-in values are those of the material "default"
+  // (kDefaultMaterial*), and a renderer without a material takes that one
+  // (unlike CueMol2, which gave it the built-in values), so the three always
+  // look the same.
+  double ka = kDefaultMaterialAmbient, kd = kDefaultMaterialDiffuse,
+         ks = kDefaultMaterialSpecular, shin = kDefaultMaterialShininess;
   {
     // Look the name up in this scene's styles (display() has already pushed
     // the context; pushing it again is harmless).
@@ -806,13 +807,13 @@ Scene::MaterialLight Scene::getMaterialLight(const LString &mat_id) const
   double amb = 0.2 + ka, diff = kd, spec = 0.4 * ks;
 
   // The ambient-dominant light pairs with the Fast GI AO, which darkens the
-  // ambient part only: scale every material so that the built-in one gets
-  // the kFastGILight* values.
+  // ambient part only: scale the ambient and diffuse of every material so
+  // that "default" gets the kFastGILight* values. The specular and the
+  // exponent stay the material's, so the balance of highlight and colour
+  // that makes it read as plastic or metal does not change with the mode.
   if (isAOEnabled() && getAOMethod() == AOM_FASTGI) {
     amb *= kFastGILightAmbient / kLegacyLightAmbient;
     diff *= kFastGILightDiffuse / kLegacyLightDiffuse;
-    spec *= kFastGILightSpecular / kLegacyLightSpecular;
-    shin *= kFastGILightShininess / kLegacyLightShininess;
   }
   const double bri = std::max(0.0, m_fLightBrightness);
   MaterialLight ml;

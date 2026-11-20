@@ -140,7 +140,11 @@ namespace {
     static const PbrEntry kPbr[] = {
         // ported from a POV finish
         {"default", 0.20f, 0.80f, 0.0f, 0.3742032f, 0.40f, 0.00f},
+        // polished plastic / ceramic: the same finish as default
+        {"plastic", 0.20f, 0.80f, 0.0f, 0.3742032f, 0.40f, 0.00f},
         {"matte", 0.30f, 0.80f, 0.0f, 0.5000000f, 0.00f, 0.00f},
+        // matte plastic: POV specular 0.15 roughness 0.08 by the same mapping
+        {"matte_plastic", 0.20f, 0.80f, 0.0f, 0.6094183f, 0.15f, 0.00f},
         // TODO: add an "aniso_diff_metal" sibling -- brushed metal, driven by
         // pbr.anisotropy (+ pbr.anisotropyRotation, in turns: 0 = brushed
         // along the axis, 0.25 = a circumferential/lathe brush). The reviewed
