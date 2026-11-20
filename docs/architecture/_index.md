@@ -154,6 +154,10 @@ architecture, it belongs here.
   (HDR の scene 色、鏡面の遮蔽、照り返し)、3 A 格子の焼き込みプローブ (GPU の焼き込み、形が止まってからの焼き直し、
   時間 AA のやり直し、3 次 B-spline の読み出し)、プローブから作る key light の柔らかい影、明るさのつまみ、
   `aoMethod` の無い古い qsc を GTAO で読む互換、調整の経緯と採らなかった案。
+- [renderer の半透明 (veil の後処理合成)](renderer-group-alpha.md) (日本語) -- renderer の alpha を
+  umbreon と同じ方式で合成する: alpha ごとの層 (veil) を背景の深度から不透明として別に描き、`-log(1-a)` を
+  足す加算の累積と `T = exp(-Σ)` で画素ごとに合成。描画の範囲の絞り込み (`Scene::DrawFilter`)、常時前面の
+  ラベル、hover の再表示、プローブの焼き込みから veil を除くこと、背景を透明にした書き出しの premultiplied、検算。
 - [renderer の material と光](renderer-material.md) (日本語) -- renderer の `material` で光の強さと
   ハイライトを決める。material の一覧 (磨いた / 艶消しのプラスチック、艶消し / 磨いた金属ほか)、CueMol2 と同じ名前から
   光への換算と Fast GI での換算 (環境光と拡散だけ)、三角形の画素ごとのライティング、1 を超えた明るさのトーンカーブ、

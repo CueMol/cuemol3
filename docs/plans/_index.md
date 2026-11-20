@@ -19,7 +19,6 @@
 
 | ファイル | 内容 | 状態 |
 |---|---|---|
-| [261120-renderer-group-alpha-plan.md](261120-renderer-group-alpha-plan.md) | renderer の半透明を umbreon と同じ後処理の合成 (alpha ごとの層を不透明として別に描き、画素ごとに T = Π(1-a) で重み付け) にする。頂点ごとの alpha は今のまま。ChimeraX の single-layer 方式との比較 | **未実装 / 計画中** (`feat/renderer-group-alpha`) |
 | [261120-renderer-material-plan.md](261120-renderer-material-plan.md) | renderer の material の残り: material の検索のキャッシュ、色ごとの material | **未着手 / 必要になったら**。material を光に掛ける仕組み・金属度・環境の映り込み・toon・陶器は実装済み (`../architecture/renderer-material.md`) |
 | [260908-tritium-plugin-system-plan.md](260908-tritium-plugin-system-plan.md) | tritium の plugin システム (JS/TS + C++ 両レーン)。VSCode 拡張機構の調査、C++ 登録機構の seam、packaging と配置、Phase 0/A/A'/B/C | **Phase 0 のみ実装済み** (react 側の in-tree plugin host。`../architecture/tritium_plugin/`)。実行時ロード (Phase A)、C++ レーン (Phase A')、schema 駆動 UI / sideload (Phase B)、重い native の分離 (Phase C) は未実装 |
 | [umbreon-process-isolation-plan.md](umbreon-process-isolation-plan.md) | umbreon GI(OIDN) の大確保が Chromium PartitionAlloc で crash する件と、恒久対策としての process 分離 (mmap zero-copy) | **未実装 / 当面着手しない**。§2 の原因究明は確定した調査結果。着手条件は crash が実害になったとき |
