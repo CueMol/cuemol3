@@ -699,6 +699,37 @@ void Scene::display(DisplayContext *pdc)
   std::vector<RendererPtr> transps;
   std::vector<RendererPtr> laters;
 
+  // The draw filter (frame pipeline veil composite, see DrawFilter): the
+  // background leaves out the veils and the labels drawn on top, a veil pass
+  // draws only that veil's renderers, the label pass only those labels.
+  const DrawFilter::Kind dfKind = m_drawFilter.kind;
+  std::vector<double> veilAlphas;
+  if (dfKind == DrawFilter::DF_BACKGROUND || dfKind == DrawFilter::DF_VEIL)
+    veilAlphas = getVeilAlphas();
+  auto veilOf = [&veilAlphas](const RendererPtr &pRend) {
+    const double a = pRend->getDefaultAlpha();
+    if (a >= 1.0 - kVeilAlphaEps) return -1;
+    for (size_t v = 0; v < veilAlphas.size(); ++v)
+      if (std::abs(a - veilAlphas[v]) <= kVeilAlphaEps) return int(v);
+    return -1;
+  };
+  auto drawsBody = [&](const RendererPtr &pRend) {
+    switch (dfKind) {
+      case DrawFilter::DF_BACKGROUND: return veilOf(pRend) < 0;
+      case DrawFilter::DF_VEIL: return veilOf(pRend) == m_drawFilter.veil;
+      case DrawFilter::DF_ONTOP_LABELS: return false;
+      default: return true;
+    }
+  };
+  auto drawsLabels = [&](const RendererPtr &pRend) {
+    switch (dfKind) {
+      case DrawFilter::DF_BACKGROUND: return !pRend->isLabelOnTop();
+      case DrawFilter::DF_VEIL: return false;
+      case DrawFilter::DF_ONTOP_LABELS: return pRend->isLabelOnTop();
+      default: return true;
+    }
+  };
+
   {
     rendtab_t::const_iterator i = m_rendtab.begin();
     rendtab_t::const_iterator ie = m_rendtab.end();
@@ -709,6 +740,9 @@ void Scene::display(DisplayContext *pdc)
         continue;
 
       if (!pRend->isVisible())
+        continue;
+
+      if (!drawsBody(pRend))
         continue;
 
       if (pRend->isDispLater()) {
@@ -760,7 +794,8 @@ void Scene::display(DisplayContext *pdc)
       ObjectPtr pobj = prend->getClientObj();
       if (!pobj.isnull() &&
           pobj->isVisible() &&
-          prend->isVisible()) {
+          prend->isVisible() &&
+          drawsLabels(prend)) {
         pdc->setAlpha(prend->getDefaultAlpha());
         
         bmat = false;
@@ -780,6 +815,38 @@ void Scene::display(DisplayContext *pdc)
   }
 
   pdc->endRender();
+}
+
+void Scene::assignVeils(const std::vector<double> &alphas, std::vector<int> &veilIdx,
+                        std::vector<double> &veilAlphas)
+{
+  veilIdx.assign(alphas.size(), -1);
+  veilAlphas.clear();
+  for (size_t i = 0; i < alphas.size(); ++i) {
+    const double a = alphas[i];
+    if (a >= 1.0 - kVeilAlphaEps) continue;
+    size_t v = 0;
+    for (; v < veilAlphas.size(); ++v)
+      if (std::abs(a - veilAlphas[v]) <= kVeilAlphaEps) break;
+    if (v == veilAlphas.size()) veilAlphas.push_back(a);
+    veilIdx[i] = int(v);
+  }
+}
+
+std::vector<double> Scene::getVeilAlphas() const
+{
+  // The same renderers and order as display() walks them.
+  std::vector<double> alphas;
+  for (const auto &kv : m_rendtab) {
+    const RendererPtr &pRend = kv.second;
+    ObjectPtr pObj = pRend->getClientObj();
+    if (pObj.isnull() || !pObj->isVisible() || !pRend->isVisible()) continue;
+    alphas.push_back(pRend->getDefaultAlpha());
+  }
+  std::vector<int> idx;
+  std::vector<double> veilAlphas;
+  assignVeils(alphas, idx, veilAlphas);
+  return veilAlphas;
 }
 
 Scene::MaterialLight Scene::getMaterialLight(const LString &mat_id) const
@@ -855,7 +922,9 @@ void Scene::displayRendImpl(DisplayContext *pdc, ObjectPtr pObj, RendererPtr pRe
 {
   // alpha should be set before startSection,
   // since startSection() refers to the alpha value (in Pov rendering)
-  pdc->setAlpha(pRend->getDefaultAlpha());
+  // A veil pass draws its renderers opaque: their alpha is the weight of the
+  // veil composite (FrameRenderPipeline), not a blend in the scene pass.
+  pdc->setAlpha(m_drawFilter.kind == DrawFilter::DF_VEIL ? 1.0 : pRend->getDefaultAlpha());
 
   pdc->setMaterial(pRend->getDefaultMaterial());
   // The lit shaders read the light at each draw (ShaderObject::setupFog).

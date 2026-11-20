@@ -354,6 +354,13 @@ export class GfxManager {
         glState.setBlendModeAdd(this._context, add);
     }
 
+    /// API: select the veil composite blend (colour SRC_ALPHA /
+    /// ONE_MINUS_SRC_ALPHA, alpha ONE / ONE_MINUS_SRC_ALPHA) when veil is true,
+    /// otherwise restore the default over-blend.
+    setBlendModeVeil(veil: boolean): void {
+        glState.setBlendModeVeil(this._context, veil);
+    }
+
     //////////
     // Buffer
 
@@ -495,6 +502,12 @@ export class GfxManager {
     /// depth. Restores the previous draw target binding to the default fb.
     blitDepthToDefault(name: string): void {
         this.fbos.blitDepthToDefault(name);
+    }
+
+    /// API: blit FBO src's depth buffer into FBO dst (same size and format);
+    /// the veil passes start from the background's depth this way.
+    blitDepthTo(src: string, dst: string): void {
+        this.fbos.blitDepthTo(src, dst);
     }
 
     /// API: read back an RGBA sub-rectangle of the named FBO's color

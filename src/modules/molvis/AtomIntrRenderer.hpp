@@ -135,6 +135,8 @@ public:
 
   void displayLabels(DisplayContext *pdc) override;
 
+  bool isLabelOnTop() const override { return m_bShowLabel && m_bLabelOnTop; }
+
   ////
 
   void propChanged(qlib::LPropEvent &ev) override;

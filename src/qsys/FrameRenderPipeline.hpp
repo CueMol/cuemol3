@@ -20,6 +20,7 @@
 #include <gfx/PostProcGpuPrim.hpp>  // gfx::AoConstants (by-value Params member)
 
 #include <functional>
+#include <vector>
 
 namespace gfx {
 class DisplayContext;
@@ -169,7 +170,9 @@ private:
     /// constants it was drawn with, so presentLast() reproduces the frame.
     struct StageRecord
     {
-        enum Kind { NONE, COMPOSITE, FXAA, SMAA, JITTER };
+        /// COPY: m_pCompRT as is (a frame with veils and no post-AA: the
+        /// veils and the labels on top are composited there).
+        enum Kind { NONE, COMPOSITE, FXAA, SMAA, JITTER, COPY };
         Kind kind = NONE;
         gfx::AoConstants aoc;
         bool aoActive = false;
@@ -182,6 +185,16 @@ private:
     /// Draw the given final stage into the currently bound framebuffer. The
     /// caller sets depth test / blend off around it.
     void presentStage(gfx::DisplayContext *pdc, const StageRecord &st);
+
+    /// Composite the translucent veils (Scene::getVeilAlphas) over the
+    /// background already in m_pCompRT, then draw the labels on top there:
+    /// each veil is drawn opaque into m_pVeilRT from the background's depth,
+    /// accumulated into m_pVeilAccRT / m_pVeilLogRT, and blended over the
+    /// background per pixel (veil_composite_frag.glsl). Returns false when
+    /// the veil targets cannot be allocated (the veils are then left out).
+    bool compositeVeils(gfx::DisplayContext *pdc, const ScenePtr &pScene,
+                        const std::vector<double> &veils,
+                        const std::function<void()> &sceneRenderFn);
 
     /// Bake (or keep) the ambient probes of the bitmask AO and fill `probe`
     /// for the AO pass. Sets m_bProbePending / m_bProbeBaked for this frame
@@ -219,6 +232,12 @@ private:
     /// Temporal-jitter per-sample color (RGBA8) and float accumulation (RGBA16F).
     gfx::RenderTarget *m_pJitterSampleRT = nullptr;
     gfx::RenderTarget *m_pJitterAccumRT = nullptr;
+    /// Veil composite: one veil drawn opaque (colour + depth), and the float
+    /// accumulations (sum of a * colour and a; sum of -log(1 - a)).
+    /// Allocated on the first frame with veils.
+    gfx::RenderTarget *m_pVeilRT = nullptr;
+    gfx::RenderTarget *m_pVeilAccRT = nullptr;
+    gfx::RenderTarget *m_pVeilLogRT = nullptr;
 
     /// Fullscreen post-processing primitive (GTAO + denoise + composite + AA +
     /// jitter compose). Owned.

@@ -60,6 +60,7 @@ public:
                        quint32 *pbuf) override;
 
     void blitDepthToDefault() override;
+    void blitDepthTo(gfx::RenderTarget *pDst) override;
 
     /// True if color attachment 0 is an unsigned-integer texture.
     bool isIntegerColor() const

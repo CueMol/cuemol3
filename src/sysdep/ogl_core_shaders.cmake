@@ -38,6 +38,8 @@ SET(OGL_CORE_SHADER_SOURCES
   ${CMAKE_CURRENT_LIST_DIR}/ogl_core/smaa_weights_frag.glsl
   ${CMAKE_CURRENT_LIST_DIR}/ogl_core/smaa_blend_frag.glsl
   ${CMAKE_CURRENT_LIST_DIR}/ogl_core/jitter_compose_frag.glsl
+  ${CMAKE_CURRENT_LIST_DIR}/ogl_core/veil_accum_frag.glsl
+  ${CMAKE_CURRENT_LIST_DIR}/ogl_core/veil_composite_frag.glsl
   ${CMAKE_CURRENT_LIST_DIR}/ogl_core/hover_mask_frag.glsl
   ${CMAKE_CURRENT_LIST_DIR}/ogl_core/hover_blur_frag.glsl
   ${CMAKE_CURRENT_LIST_DIR}/ogl_core/hover_hl_frag.glsl

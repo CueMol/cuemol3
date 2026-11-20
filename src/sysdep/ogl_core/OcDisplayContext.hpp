@@ -44,6 +44,7 @@ public:
     void setBlendEnabled(bool b) override;
 
     void setBlendModeAdd(bool add) override;
+    void setBlendModeVeil(bool veil) override;
 
     //////////
 

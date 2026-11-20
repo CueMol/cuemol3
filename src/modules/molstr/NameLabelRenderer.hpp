@@ -110,6 +110,8 @@ public:
 
   bool isTransp() const override { return true; }
 
+  bool isLabelOnTop() const override { return m_bLabelOnTop; }
+
   //////
   // Event handlers
 

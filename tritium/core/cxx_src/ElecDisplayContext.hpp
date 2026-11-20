@@ -42,6 +42,7 @@ public:
     /// Select additive (GL_ONE, GL_ONE) vs the default over-blend. Used by the
     /// temporal-jitter accumulation step.
     virtual void setBlendModeAdd(bool b) override;
+    virtual void setBlendModeVeil(bool b) override;
 
     virtual void setCullFace(bool f = true) override;
 
