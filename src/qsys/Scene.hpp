@@ -266,12 +266,14 @@ namespace qsys {
     };
 
     /// Light intensities while the Fast GI AO is on (ambient total, diffuse,
-    /// specular x material). The AO darkens the ambient part; the diffuse key
+    /// specular x material), for a renderer without a material (other
+    /// materials are scaled alike, getMaterialLight). The AO darkens the
+    /// ambient part; the diffuse key
     /// light tells the faces of a shape apart (a cartoon cylinder's side from
     /// its cap) and is darkened in the cavities by its probe shadow, so a
     /// strong key does not light the cavities up. Without Fast GI the scene
-    /// keeps the former 0.4 / 0.8 / 0.16, which shade without AO (see
-    /// display()). Both are scaled by lightBrightness.
+    /// keeps the former 0.4 / 0.8 / 0.16 (kLegacyLight*), which shade without
+    /// AO. Both are scaled by lightBrightness.
     /// (ambient / diffuse 0.7 / 0.65 tuned for the depth cue, x 0.8 for the
     /// brightness). The highlight is broader (exponent 16) and stronger than
     /// the former 32 / 0.16 to read as plastic over the ambient-lit colour.
@@ -279,7 +281,11 @@ namespace qsys {
     static constexpr double kFastGILightDiffuse = 0.52;
     static constexpr double kFastGILightSpecular = 0.25;
     static constexpr double kFastGILightShininess = 16.0;
-    /// The former specular exponent, kept without Fast GI.
+    /// The former light without Fast GI (ambient total / diffuse / specular /
+    /// exponent): what a renderer without a material is lit with.
+    static constexpr double kLegacyLightAmbient = 0.4;
+    static constexpr double kLegacyLightDiffuse = 0.8;
+    static constexpr double kLegacyLightSpecular = 0.16;
     static constexpr double kLegacyLightShininess = 32.0;
     /// Eye-space direction to the key light (upper right front), the same
     /// with and without Fast GI.
@@ -287,6 +293,21 @@ namespace qsys {
     /// Fast GI: contrast (power of the visibility) of the key light's soft
     /// shadow from the baked probes (gtao_frag.glsl).
     static constexpr double kFastGIKeyShadowPower = 2.0;
+
+    /// Light intensities and specular exponent (FogBlock) of one material.
+    struct MaterialLight
+    {
+      float ambient;
+      float diffuse;
+      float specular;
+      float shininess;
+    };
+
+    /// The light a renderer of material mat_id is lit with: the material's
+    /// values (data/default_style.xml, as CueMol2's OpenGL view read them),
+    /// scaled for the AO method and by lightBrightness. An empty or unknown
+    /// name is lit as before materials took effect.
+    MaterialLight getMaterialLight(const LString &mat_id) const;
 
     /// Overall light scale (lightBrightness): multiplies the ambient, diffuse
     /// and specular intensities alike, so the image gets brighter or darker
