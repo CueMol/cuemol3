@@ -1499,20 +1499,23 @@ bool GUIView::renderAOColorFrame(DisplayContext *pdc, const ScenePtr &pScene,
     const int bh = outRT->getHeight();
 
     const bool useAO = pScene->isAOEnabled() && hasFBO();
+    // Translucent renderers are composited as veils by the pipeline, with or
+    // without AO.
+    const bool usePipe = (useAO || !pScene->getVeilAlphas().empty()) && hasFBO();
     // The off-screen export always renders the AO term at full resolution: the
     // half-res mode is a live-interaction optimization (see drawScene), not a
-    // quality setting, so an exported still must not inherit it. The AO-off
-    // plain-scene fallback below is equivalent to an AA-only pipeline composite
-    // (this path never applies spatial post-AA), so the pipeline is only set up
-    // for AO here; pass params.enableAO when export post-AA is added.
-    if (useAO) ensurePipeline(bw, bh, /*halfRes=*/false, /*aoEnabled=*/true);
+    // quality setting, so an exported still must not inherit it. Without AO
+    // and veils, the plain-scene fallback below is equivalent to an AA-only
+    // pipeline composite (this path never applies spatial post-AA).
+    if (usePipe) ensurePipeline(bw, bh, /*halfRes=*/false, /*aoEnabled=*/useAO);
 
-    if (useAO && m_pPipeline != nullptr && m_pPipeline->isReady()) {
+    if (usePipe && m_pPipeline != nullptr && m_pPipeline->isReady()) {
         // Composite-only chain (no spatial post-AA, no jitter, no UI depth blit),
         // written to outRT. Shares FrameRenderPipeline::render with the live path.
         FrameRenderParams params;
         params.camAoc = computeAoConstants();
         params.aoNoiseOffset = aoNoiseOffset;
+        params.enableAO = useAO;
         params.bgTransparent = bgTransparent;
         params.enablePostAA = false;
         params.jitterActive = false;
