@@ -179,8 +179,8 @@ alpha, and edge groups staying independent of the veils).
   needed no change: it was already feeding umbreon the same weights POV-Ray
   gets.
 - libcuemol2 now requires an umbreon at or after that fix. CI builds umbreon
-  from source at `UMBREON_GIT_REF` (`build_scripts/deplibs.env`, currently
-  `main`), so the umbreon change had to land first. A local checkout with a
+  from source at `UMBREON_GIT_REF` (`build_scripts/deplibs.env`, then the
+  floating `main`, now a pinned commit), so the umbreon change had to land first. A local checkout with a
   stale umbreon fails the regression test — which is the intended signal.
 - Veils that **overlap each other** can still overshoot, but only with two or
   more **distinct** alphas: 0.6 + 0.5 in one pixel yields

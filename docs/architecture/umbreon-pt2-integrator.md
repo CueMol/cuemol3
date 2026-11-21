@@ -27,8 +27,8 @@ integrator に固定され続ける状態にあった。
 `UmbreonDisplayContext::buildSceneAndOptions()` の GI ブロックで
 **`opt.giIntegrator = 2` を明示 pin する**。UI / `.qif` には integrator 選択を露出しない。
 
-「未設定にして umbreon の既定に追従する」案は採らなかった。`build_scripts/deplibs.env` の
-`UMBREON_GIT_REF=main` は**浮動 ref** であり、追従すると umbreon が将来 pt3 を既定に昇格した
+「未設定にして umbreon の既定に追従する」案は採らなかった。当時の `build_scripts/deplibs.env` の
+`UMBREON_GIT_REF=main` は**浮動 ref** であり (現在はコミット SHA で固定している)、追従すると umbreon が将来 pt3 を既定に昇格した
 時点で cuemol2 のレンダリング結果が黙って変わる。明示 pin であれば、integrator の更新は
 常に意図的なコミットとして残る。
 
