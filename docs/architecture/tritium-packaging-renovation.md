@@ -152,7 +152,8 @@ About ダイアログの表示バージョンは C++ 側 (`getAppInfo` -> `Scene
 ### embedded python 条件分岐 (Decision 3 / 1-3 詳細)
 
 - 現状確認: `.build_out`/dev build は非 embed (`lib/python` 無し、libcuemol2.dylib に
-  libpython の hard load 依存無し)。embed build は CI の `_py312` variant のみ。libcuemol2.dylib
+  libpython の hard load 依存無し)。embed build は以前 CI の `_py312` variant (UXP GUI 用) で作っていたが、
+  使われていないため CI から外した (現在 CI に embed build は無い)。libcuemol2.dylib
   には `@loader_path/../lib/python/lib` 等の LC_RPATH が常時 baked されるが、これは検索パス
   であり libpython を hard link しない限り無害。
 - 方針: embed build を配布する場合のみ `$LIBCUEMOL2_ROOT/lib/python` を staging する。

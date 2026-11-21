@@ -63,6 +63,11 @@ runs:
     env:
       SCCACHE_GHA_ENABLED: "true"
       SCCACHE_GHA_VERSION: "${{ env.RUNNER_TYPE }}"
+      # mozbuild posts a desktop notification through terminal-notifier when
+      # the build and the packaging finish (mozbuild/base.py notify). On the
+      # CI runner that call can hang forever, leaving the job stuck until the
+      # 6 h timeout after the build itself has finished; MOZ_NOSPAM skips it.
+      MOZ_NOSPAM: "1"
 #      ARTIFACT_NAME: cuemol2_${{ runner.os }}_${{ runner.arch }}.tar.bz2
       ARTIFACT_NAME: ${{ inputs.artifact-name }}.tar.bz2
     run: |

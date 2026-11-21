@@ -46,17 +46,10 @@ env:
 ###############################################
 
 jobs:
-  # Compute the build_posix matrix. The non-embed legs (arm64 + Intel) run on
-  # every push; the py312 (embed-python) leg is added only on the release
-  # cadence (develop / tag / manual dispatch), so feature-branch pushes do not
-  # rebuild the embed-python variant every time. A dynamic matrix is used
-  # because a job-level if cannot reference the matrix context.
-  #
-  # It also decides whether this run builds at all (`build`, see the top).
+  # Decides whether this run builds at all (`build`, see the top).
   setup_matrix:
     runs-on: ubuntu-latest
     outputs:
-      posix-matrix: ${{ steps.gen.outputs.matrix }}
       build: ${{ steps.changes.outputs.build }}
     steps:
       # History only (no file contents): enough for the merge-base and the
@@ -76,25 +69,16 @@ jobs:
           SHA: ${{ github.sha }}
         run: echo "build=$(bash build_scripts/ci_needs_build.sh)" >> "$GITHUB_OUTPUT"
 
-      - name: Compute build_posix matrix
-        id: gen
-        shell: bash
-        run: |
-          base='{"os":"macos-15","name":"MacOS 15 arm64 clang","embed-python":"","postfix":""},{"os":"macos-15-intel","name":"MacOS 15 x64 clang","embed-python":"","postfix":""}'
-          py312='{"os":"macos-15","name":"MacOS 15 arm64 clang py312","embed-python":"3.12","postfix":"_py312"}'
-          if [ "${{ env.BUILD_MODE }}" = "full" ]; then
-            echo "matrix={\"include\":[$base,$py312]}" >> "$GITHUB_OUTPUT"
-          else
-            echo "matrix={\"include\":[$base]}" >> "$GITHUB_OUTPUT"
-          fi
-
   build_posix:
     name: '${{ matrix.name }}'
     needs: setup_matrix
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.setup_matrix.outputs.posix-matrix) }}
+      matrix:
+        include:
+          - { os: macos-15, name: 'MacOS 15 arm64 clang' }
+          - { os: macos-15-intel, name: 'MacOS 15 x64 clang' }
 
     env:
       MACOSX_DEPLOYMENT_TARGET: "10.15"
@@ -114,7 +98,6 @@ jobs:
         echo "Branch/Tag: ${{ github.ref }}"
         echo "Event: ${{ github.event_name }}"
         echo "Build type: ${{ matrix.os }}"
-        echo "Embed python: ${{ matrix.embed-python }}"
 
     - uses: actions/checkout@v4
       with:
@@ -134,7 +117,7 @@ jobs:
       shell: bash
       run: |
         VERSION=$(grep '#define QM_VERSION' src/_version.h | sed 's/.*"\(.*\)".*/\1/')
-        TARGET="cuemol2_${VERSION}_${{ runner.os }}_${{ runner.arch }}${{ matrix.postfix }}"
+        TARGET="cuemol2_${VERSION}_${{ runner.os }}_${{ runner.arch }}"
         echo $VERSION
         echo "Build: $TARGET"
         echo "version=$VERSION" >> "$GITHUB_OUTPUT"
@@ -162,7 +145,6 @@ jobs:
       shell: bash
       run: |
         echo "RUNNER_TYPE=${{ matrix.os }}" >> $GITHUB_ENV
-        echo "EMBED_PYTHON=${{ matrix.embed-python }}" >> $GITHUB_ENV
         set -eux
         clang --version
         xcodebuild -version
@@ -262,7 +244,7 @@ jobs:
     # Source-only checks (typecheck / eslint / vitest) -- platform independent,
     # so run them on a single matrix leg rather than on every one.
     - name: Check tritium/react-gui
-      if: needs.setup_matrix.outputs.build != 'false' && (matrix.os == 'macos-15' && matrix.embed-python == '')
+      if: needs.setup_matrix.outputs.build != 'false' && matrix.os == 'macos-15'
       uses: ./build_scripts/check_tritium_react_gui
 
     # Fetch the external bundle apps (POV-Ray / apbs-pdb2pqr / ffmpeg) before
@@ -275,10 +257,10 @@ jobs:
         basedir: ${{ github.workspace }}/target
 
     # Package the tritium Electron app (macOS arm64 DMG, ad-hoc signed).
-    # Runs only on the arm64 non-embed-Python leg, in full mode (develop /
+    # Runs only on the arm64 leg, in full mode (develop /
     # workflow_dispatch / tags) -- not on every feature-branch push.
     - name: Package tritium (macOS arm64 DMG)
-      if: needs.setup_matrix.outputs.build != 'false' && (matrix.os == 'macos-15' && matrix.embed-python == '' && env.BUILD_MODE == 'full')
+      if: needs.setup_matrix.outputs.build != 'false' && (matrix.os == 'macos-15' && env.BUILD_MODE == 'full')
       shell: bash
       run: |
         set -eux
@@ -288,7 +270,7 @@ jobs:
         pnpm run package:mac
 
     - name: Upload tritium DMG
-      if: needs.setup_matrix.outputs.build != 'false' && (matrix.os == 'macos-15' && matrix.embed-python == '' && env.BUILD_MODE == 'full')
+      if: needs.setup_matrix.outputs.build != 'false' && (matrix.os == 'macos-15' && env.BUILD_MODE == 'full')
       uses: actions/upload-artifact@v4
       with:
         name: CueMol3_${{ steps.version.outputs.version }}_mac_arm64
