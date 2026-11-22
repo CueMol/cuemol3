@@ -849,6 +849,14 @@ void UmbreonDisplayContext::appendIntData()
       um.triMaterialId.push_back(
           static_cast<std::uint8_t>(materialIndexFor(triMat)));
       um.triGroupId.push_back(group);
+      // Edge-line mode of the face, as the POV-Ray silhouette builder reads it
+      // (RendIntData::calcSilEdgeLines): MESHXX faces (DVA_NOEDGE, e.g. the
+      // inner part of a ribbon arrowhead step) get no edge line, NORGLN faces
+      // (POLY_FILL_NORGLN / _XX) no border line.
+      um.triEdgeMode.push_back(
+          f.nmode == MFMOD_MESHXX   ? umbreon::Mesh::kTriNoEdge
+          : f.nmode == MFMOD_NORGLN ? umbreon::Mesh::kTriNoBorder
+                                    : umbreon::Mesh::kTriEdgeNormal);
       for (int k = 0; k < 3; ++k) {
         um.positions.push_back(toVec3(pv[k]->v));
         um.normals.push_back(toVec3(pv[k]->n));

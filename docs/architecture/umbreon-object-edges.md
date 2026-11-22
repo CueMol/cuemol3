@@ -31,6 +31,11 @@ CueMol の umbreon レンダリングで renderer の edge line (`egtype`) を�
 - 線描画由来の円柱 (`convLines` で線を円柱にしたもの。wire / line 表示) には
   `Cylinder::noEdge` を付ける。それ自体には輪郭を作らず、ほかの線の切り落としにも使わない
   (POV-Ray の書き出しと同じ)。
+- mesh の三角形ごとの線の扱い (`MeshFace::nmode`) を `umbreon::Mesh::triEdgeMode` で渡す:
+  `MFMOD_MESHXX` (`DVA_NOEDGE` の頂点を含む三角形。リボンの矢じりの付け根の段差の内側など)
+  は辺に線を出さず、`MFMOD_NORGLN` (`POLY_FILL_NORGLN` / `_XX`) は外周の線を出さない。
+  POV-Ray の書き出し (`RendIntData::calcSilEdgeLines`) と同じ扱い。丸い断面のシート
+  (RoundRibbon) では付け根の段差がごく小さな壁になり、これを渡さないとシートを横切る線が出た。
 - silhouette モードの「後ろの面」の範囲 (`outlineFarVz`) は、fog の範囲から
   `outlineFarDepth` で求めた view-z を両方式で共有する。それより奥の面は fog でほぼ背景に
   溶けているので、後ろの面とみなさない。
@@ -38,7 +43,7 @@ CueMol の umbreon レンダリングで renderer の edge line (`egtype`) を�
 ## 比較で確かめたこと
 
 - POV-Ray の画像 (同じシーン・カメラ、球と円柱は `detail` 30) と比べ、ball-and-stick /
-  stick / tube / それらの混在で、edges・silhouette とその混在、透視・正射影のいずれも
+  stick / tube / ribbon (DefaultRibbon / Fancy1Ribbon / RoundRibbon) / それらの混在で、edges・silhouette とその混在、透視・正射影のいずれも
   線の有無が一致する。os の線が POV-Ray より約 0.5 px 太いのは、POV-Ray が球・円柱を多角形の
   mesh にしてから輪郭を取るため。
 - POV-Ray の書き出しは near clip のある場面を比較の基準にできない: 輪郭の計算と見え隠れの
