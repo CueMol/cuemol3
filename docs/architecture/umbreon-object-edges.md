@@ -54,5 +54,7 @@ CueMol の umbreon レンダリングで renderer の edge line (`egtype`) を�
   判定 (`RendIntData::calcSilEdgeLines` / `buildAABBTree`) が near clip で切る前の mesh を
   使うので、消えた手前の面の奥の線が途切れる。また far clip が無く、`export_scene` の経路では
   書き出しが常に透視投影で `useClipZ` も off (`PovrayBackend` はレンダリング設定から設定する)。
-- clip と fog の効き方は `screen` 方式と揃う。違いは、`screen` 方式が clip 面から
-  (far - near) の 2% 以内の輪郭を切り口とみなして描かないこと (`object` は形どおり描く)。
+- clip と fog の効き方は `screen` 方式と揃う。near clip で開いた物体の内側 (切り口) に
+  接する線は、両方式とも描かない (切った分子表面の奥の壁の線、切り口から見える空洞の
+  輪郭、切ったリボンの内側の線)。違いは、`screen` 方式が clip 面から (far - near) の
+  2% 以内の輪郭を切り口とみなして描かないこと (`object` は形どおり描く)。
