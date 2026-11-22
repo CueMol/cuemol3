@@ -45,6 +45,7 @@ UmbreonRenderSettings::UmbreonRenderSettings()
       m_contactEdges(true),
       m_outlineFarDepth(0.2),
       m_perPixelBlend(true),
+      m_edgeMethod("screen"),
       m_useGI(false),
       m_giSamples(32),
       m_giSkyGradient(false),

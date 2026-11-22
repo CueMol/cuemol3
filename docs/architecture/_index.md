@@ -218,6 +218,12 @@ architecture, it belongs here.
   意味の exporter property として露出し、render window では Lights グループ (全方式共通の
   Light intensity / Flash fraction) と GI lighting axis (raytrace 一致から headlight をほぼ
   無くすまでの 5 段、明るさ一定) と勾配 sky で操作する。C++ は auto フォールバックのみ。
+- [umbreon の線の方式 (screen / object)](umbreon-object-edges.md) (日本語) -- `umbreon.edgeMethod`
+  で screen-space と object-space の edge line を切り替える。object では renderer ごとの線色・半径
+  (`eglinew`)・`raise` (= 0.25 `eglinew`)・silhouette モードを `Scene::groupObjectEdgeStyle` で渡し、
+  線描画由来の円柱は輪郭を作らない。POV-Ray との比較で確かめた範囲と、POV-Ray の書き出しの
+  near clip の限界。
+
 - [umbreon group-alpha blend](umbreon-group-alpha-blend.md) -- section 透過
   (group alpha) を多重パスで合成する際の不変条件: パスの重みは単位分割
   (合計ちょうど 1) でなければならず、合計が 1 を超えたときに背景係数が**負に

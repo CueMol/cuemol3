@@ -70,6 +70,8 @@ namespace render {
     double m_outlineFarDepth;
     /// Group-alpha compositing: per-pixel instead of global layer weights.
     bool m_perPixelBlend;
+    /// Edge line method: "screen" (image-space strokes) or "object" (3D lines).
+    LString m_edgeMethod;
     bool m_useGI;
     int m_giSamples;
     LString m_denoise;
