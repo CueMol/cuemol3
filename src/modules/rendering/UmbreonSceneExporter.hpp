@@ -111,6 +111,10 @@ namespace render {
     /// instead of the legacy global layer weights; default off
     bool m_bPerPixelBlend;
 
+    /// edge line method: true = object-space 3D lines (umbreon
+    /// objectSpaceEdges), false = image-space strokes (strokeEdges, default)
+    bool m_bObjectEdges;
+
     /// silhouette (outline) edge mode: depth, as a fraction of the fog range
     /// (0 = view center, 1 = fog end), beyond which a same-group surface no
     /// longer hides a nearer object's contour (umbreon outlineFarVz)

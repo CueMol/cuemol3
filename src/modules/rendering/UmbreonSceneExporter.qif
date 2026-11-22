@@ -139,6 +139,10 @@ runtime_class UmbreonSceneExporter extends SceneExporter
   /// renders identically either way; only overlaps differ.
   property boolean perPixelBlend => m_bPerPixelBlend;
 
+  /// edge line method: false (default) = image-space strokes; true = 3D
+  /// lines of world width eglinew that the ray tracer occludes
+  property boolean objectEdges => m_bObjectEdges;
+
   //////////
   // transparent background: emit an RGBA PNG with alpha = coverage (POV
   // "_transpbg") so it can be composited over another image

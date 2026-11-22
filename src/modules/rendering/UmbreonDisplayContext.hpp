@@ -116,6 +116,11 @@ namespace render {
     /// LayerWeights blend (global weights over the finished frames, the
     /// blendpng closed form). See docs/architecture/umbreon-group-alpha-blend.md.
     bool perPixelBlend = true;
+    /// Edge line method: false = image-space strokes (umbreon strokeEdges),
+    /// true = object-space 3D lines (umbreon objectSpaceEdges): each renderer
+    /// section's contour is a line of world radius eglinew / 2 placed just
+    /// outside its surface and occluded by the ray tracer.
+    bool objectEdges = false;
     /// When true, render a transparent background: the output is RGBA (4
     /// components) with alpha = coverage (0 where no geometry is hit), so the
     /// PNG can be composited over another image (POV "_transpbg").

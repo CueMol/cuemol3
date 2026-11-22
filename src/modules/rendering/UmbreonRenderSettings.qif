@@ -86,6 +86,14 @@ runtime_class UmbreonRenderSettings
   property boolean perPixelBlend => m_perPixelBlend;
   default perPixelBlend = true;
 
+  /// Edge line method: "screen" draws the renderer edge lines as image-space
+  /// strokes (umbreon strokeEdges); "object" draws them as 3D lines of world
+  /// width eglinew (A) that the ray tracer occludes like geometry (umbreon
+  /// objectSpaceEdges), close to the interactive GL edges. Not exposed in the
+  /// GUI yet; set it from the console or a script.
+  property string edgeMethod => m_edgeMethod;
+  default edgeMethod = "screen";
+
   property boolean useGI => m_useGI;
   default useGI = true;
   /// GI gather samples per pixel. Any positive count; the GUI offers a

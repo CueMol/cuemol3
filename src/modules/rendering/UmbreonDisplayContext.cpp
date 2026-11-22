@@ -368,6 +368,11 @@ struct UmbreonDisplayContext::Impl
   /// edge lines keeps an all-disabled EdgeStyle.
   std::vector<umbreon::EdgeStyle> groupEdgeStyle;
   std::vector<char> edgeGroupStyled;
+  /// Object-space edge style per TRANSPARENCY group (= renderer section;
+  /// Scene::groupObjectEdgeStyle), used when UmbreonRenderParams::objectEdges
+  /// is set. Unlike groupEdgeStyle it is not merged by edge group: each
+  /// renderer keeps its own world-space line width.
+  std::vector<umbreon::ObjectEdgeStyle> groupObjectEdgeStyle;
   /// Whether any section enabled edge lines (gates strokeEdges.enable) and
   /// whether any section requested creases (gates the global crease extraction).
   bool anyEdges = false;
@@ -394,6 +399,16 @@ struct UmbreonDisplayContext::Impl
 namespace {
 
 #ifdef HAVE_UMBREON
+/// Object-space edge style of a section that draws no edge line.
+umbreon::ObjectEdgeStyle disabledObjectEdgeStyle()
+{
+  umbreon::ObjectEdgeStyle os;
+  os.silhouette = false;
+  os.crease = false;
+  os.border = false;
+  return os;
+}
+
 /// Process-wide collector behind UmbreonDisplayContext::drainLog(). umbreon's
 /// sink is global (one render at a time in this process), so the buffer is too.
 struct LogCollector
@@ -524,6 +539,7 @@ void UmbreonDisplayContext::startRender()
   m_pImpl->curGroup = 0;
   m_pImpl->groupBlend.clear();
   m_pImpl->groupEdgeStyle.clear();
+  m_pImpl->groupObjectEdgeStyle.clear();
   m_pImpl->edgeGroupOf.clear();
   m_pImpl->edgeGroupIds.clear();
   m_pImpl->edgeGroupStyled.clear();
@@ -614,8 +630,12 @@ void UmbreonDisplayContext::appendIntData()
   MB_DPRINTLN("UmbreonDC> section %s: group=%d alpha=%f", getSecName().c_str(),
               int(group), double(defAlpha));
 
-  // Normalize thin primitives: dots -> spheres, lines -> cylinders.
+  // Normalize thin primitives: dots -> spheres, lines -> cylinders. The
+  // cylinders convLines appends (past nCylFromShapes) are line primitives:
+  // they get no object-space outline of their own (umbreon Cylinder::noEdge),
+  // as in the POV-Ray export.
   pdat->convDots();
+  const std::size_t nCylFromShapes = pdat->m_cylinders.size();
   pdat->convLines(true);
 
   // Native screen-space edge lines (umbreon strokeEdges). Record which edge
@@ -713,6 +733,31 @@ void UmbreonDisplayContext::appendIntData()
         cs.opacity = 1.0f;
         cs.width = widthPx;
       }
+      // Object-space style of this renderer (used when objectEdges is set):
+      // the same natures, mode and color, and a line of world RADIUS eglinew
+      // (A) raised by a quarter of it along the surface normal, as the POV-Ray
+      // exporter draws it. Without a set width the default pixel band width
+      // is converted to world units and halved.
+      {
+        umbreon::ObjectEdgeStyle os;
+        os.silhouette = bSil;
+        os.border = bBorder;
+        os.crease = bCrease;
+        os.mode = es.silhouetteMode;
+        os.color[0] = er;
+        os.color[1] = eg;
+        os.color[2] = eb;
+        double radius = elw;
+        if (radius <= 0.0)
+          radius = (lscale > 0.0) ? 0.5 * double(EDGE_THICKNESS_PX) * lscale
+                                  : 0.025;
+        os.width = float(radius);
+        os.raise = 0.25f * os.width;
+        if (m_pImpl->groupObjectEdgeStyle.size() <= group)
+          m_pImpl->groupObjectEdgeStyle.resize(std::size_t(group) + 1,
+                                               disabledObjectEdgeStyle());
+        m_pImpl->groupObjectEdgeStyle[group] = os;
+      }
       // Representative width for the global stroke thickness (last edge section
       // wins); per-section cls.width above is what styles each group.
       m_pImpl->edgeThicknessPx = widthPx;
@@ -804,6 +849,14 @@ void UmbreonDisplayContext::appendIntData()
       um.triMaterialId.push_back(
           static_cast<std::uint8_t>(materialIndexFor(triMat)));
       um.triGroupId.push_back(group);
+      // Edge-line mode of the face, as the POV-Ray silhouette builder reads it
+      // (RendIntData::calcSilEdgeLines): MESHXX faces (DVA_NOEDGE, e.g. the
+      // inner part of a ribbon arrowhead step) get no edge line, NORGLN faces
+      // (POLY_FILL_NORGLN / _XX) no border line.
+      um.triEdgeMode.push_back(
+          f.nmode == MFMOD_MESHXX   ? umbreon::Mesh::kTriNoEdge
+          : f.nmode == MFMOD_NORGLN ? umbreon::Mesh::kTriNoBorder
+                                    : umbreon::Mesh::kTriEdgeNormal);
       for (int k = 0; k < 3; ++k) {
         um.positions.push_back(toVec3(pv[k]->v));
         um.normals.push_back(toVec3(pv[k]->n));
@@ -832,8 +885,9 @@ void UmbreonDisplayContext::appendIntData()
   }
 
   // --- analytic cylinders / cones ---
+  std::size_t cylIndex = 0;
   for (RendIntData::CylList::const_iterator i = pdat->m_cylinders.begin();
-       i != pdat->m_cylinders.end(); ++i) {
+       i != pdat->m_cylinders.end(); ++i, ++cylIndex) {
     const RendIntData::Cyl *p = *i;
     Vector4D v1 = p->v1, v2 = p->v2;
     if (p->pTransf != NULL) {
@@ -864,6 +918,7 @@ void UmbreonDisplayContext::appendIntData()
     // pass classified as a field of one-pixel depth steps at high zoom
     // (blobs of ink inside the atom). A flat cap lies inside the sphere.
     c.open = false;
+    c.noEdge = (cylIndex >= nCylFromShapes);
     scene.cylinders.push_back(c);
   }
 #endif  // HAVE_UMBREON
@@ -1290,7 +1345,47 @@ void UmbreonDisplayContext::buildSceneAndOptions(const UmbreonRenderParams &prm)
   // captured per-section style, and only the all-disabled entries get the
   // default contour filled in below.
   const bool defaultContours = prm.hatchEnable && prm.hatchDefaultEdges;
-  if (m_pImpl->anyEdges || defaultContours) {
+  // Outline far-side depth (UmbreonRenderParams::outlineFarDepth): a
+  // fraction of the fog range mapped to linear view-z. At 1 it is the fog
+  // end: only the fully fogged zone up to the far clip plane lies beyond
+  // it. Without fog it stays off. Shared by both edge methods.
+  float outlineFarVz = std::numeric_limits<float>::infinity();
+  if (scene.fog.enabled) {
+    const double t = std::min(1.0, std::max(0.0, prm.outlineFarDepth));
+    outlineFarVz =
+        float(scene.fog.start + t * (scene.fog.end - scene.fog.start));
+    MB_DPRINTLN("Umbreon> outline far depth %f -> view-z %f", t,
+                double(outlineFarVz));
+  }
+
+  if (prm.objectEdges && m_pImpl->anyEdges && !defaultContours) {
+    // Object-space edge lines (umbreon objectSpaceEdges): each section's
+    // contour becomes a 3D line of its own world width, occluded by the ray
+    // tracer like geometry -- the look of the interactive GL edges. Styles
+    // are per transparency group (renderer); a section without edge lines
+    // gets an all-disabled entry, so every group is covered.
+    umbreon::ObjectSpaceEdgeOptions &oe = opt.objectSpaceEdges;
+    oe.enable = true;
+    oe.clip = true;
+    oe.outlineFarVz = outlineFarVz;
+    if (m_pImpl->anyCrease && m_dCreaseLimit > 0.0)
+      oe.creaseAngleDeg = float(m_dCreaseLimit);
+    // Mesh feature gates tuned on CueMol ribbons (the umbreon CLI defaults):
+    // a crease must be a real fold, not a smooth-shaded facet seam, and
+    // convex; a border that continues smoothly into the next border edge is
+    // a strip seam, not an open end; crease hubs at chain termini are dropped.
+    oe.meshHardEdgeDeg = 40.0f;
+    oe.meshCreaseSmoothVetoDeg = 25.0f;
+    oe.meshCreaseConvexOnly = true;
+    oe.meshBorderCoplanarVetoDeg = 35.0f;
+    oe.meshCreaseMaxDegree = 4;
+    if (m_pImpl->groupObjectEdgeStyle.size() < std::size_t(m_pImpl->nextGroup))
+      m_pImpl->groupObjectEdgeStyle.resize(std::size_t(m_pImpl->nextGroup),
+                                           disabledObjectEdgeStyle());
+    scene.groupObjectEdgeStyle = m_pImpl->groupObjectEdgeStyle;
+    MB_DPRINTLN("Umbreon> object-space edges, %d sections",
+                int(scene.groupObjectEdgeStyle.size()));
+  } else if (m_pImpl->anyEdges || defaultContours) {
     opt.strokeEdges.enable = true;
     opt.strokeEdges.silhouette = true;
     opt.strokeEdges.border = true;
@@ -1311,18 +1406,7 @@ void UmbreonDisplayContext::buildSceneAndOptions(const UmbreonRenderParams &prm)
     // deterministic owner section for each contact run and styles it from
     // there, since the near side is numerical noise at a contact).
     opt.strokeEdges.contact = prm.contactEdges;
-    // Outline far-side depth (UmbreonRenderParams::outlineFarDepth): a
-    // fraction of the fog range mapped to linear view-z. At 1 it is the fog
-    // end: only the fully fogged zone up to the far clip plane lies beyond
-    // it. Without fog it stays off.
-    opt.strokeEdges.outlineFarVz = std::numeric_limits<float>::infinity();
-    if (scene.fog.enabled) {
-      const double t = std::min(1.0, std::max(0.0, prm.outlineFarDepth));
-      opt.strokeEdges.outlineFarVz =
-          float(scene.fog.start + t * (scene.fog.end - scene.fog.start));
-      MB_DPRINTLN("Umbreon> outline far depth %f -> view-z %f", t,
-                  double(opt.strokeEdges.outlineFarVz));
-    }
+    opt.strokeEdges.outlineFarVz = outlineFarVz;
     opt.strokeEdges.thickness = int(m_pImpl->edgeThicknessPx + 0.5f);
     if (opt.strokeEdges.thickness < 1)
       opt.strokeEdges.thickness = 1;
