@@ -44,7 +44,11 @@ CueMol の umbreon レンダリングで renderer の edge line (`egtype`) を�
 
 - POV-Ray の画像 (同じシーン・カメラ、球と円柱は `detail` 30) と比べ、ball-and-stick /
   stick / tube / ribbon (DefaultRibbon / Fancy1Ribbon / RoundRibbon) / それらの混在で、
-  edges・silhouette とその混在、透視・正射影のいずれも線の有無が一致する。os の線が POV-Ray より約 0.5 px 太いのは、POV-Ray が球・円柱を多角形の
+  edges・silhouette とその混在、透視・正射影のいずれも線の有無が一致する。分子表面
+  (dsurface の distfield / meshms) も一致する。ただし distfield の marching cubes が作る
+  線幅より小さい三角形の塊 (面積がほぼ 0) に POV-Ray は点を描くが、object 方式は描かない
+  (面積 0 の三角形を輪郭の判定に使わないため。滑らかな表面の上の汚れなので、こちらを
+  正とする)。os の線が POV-Ray より約 0.5 px 太いのは、POV-Ray が球・円柱を多角形の
   mesh にしてから輪郭を取るため。
 - POV-Ray の書き出しは near clip のある場面を比較の基準にできない: 輪郭の計算と見え隠れの
   判定 (`RendIntData::calcSilEdgeLines` / `buildAABBTree`) が near clip で切る前の mesh を
