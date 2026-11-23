@@ -94,6 +94,19 @@ runtime_class UmbreonRenderSettings
   property string edgeMethod => m_edgeMethod;
   default edgeMethod = "screen";
 
+  /// Screen edge method only: how a depth step within one object becomes a
+  /// line. "jump" decides each pixel pair alone (absolute step size, planar
+  /// extrapolations from both sides, local max), so lines do not blink as a
+  /// whole in rotations; "legacy" is the slope-adaptive test with a
+  /// chain-level vote. Not exposed in the GUI yet.
+  property string screenEdgeDepth => m_screenEdgeDepth;
+  default screenEdgeDepth = "jump";
+  /// Screen edge method, "jump" test: minimum depth step in A (floored at
+  /// 12 pixel widths). Smaller values draw subtler steps, including the
+  /// facet steps of a coarse mesh.
+  property real screenEdgeJump => m_screenEdgeJump;
+  default screenEdgeJump = 0.5;
+
   property boolean useGI => m_useGI;
   default useGI = true;
   /// GI gather samples per pixel. Any positive count; the GUI offers a

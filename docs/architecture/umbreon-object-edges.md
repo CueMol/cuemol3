@@ -13,6 +13,32 @@ CueMol の umbreon レンダリングで renderer の edge line (`egtype`) を�
 合わせてある。umbreon 側の仕様は umbreon の `docs/api/libumbreon.md` の「方式B」と
 `docs/plans/edge-object-space-completion.md` にある。
 
+## screen 方式の段差の判定 (`screenEdgeDepth` / `screenEdgeJump`)
+
+`screen` 方式で、同じ物体の中の奥行きの段差 (自己遮蔽の輪郭) をどう線にするかは、レンダリング
+設定 `umbreon.screenEdgeDepth` で選ぶ (GUI は無い)。`UmbreonSceneExporter` が読み、
+`UmbreonRenderParams::screenEdgeLegacy` / `screenEdgeJump` 経由で umbreon の
+`StrokeEdgeOptions::screenDepthStep` / `screenDepthJump` に渡す。
+
+| 値 | umbreon 側 | 判定 |
+|---|---|---|
+| `jump` (既定) | `ScreenDepthStep::Jump` | 画素の組ごとに独立に判定する。段差が `umbreon.screenEdgeJump` (Å、既定 0.5。12 画素分の長さが下限) を超え、両側の面をそれぞれ延長した奥行きが反対側と同じだけ外れ、平行に並ぶ 3 組の中で最大のときに線にする |
+| `legacy` | `ScreenDepthStep::Legacy` | 従来の判定。段差の勾配に応じたしきい値で強い段差と弱い段差に分け、弱い段差は同じ線 (chain) に強い段差が十分あるときだけ残す |
+
+- `legacy` は線全体を多数決で残すか消すかを決めるので、回転アニメーションで長い線がまるごと
+  点滅することがあった (1IYE の ribbon など)。`jump` には線単位の判定が無く、線は段差が
+  しきい値をまたぐ所で伸び縮みするだけになる。
+- `jump` の延長の判定により、真横に近い向きで見た平らな面 (cartoon の helix 円柱の底面など)
+  の内部は線にならない。
+- `jump` の既知の性質:
+  - 粗い mesh の面の稜を視線がすり抜けて奥に当たる段差 (ribbon の断面の稜に沿う短いヒゲ) は
+    本物の段差として線になる。消すには renderer の分割数 (`axialdetail` や各断面の `detail`)
+    を上げる。
+  - 面の中で終わる輪郭は、先端で段差が 0 に向かうので、段差がしきい値を下回る所で止まる
+    (円柱の底面から tube が生える根元など)。しきい値を下げると伸びるが、粗い mesh の
+    細かい段差も拾う。
+- 検証の経緯は umbreon の `docs/plans/edge-screen-depth-jump-report.md`。
+
 ## 受け渡し (`UmbreonSceneExporter` / `UmbreonDisplayContext`)
 
 - `UmbreonRenderSettings.edgeMethod` を `UmbreonSceneExporter` が読み (`objectEdges` = 値が

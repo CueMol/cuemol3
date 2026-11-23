@@ -1387,6 +1387,10 @@ void UmbreonDisplayContext::buildSceneAndOptions(const UmbreonRenderParams &prm)
                 int(scene.groupObjectEdgeStyle.size()));
   } else if (m_pImpl->anyEdges || defaultContours) {
     opt.strokeEdges.enable = true;
+    opt.strokeEdges.screenDepthStep = prm.screenEdgeLegacy
+                                          ? umbreon::ScreenDepthStep::Legacy
+                                          : umbreon::ScreenDepthStep::Jump;
+    opt.strokeEdges.screenDepthJump = float(prm.screenEdgeJump);
     opt.strokeEdges.silhouette = true;
     opt.strokeEdges.border = true;
     opt.strokeEdges.crease = m_pImpl->anyCrease;

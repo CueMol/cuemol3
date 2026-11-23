@@ -121,6 +121,12 @@ namespace render {
     /// section's contour is a line of world radius eglinew / 2 placed just
     /// outside its surface and occluded by the ray tracer.
     bool objectEdges = false;
+    /// Image-space strokes only: the same-object depth-step test. False =
+    /// umbreon's jump test (per pixel pair, no chain vote), true = its legacy
+    /// slope-adaptive test.
+    bool screenEdgeLegacy = false;
+    /// Jump test: minimum depth step (A).
+    double screenEdgeJump = 0.5;
     /// When true, render a transparent background: the output is RGBA (4
     /// components) with alpha = coverage (0 where no geometry is hit), so the
     /// PNG can be composited over another image (POV "_transpbg").
