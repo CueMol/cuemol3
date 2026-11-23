@@ -177,6 +177,8 @@ describe('renderStart animation branch', () => {
                     makeMovie: false,
                     movieFormat: 'mp4_h264',
                     dupLastFrame: true,
+                    rateControl: 'quality',
+                    quality: 'high',
                     bitrateKbps: 1024,
                     ...over,
                 },

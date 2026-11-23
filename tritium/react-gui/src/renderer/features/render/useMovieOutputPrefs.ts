@@ -25,7 +25,9 @@ import type { MovieRenderPrefs } from "@shared/types/uiPrefs";
 import {
   DEFAULT_MOVIE_SETTINGS,
   MOVIE_FORMAT_EXT,
+  MOVIE_QUALITY_IDS,
   type MovieFormatId,
+  type MovieQuality,
   type MovieSettings,
 } from "@renderer/data/renderSettings";
 import { PERSIST_DEBOUNCE_MS } from "@renderer/utils/timing";
@@ -53,6 +55,12 @@ function patchFromPrefs(prefs: MovieRenderPrefs | undefined): Partial<MovieSetti
   if (typeof prefs.makeMovie === "boolean") patch.makeMovie = prefs.makeMovie;
   if (knownFormat(prefs.movieFormat)) patch.movieFormat = prefs.movieFormat;
   if (typeof prefs.dupLastFrame === "boolean") patch.dupLastFrame = prefs.dupLastFrame;
+  if (prefs.rateControl === "quality" || prefs.rateControl === "bitrate") {
+    patch.rateControl = prefs.rateControl;
+  }
+  if (MOVIE_QUALITY_IDS.includes(prefs.quality as MovieQuality)) {
+    patch.quality = prefs.quality as MovieQuality;
+  }
   if (typeof prefs.bitrateKbps === "number" && prefs.bitrateKbps > 0) {
     patch.bitrateKbps = prefs.bitrateKbps;
   }
@@ -72,6 +80,8 @@ function prefsFromSettings(movie: MovieSettings): MovieRenderPrefs {
     makeMovie: movie.makeMovie,
     movieFormat: movie.movieFormat,
     dupLastFrame: movie.dupLastFrame,
+    rateControl: movie.rateControl,
+    quality: movie.quality,
     bitrateKbps: movie.bitrateKbps,
   };
 }

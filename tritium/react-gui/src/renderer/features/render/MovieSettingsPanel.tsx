@@ -7,7 +7,7 @@
  * unchanged to POV-Ray and Umbreon alike. Keeping them out of the Render tab
  * keeps that tab to the backend-driven groups, and a hand-written panel does
  * things the generic PropDef editor cannot -- a folder picker, and disabling
- * the format / bit rate while encoding is off.
+ * the format / rate controls while encoding is off or the format ignores them.
  */
 
 import React, { useCallback, useEffect, useState } from "react";
@@ -28,8 +28,13 @@ import {
   MOVIE_FORMAT_LABEL,
   MOVIE_FPS_PRESETS,
   MOVIE_BITRATE_PRESETS,
+  MOVIE_FORMAT_RATE,
+  MOVIE_QUALITY_IDS,
+  MOVIE_QUALITY_LABEL,
   type MovieSettings,
   type MovieFormatId,
+  type MovieQuality,
+  type MovieRateControl,
 } from "@renderer/data/renderSettings";
 
 /** Where the output goes: the app-managed folder, or one the user names. */
@@ -38,6 +43,11 @@ type LocationMode = "temp" | "custom";
 const LOCATION_OPTIONS = [
   { label: "Temporary", value: "temp" as const },
   { label: "Custom", value: "custom" as const },
+];
+
+const RATE_CONTROL_OPTIONS = [
+  { label: "Quality", value: "quality" as const },
+  { label: "Bit rate", value: "bitrate" as const },
 ];
 
 interface MovieSettingsPanelProps {
@@ -100,6 +110,14 @@ export const MovieSettingsPanel: React.FC<MovieSettingsPanelProps> = ({
 
   // Encoding options only matter when a movie is actually produced.
   const encodeDisabled = disabled || !settings.makeMovie;
+  // Which rate controls the chosen format takes (see MOVIE_FORMAT_RATE): the
+  // H.264 / H.265 formats choose between a quality level and a bit rate,
+  // WMV2 takes a bit rate only, the uncompressed and GIF formats neither.
+  const rateSupport = MOVIE_FORMAT_RATE[settings.movieFormat];
+  const rateControl: MovieRateControl =
+    rateSupport === "crf" ? settings.rateControl : "bitrate";
+  const qualityDisabled = encodeDisabled || rateSupport !== "crf" || rateControl !== "quality";
+  const bitrateDisabled = encodeDisabled || rateSupport === "none" || rateControl !== "bitrate";
 
   // A radio group, not a segmented control: this is a setting with two named
   // alternatives, and a segmented control inside a settings section reads as a
@@ -197,12 +215,27 @@ export const MovieSettingsPanel: React.FC<MovieSettingsPanelProps> = ({
           </SelectField>
         </Field>
 
-        <Field label="Render last frame" inline>
-          <SwitchField
-            checked={settings.dupLastFrame}
-            onChange={(dupLastFrame) => onChange({ dupLastFrame })}
-            disabled={disabled}
+        <Field label="Rate control">
+          <RadioField<MovieRateControl>
+            value={rateControl}
+            onValueChange={(v) => onChange({ rateControl: v })}
+            options={RATE_CONTROL_OPTIONS}
+            disabled={encodeDisabled || rateSupport !== "crf"}
           />
+        </Field>
+
+        <Field label="Quality">
+          <SelectField
+            value={settings.quality}
+            onChange={(v) => onChange({ quality: v as MovieQuality })}
+            disabled={qualityDisabled}
+          >
+            {MOVIE_QUALITY_IDS.map((id) => (
+              <option key={id} value={id}>
+                {MOVIE_QUALITY_LABEL[id]}
+              </option>
+            ))}
+          </SelectField>
         </Field>
 
         <Field label="Bit rate (kbps)">
@@ -210,7 +243,15 @@ export const MovieSettingsPanel: React.FC<MovieSettingsPanelProps> = ({
             value={bitrateDraft}
             onChange={handleBitrate}
             options={MOVIE_BITRATE_PRESETS.map(String)}
-            disabled={encodeDisabled}
+            disabled={bitrateDisabled}
+          />
+        </Field>
+
+        <Field label="Render last frame" inline>
+          <SwitchField
+            checked={settings.dupLastFrame}
+            onChange={(dupLastFrame) => onChange({ dupLastFrame })}
+            disabled={disabled}
           />
         </Field>
       </FieldSection>
