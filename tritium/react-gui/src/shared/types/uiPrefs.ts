@@ -29,6 +29,9 @@ export interface MovieRenderPrefs {
   /** MovieFormatId; kept as a plain string here to avoid a renderer import. */
   movieFormat?: string
   dupLastFrame?: boolean
+  /** MovieRateControl / MovieQuality ids, plain strings like movieFormat. */
+  rateControl?: string
+  quality?: string
   bitrateKbps?: number
 }
 

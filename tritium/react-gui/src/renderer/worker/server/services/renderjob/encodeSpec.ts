@@ -48,6 +48,8 @@ export function encodeOptions(entry: RenderJobEntry, args: RenderStartArgs): Ffm
     fps: movie.fps,
     frameCount: anim.framePaths.length,
     format: movie.movieFormat,
+    rateControl: movie.rateControl,
+    quality: movie.quality,
     bitrateKbps: movie.bitrateKbps,
   };
 }

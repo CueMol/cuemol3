@@ -393,6 +393,54 @@ export const MOVIE_FORMAT_LABEL: Record<MovieFormatId, string> = {
 };
 
 /**
+ * How a format's encoder can be told how much data to spend:
+ *  - `crf`: constant quality (x264 / x265 `-crf`), or a fixed bit rate;
+ *  - `bitrate`: a fixed bit rate only (WMV2 has no quality mode);
+ *  - `none`: neither applies (uncompressed video, animated GIF).
+ */
+export type MovieRateSupport = "crf" | "bitrate" | "none";
+
+export const MOVIE_FORMAT_RATE: Record<MovieFormatId, MovieRateSupport> = {
+  mov_h264: "crf",
+  mov_h265: "crf",
+  mov_raw: "none",
+  mp4_h264: "crf",
+  mp4_h265: "crf",
+  wmv2: "bitrate",
+  gifanim: "none",
+};
+
+/**
+ * Rate control of a `crf` format: hold a quality level (the bit rate follows
+ * the image size, frame rate and content) or hold a bit rate.
+ */
+export type MovieRateControl = "quality" | "bitrate";
+
+/** Named quality levels of the `quality` rate control. */
+export type MovieQuality = "high" | "standard" | "small";
+
+export const MOVIE_QUALITY_IDS: MovieQuality[] = ["high", "standard", "small"];
+
+export const MOVIE_QUALITY_LABEL: Record<MovieQuality, string> = {
+  high: "High",
+  standard: "Standard",
+  small: "Small file",
+};
+
+/**
+ * CRF per quality level and encoder. x265 reaches about the same quality as
+ * x264 at a CRF higher by ~5 (both encoders' defaults, 23 and 28, are meant
+ * to look alike). Measured on a 720x720 30 fps ribbon rotation with thin
+ * lines (x264): CRF 18 = 40 dB PSNR at ~7.4 Mbps, CRF 23 = 36 dB at
+ * ~4.1 Mbps; a fixed 1024 kbps gave 28.5 dB with visible blocking.
+ */
+export const MOVIE_QUALITY_CRF: Record<MovieQuality, { x264: number; x265: number }> = {
+  high: { x264: 18, x265: 23 },
+  standard: { x264: 23, x265: 28 },
+  small: { x264: 28, x265: 33 },
+};
+
+/**
  * Movie-mode settings.
  *
  * These are backend-independent and belong to the render *mode*, not to the
@@ -428,7 +476,14 @@ export interface MovieSettings {
    * (UXP's "Loop" checkbox).
    */
   dupLastFrame: boolean;
-  /** Encoding bit rate in kbps. */
+  /**
+   * Rate control for the `crf` formats (H.264 / H.265). WMV2 always uses the
+   * bit rate; the uncompressed and GIF formats use neither.
+   */
+  rateControl: MovieRateControl;
+  /** Quality level of the `quality` rate control. */
+  quality: MovieQuality;
+  /** Encoding bit rate in kbps (the `bitrate` rate control, and WMV2). */
   bitrateKbps: number;
 }
 
@@ -442,14 +497,22 @@ export const DEFAULT_MOVIE_SETTINGS: MovieSettings = {
   makeMovie: true,
   movieFormat: "mp4_h264",
   dupLastFrame: true,
-  bitrateKbps: 1024,
+  rateControl: "quality",
+  quality: "high",
+  // UXP anim-render-dlg's default; 1024 visibly degrades thin lines even at
+  // 720x720.
+  bitrateKbps: 10240,
 };
 
 /** Frame-rate choices offered in the Movie panel (UXP `main-mlist-fps`). */
 export const MOVIE_FPS_PRESETS = [24, 30, 60];
 
-/** Bit-rate choices in kbps (UXP `ffmpeg-bitrate`). */
-export const MOVIE_BITRATE_PRESETS = [256, 1024, 10240];
+/**
+ * Bit-rate choices in kbps. UXP `ffmpeg-bitrate` offered 256 / 1024 / 10240;
+ * 256 and 1024 are dropped as unusable for molecular images (blocking at
+ * 720x720), and higher rates are added for HD sizes.
+ */
+export const MOVIE_BITRATE_PRESETS = [2048, 5120, 10240, 20480];
 
 /** Backend-independent render-setting rows (values come from the scene, see RenderPropSpec). */
 export const RENDER_COMMON_PROPS: RenderPropSpec[] = [

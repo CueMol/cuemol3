@@ -14,7 +14,14 @@
 import * as path from "path";
 
 import { movieFrameFileName } from "@shared/movieFrames";
-import { MOVIE_FORMAT_EXT, type MovieFormatId } from "@renderer/data/renderSettings";
+import {
+  MOVIE_FORMAT_EXT,
+  MOVIE_FORMAT_RATE,
+  MOVIE_QUALITY_CRF,
+  type MovieFormatId,
+  type MovieQuality,
+  type MovieRateControl,
+} from "@renderer/data/renderSettings";
 
 /** Codec / container options per format (UXP `onOutFmtChg`). */
 const FORMAT_MAIN_OPT: Record<MovieFormatId, string> = {
@@ -43,7 +50,11 @@ export interface FfmpegEncodeOptions {
   frameCount: number;
   /** Container / codec. */
   format: MovieFormatId;
-  /** Encoding bit rate in kbps (ignored for the raw codec). */
+  /** Rate control of the H.264 / H.265 formats (see MOVIE_FORMAT_RATE). */
+  rateControl: MovieRateControl;
+  /** Quality level when rateControl is "quality". */
+  quality: MovieQuality;
+  /** Encoding bit rate in kbps (bit-rate rate control, and WMV2). */
   bitrateKbps: number;
 }
 
@@ -72,8 +83,13 @@ export function buildFfmpegArgs(opts: FfmpegEncodeOptions): string {
     "-an",
     `-vframes ${opts.frameCount}`,
   ];
-  // The raw codec carries no bit rate (UXP skips it for mov_raw).
-  if (opts.format !== "mov_raw") {
+  // H.264 / H.265 hold a quality level (CRF) unless a bit rate is asked
+  // for; WMV2 only takes a bit rate; the raw codec and GIF take neither.
+  const rate = MOVIE_FORMAT_RATE[opts.format];
+  if (rate === "crf" && opts.rateControl === "quality") {
+    const crf = MOVIE_QUALITY_CRF[opts.quality];
+    args.push(`-crf ${mainOpt.includes("libx265") ? crf.x265 : crf.x264}`);
+  } else if (rate !== "none") {
     args.push(`-b:v ${opts.bitrateKbps}k`);
   }
   if (mainOpt) args.push(mainOpt);

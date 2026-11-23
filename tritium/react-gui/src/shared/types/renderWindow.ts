@@ -46,6 +46,8 @@ export interface RenderSettingsSnapshotWire {
     makeMovie: boolean
     movieFormat: string
     dupLastFrame: boolean
+    rateControl: string
+    quality: string
     bitrateKbps: number
   }
 }

@@ -264,3 +264,12 @@ unsaved-changes check resolves view -> scene only
 `uxp_gui/cuemol2/base/content/anim/anim-render-dlg.{xul,js}` (4 tabs: Main /
 Render / Movie / Preview), launched modeless from
 `anim-ribbon.js:214-227` (`cuemolui.onAnimRender`).
+
+UXP との違い (ムービーの画質): UXP の Movie タブはビットレート (`-b:v`) の指定だけで、
+既定値は 1024 kbps。H.264 / H.265 ではこの値だと分子の細い線や輪郭がブロック状に崩れる
+(720x720・30 fps の計測で PSNR 28.5 dB)。tritium では H.264 / H.265 の既定を画質指定
+(`-crf`、Quality: High = x264 18 / x265 23、Standard 23 / 28、Small file 28 / 33) にし、
+ビットレート指定は Rate control で選べるようにした (既定 10240 kbps)。CRF の無い WMV2 は
+常にビットレート指定、raw と GIF はどちらも付けない。対応表は
+`tritium/react-gui/src/renderer/data/renderSettings.ts` の `MOVIE_FORMAT_RATE` /
+`MOVIE_QUALITY_CRF`。

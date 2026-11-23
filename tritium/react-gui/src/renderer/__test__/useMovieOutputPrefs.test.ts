@@ -121,6 +121,20 @@ describe('useMovieOutputPrefs', () => {
     handle.unmount();
   });
 
+  // A chosen rate control survives the window being closed; an unknown
+  // quality id (hand-edited or from a newer build) falls back to the default.
+  it('restores the rate control and drops an unknown quality', async () => {
+    routeInvoke({ rateControl: 'bitrate', quality: 'ultra', bitrateKbps: 2048 });
+    const handle = mountHook();
+
+    await flushPromises();
+
+    expect(handle.result.movie.rateControl).toBe('bitrate');
+    expect(handle.result.movie.quality).toBe(DEFAULT_MOVIE_SETTINGS.quality);
+    expect(handle.result.movie.bitrateKbps).toBe(2048);
+    handle.unmount();
+  });
+
   it('writes the settings back, without this run\'s temporary folder', async () => {
     routeInvoke();
     const handle = mountHook({ baseName: 'spin', fps: 60 });
