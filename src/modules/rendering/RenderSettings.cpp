@@ -46,6 +46,8 @@ UmbreonRenderSettings::UmbreonRenderSettings()
       m_outlineFarDepth(0.2),
       m_perPixelBlend(true),
       m_edgeMethod("screen"),
+      m_screenEdgeDepth("jump"),
+      m_screenEdgeJump(0.5),
       m_useGI(false),
       m_giSamples(32),
       m_giSkyGradient(false),

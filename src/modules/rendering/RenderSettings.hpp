@@ -72,6 +72,10 @@ namespace render {
     bool m_perPixelBlend;
     /// Edge line method: "screen" (image-space strokes) or "object" (3D lines).
     LString m_edgeMethod;
+    /// Screen edges: same-object depth-step test, "jump" or "legacy".
+    LString m_screenEdgeDepth;
+    /// Screen edges, jump test: minimum depth step (A).
+    double m_screenEdgeJump;
     bool m_useGI;
     int m_giSamples;
     LString m_denoise;

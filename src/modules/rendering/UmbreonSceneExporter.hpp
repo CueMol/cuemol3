@@ -115,6 +115,12 @@ namespace render {
     /// objectSpaceEdges), false = image-space strokes (strokeEdges, default)
     bool m_bObjectEdges;
 
+    /// screen edges: depth-step test, true = legacy slope-adaptive test,
+    /// false = jump test (umbreon ScreenDepthStep, default jump)
+    bool m_bScreenEdgeLegacy;
+    /// screen edges, jump test: minimum depth step (A)
+    double m_dScreenEdgeJump;
+
     /// silhouette (outline) edge mode: depth, as a fraction of the fog range
     /// (0 = view center, 1 = fog end), beyond which a same-group surface no
     /// longer hides a nearer object's contour (umbreon outlineFarVz)
