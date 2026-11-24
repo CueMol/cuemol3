@@ -890,7 +890,12 @@ Scene::MaterialLight Scene::getMaterialLight(const LString &mat_id) const
   // flat tones (lighting_inc.glsl) under the light any material gets.
   const bool bToon = toon > 0.0;
   const bool bToonPov = bToon && !isAOEnabled();
-  double amb = (bToonPov ? 0.0 : 0.2) + ka, diff = kd, spec = 0.4 * ks;
+  // A material lit by the ambient light alone (nolighting, shadow) shows its
+  // colour times its ambient, as POV-Ray and the ray tracer draw it: no
+  // global ambient on top, no lightBrightness, no AO (it is drawn without a
+  // normal, see lighting_inc.glsl isUnlit) and no tone curve.
+  const bool bFlat = kd <= 0.0 && ks <= 0.0;
+  double amb = (bToonPov || bFlat ? 0.0 : 0.2) + ka, diff = kd, spec = 0.4 * ks;
   if (bToonPov) diff *= kToonLightDiffuse;
 
   // The ambient-dominant light pairs with the Fast GI AO, which darkens the
@@ -898,14 +903,12 @@ Scene::MaterialLight Scene::getMaterialLight(const LString &mat_id) const
   // that "default" gets the kFastGILight* values. The specular and the
   // exponent stay the material's, so the balance of highlight and colour
   // that makes it read as plastic or metal does not change with the mode.
-  // A material lit by the ambient light alone (nolighting, shadow) gets no
-  // AO (fog_inc.glsl encodeMaterial), so it keeps its light as without AO.
-  const bool bFlat = diff <= 0.0 && spec <= 0.0;
+  double bri = bFlat ? 1.0 : std::max(0.0, m_fLightBrightness);
   if (!bFlat && isAOEnabled() && getAOMethod() == AOM_FASTGI) {
     amb *= kFastGILightAmbient / kLegacyLightAmbient;
     diff *= kFastGILightDiffuse / kLegacyLightDiffuse;
+    bri *= kFastGILightBrightness;
   }
-  const double bri = std::max(0.0, m_fLightBrightness);
   MaterialLight ml;
   ml.ambient = float(amb * bri);
   ml.diffuse = float(diff * bri);

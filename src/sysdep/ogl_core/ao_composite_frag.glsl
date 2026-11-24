@@ -29,6 +29,9 @@ uniform int u_debugView;         // 0 = color * AO, 1 = AO in gray, 2 = AO buffe
 // colour becomes c * (1 - f * (1 - ao)). The scene colour may exceed 1 (HDR target);
 // the output is clamped here.
 uniform int u_ambientOnly;
+// Full-resolution scene normal (both AO methods). (0,0,0) = drawn without a
+// normal: the background, lines, labels, edge lines and unlit surfaces.
+uniform int u_hasSceneNormal;
 uniform sampler2D u_sceneNormalTex;
 // Bitmask: gathered near-field indirect irradiance (RGB, AO resolution) and
 // bounceStrength / lightAmbient (the albedo is the ambient part / ambient).
@@ -149,18 +152,17 @@ void main()
             o_FragColor = vec4(vec3(mix(1.0, ao, fogVis)), 1.0);
             return;
         }
-        // A material lit by the ambient light alone (nolighting, shadow;
-        // fog_inc.glsl encodeMaterial a = 0.75) is a flat look: no AO.
-        bool noAO = false;
-        if (u_hasMaterial != 0) {
-            float ma = texture(u_sceneMaterialTex, v_uv).a;
-            noAO = ma > 0.5 && ma < 0.9;
-        }
-        if (u_ambientOnly != 0) {
-            if (noAO) {
-                o_FragColor = vec4(toneMap(c.rgb), clamp(c.a, 0.0, 1.0));
+        // A pixel drawn without a normal shows its colour as given: no AO and
+        // no tone curve. Read at full resolution, so a thin line does not pick
+        // up the AO of the surface around it from a half-resolution AO term.
+        if (u_hasSceneNormal != 0) {
+            vec3 sn = texture(u_sceneNormalTex, v_uv).xyz;
+            if (dot(sn, sn) < 0.5) {
+                o_FragColor = clamp(c, 0.0, 1.0);
                 return;
             }
+        }
+        if (u_ambientOnly != 0) {
             // As in Blender / ChimeraX the fog (depth cue) comes after the
             // lighting: take the fog out, darken the ambient part of the lit
             // colour by the AO, and put the fog back. c = mix(fog, lit, fogVis),
@@ -218,11 +220,18 @@ void main()
                 outc += litPart * f * (u_bounceScale * u_lightAmbient / max(ambient, 1e-3)) * e;
             }
             // The HDR scene colour leaves its range here (lighting_inc.glsl
-            // flight2 does it for an LDR target).
-            o_FragColor = vec4(toneMap(outc), clamp(c.a, 0.0, 1.0));
+            // flight2 does it for an LDR target). Only the lit colour is tone
+            // mapped, then the fog is put back, as the LDR path orders it
+            // (light, curve, fog): a fully fogged pixel reaches the fog colour
+            // (= the background) exactly.
+            vec3 fogPart = (1.0 - fogVis) * u_fogColor;
+            vec3 outRgb = (fogVis > 1e-4)
+                              ? fogPart + fogVis * toneMap((outc - fogPart) / fogVis)
+                              : u_fogColor;
+            o_FragColor = vec4(clamp(outRgb, 0.0, 1.0), clamp(c.a, 0.0, 1.0));
             return;
         }
-        ao = noAO ? 1.0 : mix(1.0, ao, fogVis);
+        ao = mix(1.0, ao, fogVis);
         o_FragColor = clamp(vec4(c.rgb * ao, c.a), 0.0, 1.0);
     } else {
         o_FragColor = c;

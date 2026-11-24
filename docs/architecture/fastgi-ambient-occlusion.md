@@ -48,9 +48,17 @@ Fast GI のときの光の強さ (material `default` のとき。`Scene::kFastGI
 
 | 項目 | Fast GI | AO なし・GTAO |
 |---|---|---|
-| 環境光 | 0.56 | 0.4 |
-| 拡散 (key light) | 0.52 | 0.8 |
-| 鏡面 / 指数 | material の値 (`default` は 0.12 / 16) | 同じ |
+| 環境光 | 0.56 × 1.32 | 0.4 |
+| 拡散 (key light) | 0.52 × 1.32 | 0.8 |
+| 鏡面 / 指数 | material の値 × 1.32 (`default` は 0.12 / 16) | material の値 |
+
+1.32 は `Scene::kFastGILightBrightness`。Fast GI のときだけ `lightBrightness` に掛ける倍率で、
+環境光・拡散・鏡面に同じだけ掛かる (つまみを 1.32 倍にしたのと同じ)。AO で環境光が暗くなる
+分、同じつまみの値では Fast GI が GTAO・AO なしより暗く見えたため、ユーザーの目視で決めた。
+つまみの既定値ではなく定数にしているのは、GTAO・AO なしと、つまみの値を書いていない古い
+ファイルの明るさを変えないため。合成で光を分け直す値 (`FrameRenderPipeline` の
+`aoc.lightAmbient` / `lightDiffuse`) にも同じ倍率を掛ける。環境光だけで照らす material
+(`nolighting` など) は AO を掛けないので、この倍率も掛けない。
 | key light の向き (eye 空間) | (1, 1, 1.5) 右上手前 | 同じ |
 
 光の強さは renderer の material から決まり、Fast GI では環境光と拡散だけを上の比率で換算する ([renderer-material.md](renderer-material.md))。
@@ -69,6 +77,7 @@ Fast GI のときの光の強さ (material `default` のとき。`Scene::kFastGI
 - 値は線形 (`saturate`) のまま使う。`aoIntensity` (指数) は GTAO だけ。
 - 静止中に時間方向の AA (jitter) が動いている間は、1 サンプル 2 方向にし、ノイズの回転を変えて AA の蓄積で平均する (EEVEE の既定 2 方向 × 蓄積と同じ)。
 - 探索は画面上でフル解像度換算 256 px まで。拡大して 1 画素が 0.04 Å 未満になったら、静止中も半解像度のままにする (`GUIView` の `kAOHalfResPixelSize`)。拡大すると原子が画面を埋め、フル解像度の 8 方向は 45 ms 程度かかるため。
+- **法線なしのサンプルは飛ばす**: 線・label・edge line・環境光だけで照らす material などの法線なしの描画 ([renderer-material.md](renderer-material.md) §6) は、遮蔽・厚みの推定・照り返しのどれにも使わない (GTAO の経路と同じ)。以前はこれが無く、線や label が周りの面に影を落としていた。
 - **照り返し**: 探索で見つけた遮蔽面の色 (scene の色からフォグを外し、遮蔽面自身の環境光の分をプローブの可視性で暗くしたもの) を集め、2 枚目の attachment (RGBA16F) に書く。合成で `環境光の分 × aoBounce / 環境光の強さ × 集めた光` を足す。強くすると陰影がぼやけるので 0.5。
 
 ## 5. 焼き込みプローブ
@@ -77,7 +86,9 @@ Fast GI のときの光の強さ (material `default` のとき。`Scene::kFastGI
 
 - **焼き込み** (GPU): 分子を囲む球の外から 32 方向 (Fibonacci 球) の正射影で深度を描き、128 px のタイルを並べたアトラスに入れる。3 Å 格子の各プローブについて、各方向で手前に面が無ければ見える、として平均の可視性 m0 と可視性で重み付けた方向の平均 m1 を RGBA16F に書く。原子の中のプローブ (m0 = 0) は周りの有効な値で埋める (6 回の往復)。格子は z の層を横に並べた 2D アトラス (テクセル `(x + z * nx, y)`)。この配置は C++ のアトラスの大きさ、bake、fill、`sampleProbeGrid` の 4 か所が前提にしている (各所のコメントが互いを指す)。
 - **作り直しの判定**: Scene が形の変わった回数 (`getOccluderGen`) を数え、焼いたときから動いていたら焼き直す。数えるのは、object と renderer のイベント (`Scene::objectChanged` / `rendererChanged`: 原子の移動・追加・削除、表示の切り替え、renderer の設定)、object と renderer の追加・削除 (`fireSceneEvent`)、表示キャッシュの無効化 (`DispCacheRenderer::invalidateDisplayCache`: renderer イベントを通らない style の変更)。カメラの操作はどれも通らないので、回転中は毎フレームの判定が整数の比較だけになる。ライブ表示では、形が変わっている間は焼かずにプローブなしで描き、0.2 s 変更が来なかったら 1 回焼く (`kProbeSettleSec`)。保留中は描画を続ける。画像の書き出しは待たずにその場で焼く。
-- **格子の範囲**: renderer が渡す遮蔽物の球 (`collectOcclusionSpheres`) の範囲に 2 格子足す。球は焼くときにだけ集める。以前は球のハッシュで形の変化を調べていて、焼き込みが済んでいても 0.1 s ごとに収集が走り、Windows で 1AON を回すと 41 fps に落ちた (今は 60 fps)。範囲を分子全体の箱にすれば収集は安くなるが、大きな分子の一部だけを描くと格子が分子全体に広がるので採らなかった。
+- **法線なしの描画は焼かない**: 焼き込みの描画の間だけ `DisplayContext::setOccluderPass(true)` にし、FogBlock の `u_occluderPass` (空いていた詰め物の場所なので UBO の大きさは変えていない) を立てる。法線なしで描くシェーダ (線・label・edge line・地図の網、環境光だけで照らす material と照明を切った三角形・球・円柱) はそのとき `discard` する。key light の影も同じ焼き込みから作るので、一緒に外れる。
+- **格子の範囲**: renderer が渡す遮蔽物の球 (`collectOcclusionSpheres`) の範囲に 2 格子足す。集めるのは `AmbientProbeVolume::collectOccluderSpheres` で、半透明の renderer と、環境光だけで照らす material の renderer は除く。線だけを描く renderer (simple / trace / spline / `*selection`) は球を出さない (`collectOcclusionSpheres` を空にしている)。範囲は格子の原点と焼き込みのカメラの範囲を決めるので、遮る物でない renderer の原子で範囲が変わると、照明した面の焼き込みの陰影まで変わる (線の renderer は球の半径が一律 1.8 Å で、CPK の範囲を広げていた)。球は焼くときにだけ集める。以前は球のハッシュで形の変化を調べていて、焼き込みが済んでいても 0.1 s ごとに収集が走り、Windows で 1AON を回すと 41 fps に落ちた (今は 60 fps)。範囲を分子全体の箱にすれば収集は安くなるが、大きな分子の一部だけを描くと格子が分子全体に広がるので採らなかった。
+- テスト: 線と環境光だけの renderer を範囲に入れないことは `src/tests/modules/molvis/test_cpk2renderer.cpp` (`ProbeGridSkipsLineAndUnlitRenderers`)。
 - **球の収集のキャッシュ**: 収集の重い部分は各 renderer の selection を全原子に掛けることなので (5.9 万原子で renderer 1 つあたり 11 ms 程度)、`MolRenderer::occlusionAtomIDs` が一致した原子の ID を覚えておき、座標だけ読み直す。ID を捨てるのは selection が変わったとき (`setSelection`)、`atomsMoved` 以外の `OBE_CHANGED` が来たとき (原子の追加・削除など)、原子数が変わったとき。原子の移動では捨てない (renderer の coordinate texture の経路も、原子が動く間は selection を評価し直さない)。4V6X の焼き直しで収集は 292 ms から 8 ms になった。読み込み直後や構造を編集した直後の 1 回は作り直しの分だけ重い。テスト: `src/tests/modules/molstr/test_occlusion_spheres.cpp`。
 - **時間 AA との関係**: 焼き直すと画が変わるので、`FrameRenderPipeline::isProbeBaked()` が true のフレームの後、`GUIView` は AA の蓄積をサンプル 0 からやり直す。以前ここが無く、蓄積済みのサンプルと混ざって画面が明るくなりすぎた。
 - **読み出し**: 受光点は法線方向に 1 格子 (3 Å) ずらした位置を 3 次 B-spline (3 線形の読み出し 8 回、Sigg & Hadwiger) で読む。3 線形で半格子ずらしただけでは、細い円柱 (cartoon のヘリックス) の中のプローブを拾って煤けた斑点が出た。照り返しの遮蔽面は 1 サンプルごとに読むので、安い 3 線形のまま。

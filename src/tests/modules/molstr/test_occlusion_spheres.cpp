@@ -84,8 +84,10 @@ protected:
 
     std::vector<Vector4D> spheres()
     {
+        // The MolRenderer implementation (the simple renderer itself draws
+        // lines only and reports no occluder).
         std::vector<Vector4D> out;
-        m_pRend->collectOcclusionSpheres(out);
+        m_pRend->molstr::MolRenderer::collectOcclusionSpheres(out);
         return out;
     }
 
@@ -124,3 +126,4 @@ TEST_F(OcclusionSpheresTest, FollowsMovedAtomsSelectionAndTopology)
     EXPECT_EQ(sph.size(), 2u);
     EXPECT_TRUE(hasCenter(sph, Vector4D(20.0, 2.0, 0.0)));
 }
+

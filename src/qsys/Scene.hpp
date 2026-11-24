@@ -283,6 +283,14 @@ namespace qsys {
     /// character (plastic, metal) when the mode changes.
     static constexpr double kFastGILightAmbient = 0.56;
     static constexpr double kFastGILightDiffuse = 0.52;
+    /// Extra brightness while the Fast GI AO is on, multiplied into
+    /// lightBrightness for the ambient, diffuse and specular alike (as if the
+    /// Brightness knob read 1.32 times higher). The AO darkens the ambient part,
+    /// so at the same knob Fast GI looked darker than GTAO / no AO. Kept out
+    /// of the knob's default so that GTAO / no AO and older files keep their
+    /// brightness. Materials lit by the ambient light alone get no AO and no
+    /// boost (getMaterialLight).
+    static constexpr double kFastGILightBrightness = 1.32;
     /// The former ambient total / diffuse light without Fast GI, for the
     /// material "default".
     static constexpr double kLegacyLightAmbient = 0.4;

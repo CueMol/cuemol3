@@ -11,7 +11,8 @@
 layout(std140) uniform FogBlock {
     float u_fogEnd;    // offset 0
     float u_fogScale;  // offset 4
-    float _fog_p1;     // offset 8  (padding for vec3 alignment)
+    float u_occluderPass;  // offset 8: 1 = occluder-only pass (the Fast GI
+                           // probe bake); primitives without a normal discard
     float _fog_p2;     // offset 12
     vec3 u_fogColor;   // offset 16
     float _fog_p3;     // offset 28
@@ -30,6 +31,22 @@ layout(std140) uniform FogBlock {
 
 ////////////////////
 
+// A material lit by the ambient light alone (no diffuse, no specular:
+// nolighting, shadow). It shows its colour as given: drawn without a normal
+// (no AO, no tone curve, not an AO occluder), like lines and labels.
+bool isAmbientOnlyLight()
+{
+    return u_lightDiffuse <= 0.0 && u_lightSpecular <= 0.0;
+}
+
+// The occluder-only pass (the Fast GI probe bake, DisplayContext::
+// setOccluderPass): a primitive drawn without a normal casts no AO, so it
+// discards its fragments there.
+bool isOccluderPass()
+{
+    return u_occluderPass > 0.5;
+}
+
 // Material of the lit colour for the Fast GI composite (MRT attachment 2,
 // ao_composite_frag.glsl): the light of the renderer being drawn, which the
 // scene sets per renderer from its material (Scene::getMaterialLight).
@@ -43,8 +60,7 @@ vec4 encodeMaterial()
     float ka = max(u_lightAmbient, 1e-3);
     float r = u_lightDiffuse / ka;
     float rough = sqrt(2.0 / (max(u_lightDir.w, 0.0) + 2.0));
-    bool ambientOnly = u_lightDiffuse <= 0.0 && u_lightSpecular <= 0.0;
-    return vec4(r / (1.0 + r), rough, ka / (1.0 + ka), ambientOnly ? 0.75 : 1.0);
+    return vec4(r / (1.0 + r), rough, ka / (1.0 + ka), isAmbientOnlyLight() ? 0.75 : 1.0);
 }
 
 vec4 fragFogColor(in vec4 color, in float frag_alpha, in float fogCoord)

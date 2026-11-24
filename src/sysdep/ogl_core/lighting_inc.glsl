@@ -207,6 +207,10 @@ vec4 flight2(in vec3 normal, in vec4 ecPosition, in vec4 in_color)
     const vec3 LUM = vec3(0.2126, 0.7152, 0.0722);
     g_ambientFraction = clamp(dot(amb, LUM) / max(dot(rgb, LUM), 1e-4), 0.0, 1.0);
     color = vec4(rgb, in_color.a);
+    // A material lit by the ambient light alone shows its colour as given:
+    // clipped, never tone mapped (isAmbientOnlyLight).
+    if (isAmbientOnlyLight())
+        return vec4(clamp(color.rgb, 0.0, 1.0), clamp(color.a, 0.0, 1.0));
     // An HDR scene target keeps the lit colour; the composite tone maps it.
     // A toon material clips and gamma-encodes instead, as POV-Ray writes its
     // image (assumed_gamma 1.0, an sRGB file): the flat tones then match it.

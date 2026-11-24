@@ -56,6 +56,12 @@ public:
     /// Release the render targets; the next update bakes again.
     void release();
 
+    /// The occluder spheres the grid spans: those of the visible, opaque
+    /// renderers lit by a light (Renderer::collectOcclusionSpheres). A
+    /// translucent renderer (a veil) and one whose material has no diffuse
+    /// and no specular light (nolighting, shadow) occlude nothing.
+    static void collectOccluderSpheres(const ScenePtr &pScene, std::vector<qlib::Vector4D> &sph);
+
     /// The baked probes (nullptr before the first bake).
     gfx::RenderTarget *getAtlas() const;
     const int *getDim() const { return m_dim; }
