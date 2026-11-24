@@ -329,11 +329,29 @@ jobs:
     # updates. Pin the version used locally so the CI compiler is reproducible.
     # The vcvars env above stays required: clang-cl uses its MSVC STL/CRT/SDK,
     # and cl.exe is still the wrapper-generator / GLSL preprocessor.
+    # The installer comes straight from the LLVM GitHub release (the Chocolatey
+    # package only wraps the same file, and its feed failed a release build with
+    # 504s). The digest is the one GitHub lists for the release asset.
     - name: Install LLVM (clang-cl)
       if: needs.setup_matrix.outputs.build != 'false'
       shell: pwsh
+      env:
+        LLVM_VER: "22.1.8"
+        LLVM_SHA256: "16e5709785fef73c854646241c4a92c5cd574318d1b33c63330dd7721903e55c"
       run: |
-        choco install llvm --version=22.1.8 -y --allow-downgrade --no-progress
+        $ErrorActionPreference = 'Stop'
+        $exe = Join-Path $env:RUNNER_TEMP "LLVM-$env:LLVM_VER-win64.exe"
+        $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$env:LLVM_VER/LLVM-$env:LLVM_VER-win64.exe"
+        curl.exe -fsSL --retry 5 --retry-all-errors --retry-delay 10 -o $exe $url
+        if ($LASTEXITCODE -ne 0) { throw "download failed: $url" }
+        $hash = (Get-FileHash -Algorithm SHA256 $exe).Hash.ToLower()
+        if ($hash -ne $env:LLVM_SHA256) { throw "SHA256 mismatch: $hash" }
+        # NSIS silent install over the runner's own LLVM in C:\Program Files\LLVM.
+        $p = Start-Process -FilePath $exe -ArgumentList '/S' -Wait -PassThru
+        if ($p.ExitCode -ne 0) { throw "LLVM installer exited with $($p.ExitCode)" }
+        $ver = & "C:\Program Files\LLVM\bin\clang-cl.exe" --version | Select-Object -First 1
+        Write-Host $ver
+        if ($ver -notmatch [regex]::Escape($env:LLVM_VER)) { throw "unexpected clang-cl: $ver" }
         echo "C:\Program Files\LLVM\bin" >> $env:GITHUB_PATH
 
     - name: Show clang-cl version
