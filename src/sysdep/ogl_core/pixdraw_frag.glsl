@@ -42,6 +42,10 @@ layout(location = 2) out vec4 o_Material;
 
 void main()
 {
+    // Drawn without a normal: casts no AO, so not part of the occluder-only
+    // pass (the probe bake, fog_inc.glsl isOccluderPass).
+    if (isOccluderPass()) discard;
+
     float alphaThreshold = 0.1;
 
     float alpha = texture(u_texture, v_texCoord).r;

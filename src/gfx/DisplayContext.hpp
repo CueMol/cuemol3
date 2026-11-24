@@ -84,6 +84,7 @@ private:
     float m_fLightDiffuse = 0.8f;
     float m_fLightSpecular = 0.16f;
     bool m_bLightNoClamp = false;
+    bool m_bOccluderPass = false;
     float m_lightDir[3] = {1.0f, 1.0f, 1.5f};
     float m_fLightShininess = 32.0f;
     // metalness, toon, Fresnel rim, toonPov (setLightMaterialExtra)
@@ -314,6 +315,12 @@ public:
         for (int i = 0; i < 4; ++i) d[i] = m_matExtra[i];
     }
     bool isLightNoClamp() const { return m_bLightNoClamp; }
+
+    /// Occluder-only pass (the Fast GI probe bake): the primitives without a
+    /// normal (lines, labels, edge lines, unlit surfaces) discard their
+    /// fragments, so they cast no AO (FogBlock, fog_inc.glsl u_occluderPass).
+    void setOccluderPass(bool b) { m_bOccluderPass = b; }
+    bool isOccluderPass() const { return m_bOccluderPass; }
 
     // Screen-space ambient occlusion (GTAO)
     virtual void enableAO(bool b);

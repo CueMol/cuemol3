@@ -35,7 +35,8 @@ public:
     struct FogBlock {
         float fogEnd;           // offset 0  — far limit of the fog range
         float fogScale;         // offset 4  — 1/(fogEnd - fogStart)
-        float _pad1, _pad2;     // offset 8, 12 — padding for vec3 alignment
+        float occluderPass;     // offset 8  - 1 = occluder-only pass (probe bake)
+        float _pad2;            // offset 12 - padding for vec3 alignment
         float fogColor[3];      // offset 16 — RGB fog colour
         float _pad3;            // offset 28 - padding
         float lightAmbient;     // offset 32 - ambient total

@@ -34,6 +34,14 @@ layout(location = 2) out vec4 o_Material;
 
 void main(void)
 {
+    // Drawn without a normal: no vertex normal, lighting off (a wireframe),
+    // or a material lit by the ambient light alone (isAmbientOnlyLight).
+    // Such a pixel gets no AO and no tone curve and occludes nothing, so it
+    // is left out of the occluder-only pass (the probe bake).
+    bool unlit = enable_lighting == 0 || isAmbientOnlyLight();
+    bool hasNormal = !unlit && dot(v_ecNormal, v_ecNormal) > 1e-12;
+    if (!hasNormal && isOccluderPass()) discard;
+
     // Lit per pixel (the vertex shader passes the vertex colour).
     vec4 color = v_frontColor;
     float ambFrac = 1.0;
@@ -43,10 +51,8 @@ void main(void)
     }
     o_FragColor = fragFogColor(color, frag_alpha, v_fogCoord);
 
-    // Write the real eye-space normal whenever one is available (lit or not), so
-    // only genuinely normal-less primitives fall back to the sentinel.
-    o_Normal = (dot(v_ecNormal, v_ecNormal) > 1e-12)
+    o_Normal = hasNormal
                    ? vec4(normalize(v_ecNormal) * (2.0 - clamp(ambFrac, 0.0, 1.0)), 1.0)
                    : vec4(0.0, 0.0, 0.0, 1.0);
-    o_Material = (enable_lighting != 0) ? encodeMaterial() : vec4(0.0);
+    o_Material = hasNormal ? encodeMaterial() : vec4(0.0);
 }
