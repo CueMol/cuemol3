@@ -1,14 +1,16 @@
 /**
  * @file main/handlers/contextMenus.ts
  * @description Native context menus the renderer asks for -- the scene tree,
- * the 3D view, and the text-field edit menu on Windows / Linux.
+ * the 3D view, a pane's dropdown, and the text-field edit menu on Windows /
+ * Linux.
  */
 
-import type { BrowserWindow } from 'electron';
+import { BrowserWindow } from 'electron';
 import { IPC } from '@shared/ipcChannels';
 import { handleInvoke } from '../ipc/handleInvoke';
 import { showNaviContextMenu } from '../naviContextMenu';
 import { showSceneContextMenu } from '../sceneContextMenu';
+import { showPopupMenu } from '../popupMenu';
 
 /** Register the context-menu channels. */
 export function registerContextMenuHandlers(mainWindow: BrowserWindow): void {
@@ -18,6 +20,12 @@ export function registerContextMenuHandlers(mainWindow: BrowserWindow): void {
 
   handleInvoke(IPC.NAVI_CTX_SHOW, (_event, payload) =>
     showNaviContextMenu(mainWindow, payload),
+  )
+
+  // A pane's dropdown, in the window that asked (the Rendering window has
+  // panes too).
+  handleInvoke(IPC.POPUP_MENU_SHOW, (event, req) =>
+    showPopupMenu(BrowserWindow.fromWebContents(event.sender) ?? mainWindow, req),
   )
 
   // Edit role picked from the Windows/Linux React text context menu

@@ -17,7 +17,7 @@
  */
 
 import React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act } from 'react'
 
 void React
@@ -51,7 +51,14 @@ vi.mock('@renderer/features/coloring/PaintSelCell', () => ({
 
 import { ColorPane } from '@renderer/features/coloring/ColorPane'
 import { ContextMenuProvider } from '@renderer/shell/menu/ContextMenuProvider'
-import { mountTree, flushPromises } from '@renderer/__test__/helpers/testHarness'
+import {
+    mountTree,
+    flushPromises,
+    menuLabels,
+    setupPopupMenu,
+    subMenu,
+    teardownElectronAPI,
+} from '@renderer/__test__/helpers/testHarness'
 import { withPaneEnv } from '@renderer/__test__/helpers/paneEnv'
 
 const SCENE_ID = 7
@@ -78,21 +85,25 @@ const ISOSURF_MOLECULE_PAINT = {
     molFancTarget: 'mol1',
 }
 
-/**
- * `*Paint` style presets, as `getPaintColoringStyles` returns them.
- *
- * `DefaultHSCPaint` comes back as "Molecule color", not "Default": it is
- * solid + `$molcol` rather than a PaintColoring, and the submenu's "Default"
- * is the real PaintColoring below.
- */
+/** `*Paint` style presets and palette themes, as `getPaintColoringStyles` returns them. */
 const PAINT_STYLES = [
-    { name: 'DefaultHSCPaint', label: 'Molecule color' },
-    { name: 'WoodyHSCPaint', label: 'Woody' },
     { name: 'RedHSCPaint', label: 'Red' },
+    { name: 'OrangeHSCPaint', label: 'Orange' },
+]
+const PAINT_THEMES = [
+    {
+        theme: 'okabeito',
+        label: 'Okabe-Ito',
+        colors: [
+            // A colour is listed by its name, or by its number without one.
+            { name: 'okabeito_1', hex: '#e69f00', label: 'Orange' },
+            { name: 'okabeito_2', hex: '#56b4e9', label: '' },
+        ],
+    },
 ]
 
-/** The submenu as the pane builds it: the coloring first, then the styles. */
-const PAINT_SUBMENU_LABELS = ['Default', ...PAINT_STYLES.map((s) => s.label)]
+/** The submenu as the pane builds it: fixed colours, themes, then the styles. */
+const PAINT_SUBMENU_LABELS = ['CueMol2 default', 'CueMol1 (woody)', 'Okabe-Ito', 'Red', 'Orange']
 
 interface MockCm {
     invokeService: ReturnType<typeof vi.fn>
@@ -132,7 +143,7 @@ function makeCm(coloringState: Record<string, unknown>): MockCm {
                 return Promise.resolve({ ok: true, objects: [] })
             }
             if (name === 'getPaintColoringStyles') {
-                return Promise.resolve({ ok: true, entries: PAINT_STYLES })
+                return Promise.resolve({ ok: true, entries: PAINT_STYLES, themes: PAINT_THEMES })
             }
             return Promise.resolve({ ok: true })
         }),
@@ -150,15 +161,6 @@ async function mountWith(coloringState: Record<string, unknown>) {
     return { cm, ...handle }
 }
 
-/**
- * Visible label of a menu item. Blueprint appends a screen-reader-only
- * "Open sub menu" caption to submenu parents; strip it so the expectations
- * read as the labels the user sees.
- */
-function menuText(item: Element): string {
-    return (item.textContent ?? '').replace(/Open sub menu$/, '')
-}
-
 /** The select that offers the scene's molecules (the Coloring mol selector). */
 function findMolSelector(container: HTMLElement): HTMLSelectElement | null {
     return (
@@ -170,16 +172,21 @@ function findMolSelector(container: HTMLElement): HTMLSelectElement | null {
 
 describe('ColorPane MOLFANC wire (isosurf)', () => {
     beforeEach(() => vi.clearAllMocks())
+    afterEach(() => teardownElectronAPI())
 
-    it('isosurf dropdown offers the paint set + Multi-gradient but no Elepot', async () => {
-        const { container, unmount } = await mountWith(ISOSURF_SOLID)
-        const trigger = container.querySelector(
-            'button[title="Coloring mode"]',
-        ) as HTMLButtonElement
+    /** Click the coloring-mode dropdown; the menu goes out through the mocked popup. */
+    async function openModeMenu(container: HTMLElement): Promise<void> {
+        const trigger = container.querySelector('button[title="Coloring mode"]') as HTMLButtonElement
         await act(async () => { trigger.click() })
         await flushPromises()
-        const items = Array.from(document.querySelectorAll('.bp5-menu-item'))
-        expect(items.map(menuText)).toEqual([
+    }
+
+    it('isosurf dropdown offers the paint set + Multi-gradient but no Elepot', async () => {
+        const sent = setupPopupMenu(null)
+        const { container, unmount } = await mountWith(ISOSURF_SOLID)
+        await openModeMenu(container)
+        expect(menuLabels(sent[0])).toEqual([
+            'Molecule color',
             'Paint coloring',
             'Solid coloring',
             'CPK coloring',
@@ -193,83 +200,37 @@ describe('ColorPane MOLFANC wire (isosurf)', () => {
         unmount()
     })
 
-    it('"Paint coloring" offers the real PaintColoring first, then the style presets', async () => {
+    it('"Paint coloring" offers the fixed colours and themes first, then the style presets', async () => {
+        const sent = setupPopupMenu(['Paint coloring', 'Red'])
         const { cm, container, unmount } = await mountWith(ISOSURF_SOLID)
         expect(cm.invokeService).toHaveBeenCalledWith('getPaintColoringStyles', {
             sceneId: SCENE_ID,
         })
-        const trigger = container.querySelector(
-            'button[title="Coloring mode"]',
-        ) as HTMLButtonElement
-        await act(async () => { trigger.click() })
-        await flushPromises()
-        const paint = Array.from(document.querySelectorAll('.bp5-menu-item')).find(
-            (i) => menuText(i) === 'Paint coloring',
-        )!
-        // Blueprint opens a submenu on hover (interactionKind "hover", 150ms
-        // default open delay). React derives onMouseEnter from the bubbling
-        // mouseover event, so dispatch that and wait out the delay for real --
-        // fake timers do not reliably flush React 18 state from timer
-        // callbacks.
-        await act(async () => {
-            paint.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
-        })
-        await act(async () => {
-            await new Promise((resolve) => setTimeout(resolve, 250))
-        })
-        await flushPromises()
-        const sub = Array.from(document.querySelectorAll('.bp5-menu-item')).filter(
-            (i) => PAINT_SUBMENU_LABELS.includes(menuText(i)),
-        )
-        expect(sub.map(menuText)).toEqual(PAINT_SUBMENU_LABELS)
-
+        await openModeMenu(container)
+        expect(menuLabels(subMenu(sent[0], ['Paint coloring']))).toEqual(PAINT_SUBMENU_LABELS)
         // A style preset still applies as a style.
-        await act(async () => {
-            (sub.find((i) => menuText(i) === 'Woody') as HTMLElement).click()
-        })
-        await flushPromises()
         expect(cm.invokeService).toHaveBeenCalledWith('setRendererColoring', {
             sceneId: SCENE_ID,
             rendId: REND_ID,
             targetKind: 'renderer',
-            coloringId: 'style-WoodyHSCPaint',
+            coloringId: 'style-RedHSCPaint',
         })
         unmount()
     })
 
-    it('"Paint coloring > Default" builds a PaintColoring ON THE RENDERER', async () => {
-        // The regression this pins: "Default" used to be the DefaultHSCPaint
-        // STYLE, which is solid + $molcol and is already the default style of
-        // the ribbon / cartoon / tube renderers -- so picking it left the
-        // renderer exactly as it was and the colour on screen went on coming
-        // from the object's own coloring.
+    it('"Paint coloring > <theme> > <colour>" paints the renderer with that theme colour', async () => {
+        const sent = setupPopupMenu(['Paint coloring', 'Okabe-Ito', '2'])
         const { cm, container, unmount } = await mountWith(ISOSURF_SOLID)
-        const trigger = container.querySelector(
-            'button[title="Coloring mode"]',
-        ) as HTMLButtonElement
-        await act(async () => { trigger.click() })
-        await flushPromises()
-        const paint = Array.from(document.querySelectorAll('.bp5-menu-item')).find(
-            (i) => menuText(i) === 'Paint coloring',
-        )!
-        await act(async () => {
-            paint.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
-        })
-        await act(async () => {
-            await new Promise((resolve) => setTimeout(resolve, 250))
-        })
-        await flushPromises()
-
-        const item = Array.from(document.querySelectorAll('.bp5-menu-item')).find(
-            (i) => menuText(i) === 'Default',
-        ) as HTMLElement
-        await act(async () => { item.click() })
-        await flushPromises()
+        await openModeMenu(container)
+        // Each colour carries its swatch.
+        const colours = subMenu(sent[0], ['Paint coloring', 'Okabe-Ito'])
+        expect(menuLabels(colours)).toEqual(['Orange', '2'])
+        expect(colours.map((n) => (n.type === 'separator' ? null : n.swatch))).toEqual(['#e69f00', '#56b4e9'])
         expect(cm.invokeService).toHaveBeenCalledWith('setRendererColoring', {
             sceneId: SCENE_ID,
             rendId: REND_ID,
             targetKind: 'renderer',
-            coloringId: 'paint-type-paint',
+            coloringId: 'paint-theme-okabeito_2',
         })
         unmount()
     })

@@ -9,6 +9,7 @@
  */
 
 import type { RendColoringId } from '@shared/types/sceneCtxMenu';
+import { MOLCOL_COLORING_ID } from '@shared/coloring/paintChoiceMenu';
 
 export interface ColoringModeItem {
     label: string
@@ -23,6 +24,8 @@ export interface ColoringModeItem {
     surfaceOnly?: boolean
     /** Shown only when the renderer exposes a `multi_grad` gradient. */
     multigradOnly?: boolean
+    /** Renderer only: an object cannot take a style. */
+    rendererOnly?: boolean
 }
 
 /**
@@ -56,6 +59,9 @@ export type PaintCtxAction =
     | 'edit' | 'cut' | 'copy' | 'paste' | 'delete' | 'deleteAll'
 
 export const COLORING_MODE_ITEMS: ColoringModeItem[] = [
+    // Follow the molecule's colouring (the `$molcol` style): what a ribbon /
+    // cartoon / tube renderer starts with. An object owns that colouring.
+    { label: 'Molecule color',          coloringId: MOLCOL_COLORING_ID,    enabled: true, rendererOnly: true },
     { label: 'Paint coloring',          coloringId: 'paint-type-paint',    enabled: true  },
     { label: 'Solid coloring',          coloringId: 'paint-type-solid',    enabled: true  },
     // The three CPK entries differ only in the carbon colour, matching the

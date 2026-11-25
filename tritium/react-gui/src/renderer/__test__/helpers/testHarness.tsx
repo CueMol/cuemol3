@@ -10,6 +10,8 @@ import React from 'react'
 import { vi } from 'vitest'
 import { createRoot, type Root } from 'react-dom/client'
 import { act } from 'react'
+import { IPC } from '@shared/ipcChannels'
+import type { MenuNode } from '@shared/menuNodes'
 
 ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -146,6 +148,50 @@ export function setupElectronAPI(overrides: Record<string, unknown> = {}): Recor
   }
   ;(window as any).electronAPI = api
   return api
+}
+
+/**
+ * Mock the macOS path of a dropdown shown with `usePopupMenu`: the
+ * `POPUP_MENU_SHOW` invoke records the tree it was sent and replies with the
+ * action at `path` (labels from the top level down), or null for none.
+ * Returns the recorded trees.
+ */
+export function setupPopupMenu(path: string[] | null): MenuNode<unknown>[][] {
+  const sent: MenuNode<unknown>[][] = []
+  setupElectronAPI({
+    platform: 'darwin',
+    invoke: vi.fn((channel: string, req: { nodes: MenuNode<unknown>[] }) => {
+      if (channel !== IPC.POPUP_MENU_SHOW) return Promise.resolve(undefined)
+      sent.push(req.nodes)
+      return Promise.resolve(path ? menuAction(req.nodes, path) : null)
+    }),
+  })
+  return sent
+}
+
+/** Labels of a menu level (separators left out). */
+export function menuLabels(nodes: ReadonlyArray<MenuNode<unknown>>): string[] {
+  return nodes.flatMap((n) => (n.type === 'separator' ? [] : [n.label]))
+}
+
+/** The submenu at `path` (labels from the top level down). */
+export function subMenu(nodes: ReadonlyArray<MenuNode<unknown>>, path: string[]): MenuNode<unknown>[] {
+  let level = nodes as MenuNode<unknown>[]
+  for (const label of path) {
+    const n = level.find((x) => x.type !== 'separator' && x.label === label)
+    if (!n || n.type === 'separator' || !n.submenu) throw new Error(`no submenu "${label}"`)
+    level = n.submenu
+  }
+  return level
+}
+
+/** The action of the item at `path`. */
+export function menuAction(nodes: ReadonlyArray<MenuNode<unknown>>, path: string[]): unknown {
+  const n = subMenu(nodes, path.slice(0, -1)).find(
+    (x) => x.type !== 'separator' && x.label === path[path.length - 1],
+  )
+  if (!n || n.type === 'separator') throw new Error(`no item "${path.join(' > ')}"`)
+  return n.action
 }
 
 export function teardownElectronAPI(): void {

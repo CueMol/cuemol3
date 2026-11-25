@@ -9,6 +9,9 @@
  */
 import type { Result } from '@renderer/worker/shared/result';
 import type { RendColoringId } from '@shared/types/sceneCtxMenu';
+import type { PaintTheme } from '@renderer/worker/server/services/helpers/defPaintColoring';
+
+export type { PaintTheme };
 
 /**
  * Discriminator for the Coloring panel's selector: both top-level objects
@@ -33,6 +36,8 @@ export interface PaintColoringStyleEntry {
 export interface GetPaintColoringStylesResult {
     ok: boolean;
     entries: PaintColoringStyleEntry[];
+    /** Palette themes whose colours the menu offers (`paint-theme-<colour>`). */
+    themes: PaintTheme[];
 }
 
 export interface SetRendererColoringArgs {

@@ -369,6 +369,8 @@ architecture, it belongs here.
 - [分子の既定の色分け (パレットのテーマ)](default-paint-palette.md) (日本語) -- 読み込んだ分子の
   PaintColoring: n 番目の分子が style で選んだテーマ (既定 Okabe-Ito) の n 番目の色を主色にし、
   核酸 / coil は NamedColor の修飾子で派生させる。使った色は scene の style set に複製して qsc に保存する。
+  Paint coloring メニューの構成 (Molecule color、CueMol2 / CueMol1 の固定色、テーマの色名、style プリセット)、
+  ドロップダウンを platform のメニューで出す `usePopupMenu`。
 - [Surface atom colouring: `AtomColorMemo` and the shared colouring pass](surface-atom-coloring.md) --
   how `dsurface`, `molsurf` and the map isosurface colour a vertex by its
   atom (molecule colour mode and `showsel`): the molstr pieces they share
