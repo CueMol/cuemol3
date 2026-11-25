@@ -289,6 +289,10 @@ jobs:
       ENABLE_MESHMS: "ON"
       CUEMOL2_CLI_ONLY: "ON"
       DEPLIBS_FLAVOR: manylinux
+      # One absolute path for every step: in a container job the workspace
+      # expression gives the host path, while the steps run under the
+      # container's mount of it.
+      DEPLIBS_DIR: /opt/cuemol-deps
     steps:
     - uses: actions/checkout@v4
       with:
@@ -331,7 +335,7 @@ jobs:
     - name: Download deplibs (manylinux)
       if: needs.changes.outputs.build != 'false'
       shell: bash
-      run: bash build_scripts/download_deplibs/run.sh "$GITHUB_WORKSPACE/target" Linux X64
+      run: bash build_scripts/download_deplibs/run.sh "$DEPLIBS_DIR" Linux X64
 
     - name: Read umbreon / MeshMS git refs
       if: needs.changes.outputs.build != 'false'
@@ -345,14 +349,14 @@ jobs:
       if: needs.changes.outputs.build != 'false'
       uses: ./build_scripts/build_umbreon_posix
       with:
-        basedir: ${{ github.workspace }}/target
+        basedir: ${{ env.DEPLIBS_DIR }}
         ref: ${{ env.UMBREON_GIT_REF }}
 
     - name: Build+install MeshMS
       if: needs.changes.outputs.build != 'false'
       uses: ./build_scripts/build_meshms_posix
       with:
-        basedir: ${{ github.workspace }}/target
+        basedir: ${{ env.DEPLIBS_DIR }}
         ref: ${{ env.MESHMS_GIT_REF }}
 
     - name: Build libcuemol2 and cuetty
@@ -360,9 +364,9 @@ jobs:
       shell: bash
       run: |
         set -eux
-        bash build_scripts/build_libcuemol2_posix/run.sh "$GITHUB_WORKSPACE/target"
-        bash build_scripts/build_cuetty_posix/run.sh "$GITHUB_WORKSPACE/target"
-        ldd "$GITHUB_WORKSPACE/target/cuemol2/bin/cuetty"
+        bash build_scripts/build_libcuemol2_posix/run.sh "$DEPLIBS_DIR"
+        bash build_scripts/build_cuetty_posix/run.sh "$DEPLIBS_DIR"
+        ldd "$DEPLIBS_DIR/cuemol2/bin/cuetty"
 
     - name: Package
       id: package
@@ -371,7 +375,7 @@ jobs:
       run: |
         set -eux
         VERSION=$(grep '#define QM_VERSION' src/_version.h | sed 's/.*"\(.*\)".*/\1/')
-        bash build_scripts/package_cuetty_linux.sh "$GITHUB_WORKSPACE/target/cuemol2" "$GITHUB_WORKSPACE/dist" "$VERSION"
+        bash build_scripts/package_cuetty_linux.sh "$DEPLIBS_DIR/cuemol2" "$GITHUB_WORKSPACE/dist" "$VERSION"
         echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
     - name: Upload cuetty tarball
