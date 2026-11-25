@@ -12,6 +12,7 @@
 #include "ObjectManager.hpp"
 #include "EventManager.hpp"
 #include "LPerfMeas.hpp"
+#include "parallel.hpp"
 // #include "TestClass.hpp"
 
 #include <boost/filesystem/path.hpp>
@@ -49,6 +50,11 @@ bool qlib::init()
     ClassRegistry::init();
     PerfMeasManager::init();
     qlib_regClasses();
+    // Apply the CUEMOL_TBB_THREADS cap now, before anything starts TBB work.
+    // Applied lazily it would only take effect at the first parallel_for, so
+    // a ray trace (umbreon, Embree and OIDN share this one oneTBB runtime)
+    // started before that would still use every core.
+    parallel_max_concurrency();
     res = true;
 
 #if (BOOST_FILESYSTEM_VERSION>2)

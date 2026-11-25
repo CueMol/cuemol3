@@ -34,7 +34,14 @@ find_package(CGAL REQUIRED)
 message(STATUS "CGAL_CONFIG: ${CGAL_CONFIG}")
 message(STATUS "CGAL_FOUND: ${CGAL_FOUND} INCLUDE_DIR: ${CGAL_INCLUDE_DIRS} LIBRARIES: ${CGAL_LIBRARIES}")
 
-find_package(LibLZMA)
+# REQUIRE_LIBLZMA: fail the configure instead of building without xz support
+# (the GUI saves scenes as QDF1 + xz by default; see build_libcuemol2_posix).
+option(REQUIRE_LIBLZMA "Fail when LibLZMA is not found" OFF)
+if (REQUIRE_LIBLZMA)
+  find_package(LibLZMA REQUIRED)
+else ()
+  find_package(LibLZMA)
+endif ()
 message(STATUS "LIBLZMA_FOUND: ${LIBLZMA_FOUND} INCLUDE_DIR: ${LIBLZMA_INCLUDE_DIRS} LIBRARIES: ${LIBLZMA_LIBRARIES}")
 if (${LIBLZMA_FOUND})
   SET(HAVE_LZMA_H "1")

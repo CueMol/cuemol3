@@ -78,6 +78,7 @@ void LoadSceneCommand::run()
     reader->attach(m_pResScene);
     reader->read();
     reader->detach();
+    m_loadErrors = reader->getLoadErrors();
 
     LOG_DPRINTLN("Set view camera m_bSetCamera = %d", m_bSetCamera);
     if (m_bSetCamera) {

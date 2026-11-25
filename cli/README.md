@@ -2,10 +2,41 @@
 
 `cuetty` is the CLI front end to libcuemol2. It has two modes:
 
-- **Headless rendering** -- load a scene file and write a PNG image, with no
-  GUI, no window and no OpenGL context (`--render`).
+- **Headless rendering** -- load a scene file and write a PNG image (`--render`)
+  or the frames of its animation (`--movie`), with no GUI, no window and no
+  OpenGL context.
 - **Interactive shell** -- an embedded Python REPL with the CueMol API bound
   (`--interactive`).
+
+---
+
+## Linux tarball (cluster nodes)
+
+Each release has `cuetty-<version>-linux-x64.tar.gz`, a self-contained cuetty
+for headless Linux machines such as cluster compute nodes. Unpack it anywhere
+and run it by path; no root, `LD_LIBRARY_PATH` or `--config` is needed:
+
+```sh
+tar xf cuetty-<version>-linux-x64.tar.gz
+cuetty-<version>-linux-x64/bin/cuetty --input scene.qsc --render out.png
+```
+
+Requirements:
+
+- x86-64 Linux with **glibc 2.28 or later** (RHEL / Rocky / Alma 8 and 9,
+  Ubuntu 20.04+, Debian 10+). It is built in the manylinux_2_28 container.
+- An **x86-64-v3 CPU** (AVX2, FMA, BMI1/2: Intel Haswell / AMD Zen or later).
+  cuetty checks this at start-up and exits with status 1 on an older CPU.
+- No GPU and no display. The OIDN denoiser runs on the CPU.
+
+**Get the scene's data onto the node.** A `.qsc` refers to the files its
+molecules came from unless they were embedded when it was saved. Save the
+scene with its data embedded, or copy the files so that the paths it refers
+to (relative ones are taken from the `.qsc`'s directory) exist on the node.
+An MD trajectory always stays in its own files, even in a scene saved with
+embedded data: copy them along with the `.qsc`, keeping their position
+relative to it. A scene that refers to data cuetty cannot load fails with
+status 1 instead of rendering without it.
 
 ---
 
@@ -62,13 +93,24 @@ scene and a camera, and walks the scene through a file `DisplayContext`. No
 
 | Option | Default | Description |
 |---|---|---|
-| `--input <path>` | -- | Input scene file (`.qsc`). Required with `--render`. |
+| `--input <path>` | -- | Input scene file (`.qsc`). Required with `--render` and `--movie`. |
 | `-r`, `--render <path>` | -- | Output PNG path. Supplying it selects render mode: the image is written and cuetty exits. |
 | `--width <px>` | scene settings | Image width override. Must be positive. |
 | `--height <px>` | scene settings | Image height override. Must be positive. |
-| `--camera <name>` | `__current` | Camera to render from. Must exist in the scene. |
-| `-c`, `--config <path>` | build-time default | `sysconfig.xml` to initialise from. |
+| `--camera <name>` | `__current` | Camera to render from. Must exist in the scene. For a movie, the start camera when the animation names none. |
+| `--threads <n>` | see below | Number of render threads. |
+| `-c`, `--config <path>` | see below | Config file to initialise from. |
 | `-h`, `--help` | -- | Print the option list. |
+
+**Threads.** Without `--threads`, cuetty uses `SLURM_CPUS_PER_TASK` (the CPUs a
+Slurm job was given), then `OMP_NUM_THREADS`, and otherwise every core of the
+machine. On a shared node, give the job's allocation one of these ways.
+
+**Config.** Without `--config`, cuetty uses `share/sysconfig_cuemol3.xml` next
+to its `bin/` directory (the layout of the Linux tarball and of an install),
+and otherwise the path it was built with. This is the config the GUI uses: it
+also loads the styles the GUI offers (such as `AlphaFoldPlddtColoring`), which
+a scene refers to by name.
 
 The default camera name is `__current`, which is where the GUI stores the
 current view when it writes a `.qsc`, so a GUI-authored scene always has it.
@@ -79,7 +121,7 @@ Any other camera saved in the scene can be named instead.
 | Status | Meaning |
 |---|---|
 | `0` | Image written. |
-| `1` | Scene could not be loaded, the named camera does not exist, an argument was invalid, or umbreon is not built in. |
+| `1` | Scene could not be loaded in full (a missing file, a corrupt or missing embedded chunk), the named camera does not exist, an argument was invalid, the image could not be written, the CPU is too old, or umbreon is not built in. |
 
 The reason is printed to the log in every failure case, so a script can
 branch on the status alone.
@@ -137,8 +179,71 @@ Only the image size and the camera can be overridden from the command line:
 which settings were used and what they resolved to:
 
 ```
-render> scene render settings, backend 'umbreon_npr', 160x120, camera '__current'
+render> scene render settings, backend 'umbreon_npr', 160x120
+render> camera '__current'
 ```
+
+### Movies
+
+```sh
+cuetty --input scene.qsc --movie <dir>/<base> [--fps N] [--no-last-frame]
+       [--frames A-B | --shard I/N] [--skip-existing]
+cuetty --input scene.qsc --list-frames [--fps N] [--no-last-frame] [--shard 0/N]
+```
+
+`--movie` renders the frames of the scene's animation (the one the GUI's
+Animation panel edits) into `<dir>/<base>_frm_0000.png`, `_frm_0001.png`, ...,
+the names the GUI writes. Each frame is set up as a still is: the scene's
+render settings, `--width` / `--height`, and the animation's own camera.
+
+| Option | Default | Description |
+|---|---|---|
+| `--movie <dir>/<base>` | -- | Output directory (created if missing) and base name. |
+| `--fps <n>` | 30 | Frame rate. The frame count is the animation length times this, plus one. |
+| `--no-last-frame` | off | Leave out the last frame, for a movie that loops (it equals the first). |
+| `--frames A-B` | all | Render frames A to B (inclusive, 0-based). |
+| `--shard I/N` | -- | Split the frames into N contiguous parts and render part I (0-based). Not with `--frames`. |
+| `--skip-existing` | off | Leave frames whose file already exists, to re-run a job that stopped. |
+| `--list-frames` | -- | Print the frame count (and, with `--shard 0/N`, the range of each part) and exit. |
+
+The start camera is the one the animation names; when it names none (or one
+the scene no longer has), it is `--camera`, as in the GUI.
+
+A run that renders later frames only still steps the animation from frame 0
+without ray tracing the frames before its range, so its frames are the same
+as those of one run over the whole sequence. A frame is written to a
+temporary file and renamed into place once it is complete, so a frame file
+that exists is a whole image, and `--skip-existing` never keeps a truncated
+one. Frames already in the directory are never deleted (other shards write
+there too).
+
+#### Frames on several nodes (Slurm)
+
+```sh
+#!/bin/bash
+#SBATCH --array=0-3
+#SBATCH --cpus-per-task=16
+CUETTY=$HOME/cuetty-<version>-linux-x64/bin/cuetty
+$CUETTY --input scene.qsc --movie frames/movie --fps 30 \
+    --shard $SLURM_ARRAY_TASK_ID/$SLURM_ARRAY_TASK_COUNT
+```
+
+Number the array from 0 with no gaps (`--array=0-3`): `--array=1-4` would make
+the parts 1/4 to 4/4 and leave out part 0. Each task uses the CPUs it was
+given (`SLURM_CPUS_PER_TASK`). Re-submitting with `--skip-existing` renders
+only the frames that are missing.
+
+#### Making the movie
+
+cuetty writes frames only. To encode them with ffmpeg the way the GUI does
+for MP4 (H.264) at the standard quality:
+
+```sh
+ffmpeg -r 30 -i frames/movie_frm_%04d.png -an -crf 23 -c:v libx264 -f mp4 \
+    -vf "fps=30,format=yuv420p" -y movie.mp4
+```
+
+Use the same rate as `--fps`.
 
 ### Text labels are not rendered
 
@@ -210,7 +315,17 @@ the GUI, or was written without saving the view. Pass an existing camera with
 
 **`cannot load scene file`** -- the path is wrong, or the file is not a
 format any registered scene reader recognises. The format is guessed from the
-file name, so the extension must be `.qsc`.
+file name, so the extension must be `.qsc`. The message also names a data file
+the scene refers to that does not exist here.
+
+**`refers to data that could not be loaded`** -- the `load error:` lines above
+it say what: an embedded chunk that is missing (the file was cut short, e.g.
+by an incomplete copy) or cannot be decoded. See
+[Linux tarball](#linux-tarball-cluster-nodes) for getting a scene's data onto
+another machine.
+
+**`this cuetty needs an x86-64-v3 CPU`** -- the Linux tarball does not run on
+CPUs older than Intel Haswell / AMD Zen.
 
 **The Python module fails to import with `Library not loaded:
 libpython3.12.dylib`** -- libcuemol2 is built against a bundled Python that

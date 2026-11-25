@@ -90,6 +90,7 @@ cmake -G Ninja -S "$MESHMS_SRC" -B "$BUILD_DIR" \
       -DMESHMS_BUILD_CLI=OFF \
       -DMESHMS_BUILD_TOOLS=OFF \
       -DCMAKE_INSTALL_PREFIX="$BASEDIR/meshms" \
+      -DCMAKE_INSTALL_LIBDIR=lib \
       $MSVC_OPT
 
 # Build only the library target; MeshMS's install rules cover the static lib,

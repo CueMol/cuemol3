@@ -270,3 +270,166 @@ jobs:
         files: |
           tritium/react-gui/release/*.AppImage
           tritium/react-gui/release/*.deb
+
+  # Portable cuetty for headless Linux nodes (RHEL 8 class and later): built in
+  # the manylinux_2_28 container (glibc 2.28, gcc-toolset) against the manylinux
+  # deplibs bundle, then packaged as cuetty-<version>-linux-x64.tar.gz. Only
+  # libcuemol2 and cuetty are built (CUEMOL2_CLI_ONLY): no Python / node.js
+  # bindings and no tests, which the Ubuntu job above covers.
+  cuetty_portable:
+    name: 'cuetty portable (manylinux_2_28 x64)'
+    needs: changes
+    runs-on: ubuntu-22.04
+    container: quay.io/pypa/manylinux_2_28_x86_64
+    env:
+      ENABLE_UMBREON: "ON"
+      # MeshMS must be on here too: run.sh defaults it to OFF, and the Ubuntu
+      # job's setting is that job's env. Without it surfaces fall back to BALL
+      # and differ from what the GUI builds.
+      ENABLE_MESHMS: "ON"
+      CUEMOL2_CLI_ONLY: "ON"
+      DEPLIBS_FLAVOR: manylinux
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        lfs: false
+
+    - name: Build skipped (only docs-like files changed)
+      if: needs.changes.outputs.build == 'false'
+      shell: bash
+      run: echo "Nothing in this branch needs a build (build_scripts/ci_needs_build.sh); the build steps are skipped."
+
+    # EL8 ships bison 3.0.4 and flex 2.6.1, below what libcuemol2 requires
+    # (3.7.4 / 2.6.4); both are only used to generate parsers at build time, so
+    # they are built here and never shipped.
+    - name: Install prerequisites
+      if: needs.changes.outputs.build != 'false'
+      shell: bash
+      run: |
+        set -eux
+        dnf install -y wget bzip2 xz xz-devel perl m4
+        command -v ninja || pipx install ninja
+        command -v cmake || pipx install cmake
+        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+        # libcuemol2's configure needs a Python >= 3.8 interpreter (code
+        # generation); the image's own python3 is older.
+        echo "/opt/python/cp312-cp312/bin" >> "$GITHUB_PATH"
+        cd /tmp
+        curl -fsSL --retry 3 -o bison.tar.xz https://ftpmirror.gnu.org/gnu/bison/bison-3.8.2.tar.xz
+        tar xJf bison.tar.xz
+        (cd bison-3.8.2 && ./configure --prefix=/usr/local && make -j4 && make install)
+        curl -fsSL --retry 3 -o flex.tar.gz https://github.com/westes/flex/releases/download/v2.6.4/flex-2.6.4.tar.gz
+        tar xzf flex.tar.gz
+        (cd flex-2.6.4 && ./configure --prefix=/usr/local && make -j4 && make install)
+        gcc --version
+        cmake --version
+        bison --version
+        flex --version
+
+    - name: Download deplibs (manylinux)
+      if: needs.changes.outputs.build != 'false'
+      shell: bash
+      run: bash build_scripts/download_deplibs/run.sh "$GITHUB_WORKSPACE/target" Linux X64
+
+    - name: Read umbreon / MeshMS git refs
+      if: needs.changes.outputs.build != 'false'
+      shell: bash
+      run: |
+        . build_scripts/deplibs.env
+        echo "UMBREON_GIT_REF=$UMBREON_GIT_REF" >> $GITHUB_ENV
+        echo "MESHMS_GIT_REF=$MESHMS_GIT_REF" >> $GITHUB_ENV
+
+    - name: Build+install umbreon
+      if: needs.changes.outputs.build != 'false'
+      uses: ./build_scripts/build_umbreon_posix
+      with:
+        basedir: ${{ github.workspace }}/target
+        ref: ${{ env.UMBREON_GIT_REF }}
+
+    - name: Build+install MeshMS
+      if: needs.changes.outputs.build != 'false'
+      uses: ./build_scripts/build_meshms_posix
+      with:
+        basedir: ${{ github.workspace }}/target
+        ref: ${{ env.MESHMS_GIT_REF }}
+
+    - name: Build libcuemol2 and cuetty
+      if: needs.changes.outputs.build != 'false'
+      shell: bash
+      run: |
+        set -eux
+        bash build_scripts/build_libcuemol2_posix/run.sh "$GITHUB_WORKSPACE/target"
+        bash build_scripts/build_cuetty_posix/run.sh "$GITHUB_WORKSPACE/target"
+        ldd "$GITHUB_WORKSPACE/target/cuemol2/bin/cuetty"
+
+    - name: Package
+      id: package
+      if: needs.changes.outputs.build != 'false'
+      shell: bash
+      run: |
+        set -eux
+        VERSION=$(grep '#define QM_VERSION' src/_version.h | sed 's/.*"\(.*\)".*/\1/')
+        bash build_scripts/package_cuetty_linux.sh "$GITHUB_WORKSPACE/target/cuemol2" "$GITHUB_WORKSPACE/dist" "$VERSION"
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+    - name: Upload cuetty tarball
+      if: needs.changes.outputs.build != 'false'
+      uses: actions/upload-artifact@v4
+      with:
+        name: cuetty_${{ steps.package.outputs.version }}_linux_x64
+        path: dist/cuetty-*-linux-x64.tar.gz
+        if-no-files-found: error
+
+  # Run the unpacked tarball on plain distribution images, with no
+  # LD_LIBRARY_PATH: the oldest target (Rocky 8, glibc 2.28) and an Ubuntu.
+  cuetty_portable_check:
+    name: 'cuetty portable check (${{ matrix.image }})'
+    needs: [changes, cuetty_portable]
+    runs-on: ubuntu-22.04
+    container: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ["rockylinux:8", "ubuntu:22.04"]
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        lfs: false
+
+    - name: Download cuetty tarball
+      if: needs.changes.outputs.build != 'false'
+      uses: actions/download-artifact@v4
+      with:
+        pattern: cuetty_*_linux_x64
+        path: dist
+        merge-multiple: true
+
+    - name: Render a still and a two-shard movie
+      if: needs.changes.outputs.build != 'false'
+      shell: bash
+      run: |
+        set -eux
+        bash build_scripts/check_cuetty_portable.sh dist/cuetty-*-linux-x64.tar.gz \
+            "$GITHUB_WORKSPACE/tests/test_data/1crn_movie_test.qsc"
+
+  # On a tag, attach the checked tarball to the release (see the tritium
+  # step above for why no body is passed).
+  cuetty_portable_release:
+    name: 'cuetty portable release'
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [changes, cuetty_portable_check]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+    - name: Download cuetty tarball
+      uses: actions/download-artifact@v4
+      with:
+        pattern: cuetty_*_linux_x64
+        path: dist
+        merge-multiple: true
+
+    - name: Attach to release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: dist/cuetty-*-linux-x64.tar.gz
