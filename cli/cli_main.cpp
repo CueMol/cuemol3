@@ -225,14 +225,15 @@ namespace {
 boost::filesystem::path exeDir()
 {
     namespace fs = boost::filesystem;
-    boost::system::error_code ec;
 #if defined(__linux__)
+    boost::system::error_code ec;
     fs::path exe = fs::read_symlink("/proc/self/exe", ec);
     if (ec) return fs::path();
 #elif defined(__APPLE__)
     char buf[4096];
     uint32_t size = sizeof buf;
     if (_NSGetExecutablePath(buf, &size) != 0) return fs::path();
+    boost::system::error_code ec;
     fs::path exe = fs::canonical(buf, ec);
     if (ec) return fs::path();
 #else
@@ -282,7 +283,11 @@ void applyThreadCap(int threads)
         }
     }
     if (src == nullptr) return;
+#ifdef _WIN32
+    ::_putenv_s("CUEMOL_TBB_THREADS", n.c_str());
+#else
     ::setenv("CUEMOL_TBB_THREADS", n.c_str(), 1);
+#endif
     std::printf("cuetty: %s render threads (%s)\n", n.c_str(), src);
     std::fflush(stdout);
 }
