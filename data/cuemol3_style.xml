@@ -34,86 +34,166 @@
        file, or in a scene's style set, with the same tag. -->
   <palette id="default_paint" value="okabeito"/>
 
+  <!-- Menu names of the themes: a theme is offered in the Paint coloring
+       menu when it has a label here and at least one <theme>_<n> colour.
+       Each colour's menu name is the <palette_color_label> beside it (the
+       palette's own name where it has one: Okabe-Ito, Paul Tol; a
+       descriptive one for ColorBrewer and Tableau); a colour without one is
+       listed by its number. -->
+  <palette_label id="okabeito" value="Okabe-Ito"/>
+  <palette_label id="tolbright" value="Tol bright"/>
+  <palette_label id="tolvibrant" value="Tol vibrant"/>
+  <palette_label id="tolmuted" value="Tol muted"/>
+  <palette_label id="tollight" value="Tol light"/>
+  <palette_label id="brewerset2" value="Brewer Set2"/>
+  <palette_label id="brewerdark2" value="Brewer Dark2"/>
+  <palette_label id="tableau10" value="Tableau 10"/>
+
   <!-- Okabe-Ito (Color Universal Design), without its black -->
   <color id="okabeito_1" value="#E69F00"/>
+  <palette_color_label id="okabeito_1" value="Orange"/>
   <color id="okabeito_2" value="#56B4E9"/>
+  <palette_color_label id="okabeito_2" value="Sky blue"/>
   <color id="okabeito_3" value="#009E73"/>
+  <palette_color_label id="okabeito_3" value="Bluish green"/>
   <color id="okabeito_4" value="#F0E442"/>
+  <palette_color_label id="okabeito_4" value="Yellow"/>
   <color id="okabeito_5" value="#0072B2"/>
+  <palette_color_label id="okabeito_5" value="Blue"/>
   <color id="okabeito_6" value="#D55E00"/>
+  <palette_color_label id="okabeito_6" value="Vermillion"/>
   <color id="okabeito_7" value="#CC79A7"/>
+  <palette_color_label id="okabeito_7" value="Reddish purple"/>
 
   <!-- Paul Tol, bright -->
   <color id="tolbright_1" value="#4477AA"/>
+  <palette_color_label id="tolbright_1" value="Blue"/>
   <color id="tolbright_2" value="#EE6677"/>
+  <palette_color_label id="tolbright_2" value="Red"/>
   <color id="tolbright_3" value="#228833"/>
+  <palette_color_label id="tolbright_3" value="Green"/>
   <color id="tolbright_4" value="#CCBB44"/>
+  <palette_color_label id="tolbright_4" value="Yellow"/>
   <color id="tolbright_5" value="#66CCEE"/>
+  <palette_color_label id="tolbright_5" value="Cyan"/>
   <color id="tolbright_6" value="#AA3377"/>
+  <palette_color_label id="tolbright_6" value="Purple"/>
   <color id="tolbright_7" value="#BBBBBB"/>
+  <palette_color_label id="tolbright_7" value="Grey"/>
 
   <!-- Paul Tol, vibrant -->
   <color id="tolvibrant_1" value="#0077BB"/>
+  <palette_color_label id="tolvibrant_1" value="Blue"/>
   <color id="tolvibrant_2" value="#33BBEE"/>
+  <palette_color_label id="tolvibrant_2" value="Cyan"/>
   <color id="tolvibrant_3" value="#009988"/>
+  <palette_color_label id="tolvibrant_3" value="Teal"/>
   <color id="tolvibrant_4" value="#EE7733"/>
+  <palette_color_label id="tolvibrant_4" value="Orange"/>
   <color id="tolvibrant_5" value="#CC3311"/>
+  <palette_color_label id="tolvibrant_5" value="Red"/>
   <color id="tolvibrant_6" value="#EE3377"/>
+  <palette_color_label id="tolvibrant_6" value="Magenta"/>
   <color id="tolvibrant_7" value="#BBBBBB"/>
+  <palette_color_label id="tolvibrant_7" value="Grey"/>
 
   <!-- Paul Tol, muted -->
   <color id="tolmuted_1" value="#332288"/>
+  <palette_color_label id="tolmuted_1" value="Indigo"/>
   <color id="tolmuted_2" value="#88CCEE"/>
+  <palette_color_label id="tolmuted_2" value="Cyan"/>
   <color id="tolmuted_3" value="#44AA99"/>
+  <palette_color_label id="tolmuted_3" value="Teal"/>
   <color id="tolmuted_4" value="#117733"/>
+  <palette_color_label id="tolmuted_4" value="Green"/>
   <color id="tolmuted_5" value="#999933"/>
+  <palette_color_label id="tolmuted_5" value="Olive"/>
   <color id="tolmuted_6" value="#DDCC77"/>
+  <palette_color_label id="tolmuted_6" value="Sand"/>
   <color id="tolmuted_7" value="#CC6677"/>
+  <palette_color_label id="tolmuted_7" value="Rose"/>
   <color id="tolmuted_8" value="#882255"/>
+  <palette_color_label id="tolmuted_8" value="Wine"/>
   <color id="tolmuted_9" value="#AA4499"/>
+  <palette_color_label id="tolmuted_9" value="Purple"/>
 
   <!-- Paul Tol, light -->
   <color id="tollight_1" value="#77AADD"/>
+  <palette_color_label id="tollight_1" value="Light blue"/>
   <color id="tollight_2" value="#99DDFF"/>
+  <palette_color_label id="tollight_2" value="Light cyan"/>
   <color id="tollight_3" value="#44BB99"/>
+  <palette_color_label id="tollight_3" value="Mint"/>
   <color id="tollight_4" value="#BBCC33"/>
+  <palette_color_label id="tollight_4" value="Pear"/>
   <color id="tollight_5" value="#AAAA00"/>
+  <palette_color_label id="tollight_5" value="Olive"/>
   <color id="tollight_6" value="#EEDD88"/>
+  <palette_color_label id="tollight_6" value="Light yellow"/>
   <color id="tollight_7" value="#EE8866"/>
+  <palette_color_label id="tollight_7" value="Orange"/>
   <color id="tollight_8" value="#FFAABB"/>
+  <palette_color_label id="tollight_8" value="Pink"/>
   <color id="tollight_9" value="#DDDDDD"/>
+  <palette_color_label id="tollight_9" value="Pale grey"/>
 
   <!-- ColorBrewer, Set2 -->
   <color id="brewerset2_1" value="#66C2A5"/>
+  <palette_color_label id="brewerset2_1" value="Teal"/>
   <color id="brewerset2_2" value="#FC8D62"/>
+  <palette_color_label id="brewerset2_2" value="Salmon"/>
   <color id="brewerset2_3" value="#8DA0CB"/>
+  <palette_color_label id="brewerset2_3" value="Periwinkle"/>
   <color id="brewerset2_4" value="#E78AC3"/>
+  <palette_color_label id="brewerset2_4" value="Pink"/>
   <color id="brewerset2_5" value="#A6D854"/>
+  <palette_color_label id="brewerset2_5" value="Lime green"/>
   <color id="brewerset2_6" value="#FFD92F"/>
+  <palette_color_label id="brewerset2_6" value="Yellow"/>
   <color id="brewerset2_7" value="#E5C494"/>
+  <palette_color_label id="brewerset2_7" value="Tan"/>
   <color id="brewerset2_8" value="#B3B3B3"/>
+  <palette_color_label id="brewerset2_8" value="Grey"/>
 
   <!-- ColorBrewer, Dark2 -->
   <color id="brewerdark2_1" value="#1B9E77"/>
+  <palette_color_label id="brewerdark2_1" value="Teal"/>
   <color id="brewerdark2_2" value="#D95F02"/>
+  <palette_color_label id="brewerdark2_2" value="Orange"/>
   <color id="brewerdark2_3" value="#7570B3"/>
+  <palette_color_label id="brewerdark2_3" value="Purple"/>
   <color id="brewerdark2_4" value="#E7298A"/>
+  <palette_color_label id="brewerdark2_4" value="Magenta"/>
   <color id="brewerdark2_5" value="#66A61E"/>
+  <palette_color_label id="brewerdark2_5" value="Green"/>
   <color id="brewerdark2_6" value="#E6AB02"/>
+  <palette_color_label id="brewerdark2_6" value="Mustard"/>
   <color id="brewerdark2_7" value="#A6761D"/>
+  <palette_color_label id="brewerdark2_7" value="Brown"/>
   <color id="brewerdark2_8" value="#666666"/>
+  <palette_color_label id="brewerdark2_8" value="Grey"/>
 
   <!-- Tableau 10 -->
   <color id="tableau10_1" value="#4E79A7"/>
+  <palette_color_label id="tableau10_1" value="Blue"/>
   <color id="tableau10_2" value="#F28E2B"/>
+  <palette_color_label id="tableau10_2" value="Orange"/>
   <color id="tableau10_3" value="#E15759"/>
+  <palette_color_label id="tableau10_3" value="Red"/>
   <color id="tableau10_4" value="#76B7B2"/>
+  <palette_color_label id="tableau10_4" value="Teal"/>
   <color id="tableau10_5" value="#59A14F"/>
+  <palette_color_label id="tableau10_5" value="Green"/>
   <color id="tableau10_6" value="#EDC948"/>
+  <palette_color_label id="tableau10_6" value="Yellow"/>
   <color id="tableau10_7" value="#B07AA1"/>
+  <palette_color_label id="tableau10_7" value="Purple"/>
   <color id="tableau10_8" value="#FF9DA7"/>
+  <palette_color_label id="tableau10_8" value="Pink"/>
   <color id="tableau10_9" value="#9C755F"/>
+  <palette_color_label id="tableau10_9" value="Brown"/>
   <color id="tableau10_10" value="#BAB0AC"/>
+  <palette_color_label id="tableau10_10" value="Grey"/>
 
   <!-- AlphaFold confidence: the B-factor column of an AlphaFold model holds
        pLDDT (0-100), coloured along ChimeraX's "alphafold" colormap

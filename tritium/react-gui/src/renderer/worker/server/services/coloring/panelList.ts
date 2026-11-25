@@ -12,6 +12,8 @@ import type { MolCoord } from '@cuemol/core/src/wrappers/MolCoord';
 import type { WorkerContext } from '@renderer/worker/server/types/WorkerContext';
 import { getSceneOrNull } from '@renderer/worker/server/services/helpers/sceneResolver';
 import { fetchStyleEntries } from '@renderer/worker/server/services/helpers/styleEntries';
+import { listPaintThemes } from '@renderer/worker/server/services/helpers/defPaintColoring';
+import { MOLCOL_STYLE_NAME } from '@shared/coloring/paintChoiceMenu';
 import {
     getMolFromRenderer,
     getMolSel,
@@ -36,16 +38,34 @@ import type {
 const PAINT_RE = /Paint$/;
 
 /**
- * Style whose name ends in `Paint` but whose coloring is not a PaintColoring:
- * it is `SolidColoring` + `defaultcolor="$molcol"`, i.e. "take the colour from
- * the molecule". Its `desc` is "Default", which read in the Paint submenu as
- * the plain PaintColoring the object branch offers -- and since it is also the
- * default style of the ribbon / cartoon / tube renderers, picking it there was
- * a no-op. The submenu offers the real PaintColoring under "Default" instead,
- * so this one is listed under what it actually does.
+ * CueMol1's default paint. The Paint coloring menu offers it as "CueMol1
+ * default", a PaintColoring of the same colours (so an object can take it
+ * too), instead of this style.
  */
-const MOLCOL_STYLE_NAME = 'DefaultHSCPaint';
-const MOLCOL_STYLE_LABEL = 'Molecule color';
+const CUEMOL1_STYLE_NAME = 'WoodyHSCPaint';
+
+/** Styles kept out of the preset list (each has its own menu item). */
+const NOT_PRESET: ReadonlySet<string> = new Set([MOLCOL_STYLE_NAME, CUEMOL1_STYLE_NAME]);
+
+/**
+ * Menu order of the stock single-hue presets (`data/default_style.xml`), by
+ * hue. The style manager lists names alphabetically (Blue, Cyan, ...).
+ * Styles not listed here (a user's own) follow, in the order listed.
+ */
+const PRESET_ORDER: readonly string[] = [
+    'RedHSCPaint',
+    'OrangeHSCPaint',
+    'YellowHSCPaint',
+    'GreenHSCPaint',
+    'CyanHSCPaint',
+    'BlueHSCPaint',
+    'PurpleHSCPaint',
+];
+
+function presetRank(name: string): number {
+    const i = PRESET_ORDER.indexOf(name);
+    return i < 0 ? PRESET_ORDER.length : i;
+}
 
 /**
  * Collect style names ending in `Paint` for the renderer Coloring submenu's
@@ -64,12 +84,13 @@ export function getPaintColoringStyles(
     const entries: PaintColoringStyleEntry[] = [];
     for (const raw of merged) {
         const name = typeof raw?.name === 'string' ? raw.name : '';
-        if (!name || !PAINT_RE.test(name)) continue;
+        if (!name || !PAINT_RE.test(name) || NOT_PRESET.has(name)) continue;
         const desc = typeof raw?.desc === 'string' ? raw.desc : '';
-        const label = name === MOLCOL_STYLE_NAME ? MOLCOL_STYLE_LABEL : desc || name;
-        entries.push({ name, label });
+        entries.push({ name, label: desc || name });
     }
-    return { ok: true, entries };
+    // Array.prototype.sort is stable: unlisted styles keep their order.
+    entries.sort((a, b) => presetRank(a.name) - presetRank(b.name));
+    return { ok: true, entries, themes: listPaintThemes(ctx, args.sceneId) };
 }
 
 /** The CPK styles the renderer Coloring submenu offers beside the Paint ones. */
@@ -87,7 +108,13 @@ export const PLDDT_COLORING_STYLE = 'AlphaFoldPlddtColoring';
  */
 export function coloringStyleNames(ctx: WorkerContext, sceneId: number): string[] {
     const paint = getPaintColoringStyles(ctx, { sceneId });
-    return [...(paint.ok ? paint.entries.map((e) => e.name) : []), ...CPK_COLORING_STYLES, PLDDT_COLORING_STYLE];
+    return [
+        MOLCOL_STYLE_NAME,
+        CUEMOL1_STYLE_NAME,
+        ...(paint.ok ? paint.entries.map((e) => e.name) : []),
+        ...CPK_COLORING_STYLES,
+        PLDDT_COLORING_STYLE,
+    ];
 }
 
 /**

@@ -12,6 +12,7 @@
  */
 
 import type { MenuNode } from '../menuNodes'
+import { MOLCOL_COLORING_ID, paintChoiceMenu } from '../coloring/paintChoiceMenu'
 import type { RendColoringId, SceneCtxAction, SceneCtxMenuPayload, SceneCtxNodeType } from '../types/sceneCtxMenu'
 
 export type SceneCtxNode = MenuNode<SceneCtxAction>
@@ -70,10 +71,11 @@ export function pasteItem(
 /**
  * Renderer Coloring submenu.
  *
- * Static coloring items plus a dynamic "Paint (Secondary str.)"
- * sub-submenu populated from `payload.paintStyles`. Hidden entirely for
- * renderer types that do not support a `coloring` property (gated by the
- * renderer-supplied `supportsColoring` flag).
+ * "Molecule color" (follow the molecule's colouring, the default of the
+ * ribbon-like renderers), the "Paint (Secondary str.)" sub-submenu shared
+ * with the Coloring panel (`paintChoiceMenu`), then the fixed schemes.
+ * Hidden entirely for renderer types that do not support a `coloring`
+ * property (gated by the renderer-supplied `supportsColoring` flag).
  */
 export function coloringSubmenu(payload: SceneCtxMenuPayload): SceneCtxNode[] {
     if (!payload.supportsColoring) return []
@@ -81,18 +83,18 @@ export function coloringSubmenu(payload: SceneCtxMenuPayload): SceneCtxNode[] {
         label,
         action: { kind: 'setRendColoring', coloringId },
     })
-    const submenu: SceneCtxNode[] = []
-    const paintStyles = payload.paintStyles ?? []
-    if (paintStyles.length > 0) {
-        submenu.push({
+    const submenu: SceneCtxNode[] = [
+        item('Molecule color', MOLCOL_COLORING_ID),
+        {
             label: 'Paint (Secondary str.)',
-            submenu: paintStyles.map((s) => ({
-                label: s.label,
-                action: { kind: 'setRendColoring', coloringId: `style-${s.name}` },
-            })),
-        })
-        submenu.push({ type: 'separator' })
-    }
+            submenu: paintChoiceMenu(
+                payload.paintThemes ?? [],
+                payload.paintStyles ?? [],
+                (coloringId): SceneCtxAction => ({ kind: 'setRendColoring', coloringId }),
+            ),
+        },
+        { type: 'separator' },
+    ]
     submenu.push(
         item('CPK molcol', 'style-DefaultCPKColoring'),
         item('CPK dark gray', 'style-DarkCPKColoring'),

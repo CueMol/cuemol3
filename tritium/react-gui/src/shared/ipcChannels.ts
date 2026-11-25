@@ -199,6 +199,10 @@ export const IPC = {
   // invoke channel for native scene-tree context menu (ScenePane right-click)
   SCENE_CTX_SHOW: 'scene-ctx:show',
 
+  // invoke channel for a native popup of any shared MenuNode tree (a pane's
+  // dropdown menu on macOS; see renderer/shell/menu/usePopupMenu.ts)
+  POPUP_MENU_SHOW: 'popup-menu:show',
+
   // CueMol scene / paint clipboard on the real OS clipboard. Main owns the
   // encoding so the payload can interoperate with the UXP CueMol2 app; the
   // renderer only relays bytes between the worker and these channels.

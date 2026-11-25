@@ -23,6 +23,11 @@ import { getMolFromRenderer, getObjectColoringClassName } from '@renderer/worker
 import type { MolCoord } from '@cuemol/core/src/wrappers/MolCoord'
 import type { Renderer } from '@cuemol/core/src/wrappers/Renderer'
 import { getSceneOrNull } from '@renderer/worker/server/services/helpers/sceneResolver'
+import {
+  listPaintThemes,
+  PAINT_CHOICE_CUEMOL1,
+  PAINT_CHOICE_CUEMOL2,
+} from '@renderer/worker/server/services/helpers/defPaintColoring'
 import type { RendColoringId } from '@shared/types/sceneCtxMenu'
 import { normalizeServiceResult } from '@renderer/worker/shared/serviceResult'
 import { NO_OBJECT, NO_RENDERER } from '../errors'
@@ -245,7 +250,9 @@ export const getColoringStyles = defineOp({
   expose: { tool: 'coloring', console: true },
   group: 'coloring',
   run(ctx, _args, oc) {
-    return { ok: true, data: { styles: coloringStyleNames(ctx, oc.sceneId) } }
+    const paintThemes = listPaintThemes(ctx, oc.sceneId)
+      .map((t) => ({ theme: t.theme, label: t.label, colors: t.colors.map((c) => c.name) }))
+    return { ok: true, data: { styles: coloringStyleNames(ctx, oc.sceneId), paintThemes } }
   },
 })
 
@@ -255,8 +262,8 @@ export const setRendererColoringOp = defineOp({
     'Colour one renderer, or an object (the colouring its renderers take by default; style ' +
     'names are for renderers only). Either give a mode -- cpk (by element), rainbow (along the chain), ' +
     'bfac (by B-factor), solid (one colour), resetdef (back to the default), paint (a paint table ' +
-    'by secondary structure, to add_paint to), multigrad (a map or surface renderer coloured by a ' +
-    'map through a gradient) -- or a style name from list_coloring_styles.',
+    'by secondary structure, to add_paint to; paintColor picks its main colour), multigrad (a map or ' +
+    'surface renderer coloured by a map through a gradient) -- or a style name from list_coloring_styles.',
   params: {
     ...coloringTarget('to colour'),
     mode: enumOf(
@@ -265,6 +272,13 @@ export const setRendererColoringOp = defineOp({
     ),
     styleName: optional(
       string('Style name from list_coloring_styles. Required when mode is "style", otherwise null.'),
+    ),
+    paintColor: optional(
+      string(
+        'For mode paint-type-paint only: a palette theme colour from list_coloring_styles paintThemes ' +
+        '(e.g. okabeito_3) to paint with, or cuemol2 / cuemol1 for those versions\' fixed colours. ' +
+        'Null picks the colour automatically.',
+      ),
     ),
   },
   mutates: true,
@@ -288,6 +302,18 @@ export const setRendererColoringOp = defineOp({
         }
       }
       coloringId = `style-${styleName}`
+    } else if (args.mode === 'paint-type-paint' && args.paintColor) {
+      const pc = args.paintColor
+      if (pc === PAINT_CHOICE_CUEMOL2) coloringId = 'paint-type-paint-cuemol2'
+      else if (pc === PAINT_CHOICE_CUEMOL1) coloringId = 'paint-type-paint-cuemol1'
+      else if (listPaintThemes(ctx, oc.sceneId).some((t) => t.colors.some((c) => c.name === pc))) {
+        coloringId = `paint-theme-${pc}`
+      } else {
+        return {
+          ok: false,
+          error: `No palette colour named "${pc}". Call list_coloring_styles for paintThemes.`,
+        }
+      }
     } else {
       coloringId = args.mode as RendColoringId
     }
