@@ -210,7 +210,7 @@ void ResiToppar::addMainCh(const std::list<LString> &rmembs)
 
 bool ResiToppar::isSideCh(const LString &aname) const
 {
-  // if undefined, all atom is main chain atom
+  // if undefined, no atom is side chain atom
   if (m_pSideChAtoms==NULL)
     return false;
 
@@ -224,9 +224,9 @@ bool ResiToppar::isSideCh(const LString &aname) const
 
 bool ResiToppar::isMainCh(const LString &aname) const
 {
-  // if undefined, all atom is main chain atom
+  // if undefined, no atom is main chain atom (same as isSideCh)
   if (m_pMainChAtoms==NULL)
-    return true;
+    return false;
 
   std::vector<LString>::const_iterator iter =
     std::find(m_pMainChAtoms->begin(), m_pMainChAtoms->end(), aname);
