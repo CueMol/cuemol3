@@ -2,7 +2,7 @@
 // The selection matches atom names against the sidech / mainch lists of
 // data/nucl_props.xml as they are, without resolving aliases: the thymine
 // methyl group (C7) and the phosphate oxygens (OP1 OP2) used to be missing
-// from those lists.
+// from those lists. A residue without the lists (water) is in neither set.
 
 #include <gtest/gtest.h>
 #include <common.h>
@@ -47,6 +47,8 @@ std::string dtResidue()
         pdb += line;
         ++serial;
     }
+    // a water: its topology (mono_top.xml) defines no main / side chain list
+    pdb += "HETATM   99  O   HOH A 101       9.000   9.000   9.000  1.00  0.00           O\n";
     pdb += "END\n";
     return pdb;
 }
@@ -75,6 +77,7 @@ TEST(NuclSideMainChain, ThymineMethylAndPhosphateOxygens)
     auto *pTM = molstr::TopparManager::getInstance();
     ASSERT_TRUE(pTM->readPrmTop((dataDir / "nucl_top.xml").string().c_str(), "xml"));
     ASSERT_TRUE(pTM->readPrmTop((dataDir / "nucl_props.xml").string().c_str(), "xml"));
+    ASSERT_TRUE(pTM->readPrmTop((dataDir / "mono_top.xml").string().c_str(), "xml"));
 
     qsys::ScenePtr pScene = qsys::SceneManager::getInstance()->createScene();
     const std::string pdb = dtResidue();
@@ -91,6 +94,7 @@ TEST(NuclSideMainChain, ThymineMethylAndPhosphateOxygens)
     EXPECT_EQ(main.count("OP1"), 1u);
     EXPECT_EQ(main.count("OP2"), 1u);
     EXPECT_EQ(main.count("C7"), 0u);
+    EXPECT_EQ(main.count("O"), 0u);  // water
 
     qsys::SceneManager::getInstance()->destroyScene(pScene->getUID());
 }

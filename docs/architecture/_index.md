@@ -74,6 +74,9 @@ architecture, it belongs here.
   (GUI の選択の追加・Selection Builder・console の dialect) を、C++ の構文木に同値な書き換え規則を繰り返して
   短くし、再コンパイルできる文字列に戻す (`SelSimplifier`、`SelCommand::simplify`)。規則の一覧、同一性の判定と
   書き戻しの方針、簡単にする場所、context menu の Invert / Toggle sidechain / Around を構文木で行うこと。
+- [主鎖・側鎖の選択 (`bymainch` / `bysidech`)](selection-main-side-chain.md) (日本語) -- 原子名とトポロジーの
+  mainch / sidech リストの完全一致で判定すること、リストの無い残基 (水など) はどちらにも選ばれないこと、
+  核酸のリストに並べる原子名の表記ゆれ (チミンのメチル基、リン酸の酸素)。
 - [Op catalog と console (native / PyMOL / ChimeraX dialect)](op-catalog.md) (日本語) --
   AI agent の tool と console のコマンドを生成する core の op catalog。`.qif` 型に合わせた param DSL と
   意味型 (node 名・property path・selection)、`invokeOp` / `runInTxn`、agent の toolset と
