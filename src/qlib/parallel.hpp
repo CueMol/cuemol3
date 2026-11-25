@@ -8,7 +8,8 @@
 // Runtime control (no rebuild needed): the CUEMOL_TBB_THREADS environment
 // variable caps the number of worker threads. Set it to 1 to run effectively
 // serially (useful for A/B timing against the parallel path); set it to N to
-// use N threads; leave it unset for the default (all cores).
+// use N threads; leave it unset for the default (all cores). qlib::init()
+// applies it, so it has to be set before then (cuetty sets it from --threads).
 //
 
 #ifndef QLIB_PARALLEL_HPP

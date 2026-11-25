@@ -163,13 +163,19 @@ public:
 
   void flush() override {
     MB_ASSERT(m_fp!=NULL);
-    ::fflush(m_fp);
+    if (::fflush(m_fp)!=0)
+      MB_THROW(IOException, "Cannot flush file: " + m_origFname);
   }
 
+  // fclose writes out what is still buffered, so a full disk or an exceeded
+  // quota often shows up only here; report it rather than leave a silently
+  // truncated file behind.
   void o_close() override {
     if (m_fp==NULL) return;
-     ::fclose(m_fp);
+    const int res = ::fclose(m_fp);
     m_fp = NULL;
+    if (res!=0)
+      MB_THROW(IOException, "Cannot write file: " + m_origFname);
   }
 
   ///////////////////////

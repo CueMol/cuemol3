@@ -337,6 +337,7 @@ add_executable(test_importers
   modules/importers/test_pickle_instream.cpp
   modules/importers/test_sdfmolwriter.cpp
   modules/importers/test_mmcif_struct_conn.cpp
+  modules/importers/test_scene_load_errors.cpp
 )
 target_include_directories(test_importers PRIVATE
   ${CMAKE_SOURCE_DIR}/src
@@ -346,6 +347,7 @@ target_include_directories(test_importers PRIVATE
 )
 target_compile_definitions(test_importers PRIVATE
   CUEMOL2_SYSCONFIG_PATH="${CMAKE_SOURCE_DIR}/data/sysconfig.xml"
+  CUEMOL2_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/test_data"
 )
 target_link_libraries(test_importers PRIVATE importers surface symm xtal mdtools molvis molstr qsys gfx qlib Boost::filesystem GTest::gtest)
 if (BUILD_OPENGL_SYSDEP)

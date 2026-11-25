@@ -93,8 +93,15 @@ install(TARGETS cuetty
 set_target_properties(cuetty PROPERTIES
   VS_DEBUGGER_ENVIRONMENT "PATH=${BOOST_LIBRARYDIR};${CMAKE_PREFIX_PATH}/bin;%PATH%")
 
-set_target_properties(cuetty PROPERTIES
-  INSTALL_RPATH "@executable_path/../lib")
+# libcuemol2 and the Boost libraries sit in <prefix>/lib, so an installed (or
+# unpacked) tree runs from any location without LD_LIBRARY_PATH.
+if (APPLE)
+  set_target_properties(cuetty PROPERTIES
+    INSTALL_RPATH "@executable_path/../lib")
+else ()
+  set_target_properties(cuetty PROPERTIES
+    INSTALL_RPATH "$ORIGIN/../lib")
+endif ()
 
 # set_target_properties(cuetty PROPERTIES
 #   BUILD_RPATH "${Python3_LIBRARY_DIRS}"
