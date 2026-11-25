@@ -9,8 +9,8 @@
 #   - the scene's animation in two shards written to separate directories,
 #     each of which must hold exactly the frames of its own range (a shard
 #     that rendered every frame, or none, fails);
-#   - four shards started at once into one new directory, which together
-#     must leave every frame.
+#   - four shards started at once into one directory, which together must
+#     leave every frame; and a missing output directory must fail.
 #
 # Pixel values are not compared: they change with every umbreon change.
 #
@@ -44,6 +44,12 @@ fi
 # Movie in two shards. 1 s at 8 fps = frames 0-8: shard 0/2 is 0-4, 1/2 is 5-8.
 MOVIE_OPTS=(--input "$SCENE" --fps 8 --width 64 --height 64)
 "$CUETTY" "${MOVIE_OPTS[@]}" --list-frames --shard 0/2
+# The output directory must exist: cuetty does not create it.
+if "$CUETTY" "${MOVIE_OPTS[@]}" --movie "$WORK/missing/movie" --shard 0/2; then
+    echo "ERROR: rendering into a missing directory succeeded" >&2
+    exit 1
+fi
+mkdir -p "$WORK/s0" "$WORK/s1" "$WORK/shared"
 "$CUETTY" "${MOVIE_OPTS[@]}" --movie "$WORK/s0/movie" --shard 0/2
 "$CUETTY" "${MOVIE_OPTS[@]}" --movie "$WORK/s1/movie" --shard 1/2
 
@@ -61,19 +67,17 @@ expect_frames()
 expect_frames "$WORK/s0" 0 4
 expect_frames "$WORK/s1" 5 8
 
-# An array job starts its tasks together, and they all create the same
-# output directory: start four shards at once into one that does not exist
-# yet. (This catches the race only when the timing hits it, as it did on a
-# real cluster; it never fails a correct build.)
+# An array job starts its tasks together, writing into one directory: start
+# four shards at once.
 pids=()
 for i in 0 1 2 3; do
-    "$CUETTY" "${MOVIE_OPTS[@]}" --movie "$WORK/shared/sub/movie" --shard $i/4 &
+    "$CUETTY" "${MOVIE_OPTS[@]}" --movie "$WORK/shared/movie" --shard $i/4 &
     pids+=($!)
 done
 for pid in "${pids[@]}"; do
     wait "$pid"
 done
-expect_frames "$WORK/shared/sub" 0 8
+expect_frames "$WORK/shared" 0 8
 
 rm -rf "$WORK"
 echo "cuetty portable check: OK"

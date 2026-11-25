@@ -201,7 +201,7 @@ render settings, `--width` / `--height`, and the animation's own camera.
 
 | Option | Default | Description |
 |---|---|---|
-| `--movie <dir>/<base>` | -- | Output directory (created if missing) and base name. |
+| `--movie <dir>/<base>` | -- | Output directory and base name. The directory must exist (cuetty does not create it). |
 | `--fps <n>` | 30 | Frame rate. The frame count is the animation length times this, plus one. |
 | `--no-last-frame` | off | Leave out the last frame, for a movie that loops (it equals the first). |
 | `--frames A-B` | all | Render frames A to B (inclusive, 0-based). |
@@ -230,6 +230,12 @@ CUETTY=$HOME/cuetty-<version>-linux-x64/bin/cuetty
 $CUETTY --input scene.qsc --movie frames/movie --fps 30 \
     --shard $SLURM_ARRAY_TASK_ID/$SLURM_ARRAY_TASK_COUNT
 ```
+
+Create the output directory before submitting (`mkdir -p frames; sbatch movie.sh`).
+cuetty does not create it: the tasks of an array job start together, and on
+NFS a task on one node may not yet see a directory that a task on another
+node has just made (Linux 6.15 and later keep the cached "no such name" after
+mkdir fails with EEXIST), so creating it from every task is not reliable.
 
 Number the array from 0 with no gaps (`--array=0-3`): `--array=1-4` would make
 the parts 1/4 to 4/4 and leave out part 0. Each task uses the CPUs it was

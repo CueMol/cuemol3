@@ -6,10 +6,8 @@
 
 #include "render_scene.hpp"
 
-#include <chrono>
 #include <cstdio>
 #include <string>
-#include <thread>
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
@@ -179,43 +177,6 @@ void shardRange(int count, int i, int n, int &first, int &last)
     last = first + base + (i < rem ? 1 : 0) - 1;
 }
 
-/// Create the output directory that every shard of an array job creates at
-/// the same time. Another task may make it first, so mkdir fails with EEXIST:
-/// that is success. On NFS the directory made from another node may then stay
-/// invisible here for a moment (the client caches that the name does not
-/// exist), so wait until it shows, for a few seconds at most, before writing
-/// into it. Found on a Slurm cluster with /home on NFS. A path that is a
-/// file fails.
-bool ensureOutputDir(const fs::path &dir)
-{
-    // Retry the create, not only the check: with nested new directories the
-    // EEXIST may have come from a parent that another task made.
-    for (int i = 0; i < 50; ++i) {
-        boost::system::error_code ec;
-        fs::create_directories(dir, ec);
-        if (!ec) return true;
-        if (ec != boost::system::errc::file_exists) {
-            LOG_DPRINTLN("render> cannot create output directory %s: %s",
-                         dir.string().c_str(), ec.message().c_str());
-            return false;
-        }
-        boost::system::error_code ec2;
-        if (fs::is_directory(dir, ec2)) return true;
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
-    boost::system::error_code ec3;
-    if (fs::exists(dir, ec3)) {
-        LOG_DPRINTLN("render> output path %s exists but is not a directory",
-                     dir.string().c_str());
-        return false;
-    }
-    // Still the cached "no such name": go on, the frame write reports a real
-    // failure.
-    LOG_DPRINTLN("render> output directory %s is not visible yet; going on",
-                 dir.string().c_str());
-    return true;
-}
-
 std::string frameFileName(const std::string &outBase, int frame)
 {
     char buf[32];
@@ -331,12 +292,24 @@ int renderMovieFrames(const std::string &qscPath, const RenderOpts &opts,
         return 0;
     }
 
-    // Shards of an array job start together and all create the same output
-    // directory (see ensureOutputDir).
-    const fs::path outDir = fs::path(movie.outBase).parent_path();
-    if (!outDir.empty() && !ensureOutputDir(outDir)) {
-        pAnimMgr->stop();
-        return 1;
+    // The output directory must exist already; cuetty does not create it.
+    // Every shard of an array job would create it at the same moment, and on
+    // NFS a shard on another node can then fail to see the directory another
+    // node just made (a cached "no such name" that mkdir's EEXIST does not
+    // clear on Linux 6.15 and later). Made once before the job is submitted,
+    // it is visible on every node. The GUI requires an existing folder too.
+    {
+        fs::path outDir = fs::path(movie.outBase).parent_path();
+        if (outDir.empty()) outDir = ".";
+        boost::system::error_code ec;
+        if (!fs::is_directory(outDir, ec)) {
+            pAnimMgr->stop();
+            LOG_DPRINTLN(
+                "render> output directory %s does not exist; create it before "
+                "rendering (for an array job, before submitting it)",
+                outDir.string().c_str());
+            return 1;
+        }
     }
 
     qsys::CameraPtr pCam = pScene->getCamera(startCam);

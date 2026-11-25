@@ -33,8 +33,8 @@ struct RenderOpts
 /// Options for rendering the frames of a scene's animation
 struct MovieOpts
 {
-    /// Output directory and base name: frame i is written to
-    /// "<outBase>_frm_<iiii>.png", the names the GUI uses
+    /// Output directory (which must exist) and base name: frame i is written
+    /// to "<outBase>_frm_<iiii>.png", the names the GUI uses
     std::string outBase;
 
     double fps = 30.0;
