@@ -436,3 +436,8 @@ architecture, it belongs here.
   0.8 s を超えたら、文言・経過秒数・バーのカードをどのタブでも見える位置に出す (入力は止めない)。
   service が呼び出しごとの `ctx.reportTask` で名乗る opt-in 方式、`invokeOp` / console の `runCommand` では名乗らない理由、
   transport の `subscribeLongTasks`、保存時間の大半が xz 圧縮という計測。
+
+- [cuetty の Linux 持ち運び版](cuetty-linux-portable.md) (日本語) -- ヘッドレスの計算ノード (RHEL 8 系を含む) で
+  umbreon の静止画と動画を描く `cuetty-<version>-linux-x64.tar.gz`。manylinux_2_28 でのビルドと glibc / CPU
+  (x86-64-v3) の下限、実行ファイルの位置からの設定探索、`--shard` で先頭から状態を進めて担当フレームだけ描く
+  分担の仕組み、読み込み・書き込みの失敗を終了コード 1 にする規則、`CUEMOL_TBB_THREADS` によるスレッド数、CI の確認。
