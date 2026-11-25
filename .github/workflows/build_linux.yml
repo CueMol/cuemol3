@@ -318,6 +318,9 @@ jobs:
         # libcuemol2's configure needs a Python >= 3.8 interpreter (code
         # generation); the image's own python3 is older.
         echo "/opt/python/cp312-cp312/bin" >> "$GITHUB_PATH"
+        # The checkout belongs to the runner user, not the container's root;
+        # the build reads the commit id with git (version.hpp).
+        git config --global --add safe.directory "$GITHUB_WORKSPACE"
         cd /tmp
         curl -fsSL --retry 3 -o bison.tar.xz https://ftpmirror.gnu.org/gnu/bison/bison-3.8.2.tar.xz
         tar xJf bison.tar.xz
