@@ -292,8 +292,21 @@ int renderMovieFrames(const std::string &qscPath, const RenderOpts &opts,
         return 0;
     }
 
+    // Shards of an array job start together and all create the same output
+    // directory. create_directories can fail with EEXIST when another process
+    // makes the directory between its check and its mkdir (seen with several
+    // Slurm tasks on one node), so only fail when there is no directory after.
     const fs::path outDir = fs::path(movie.outBase).parent_path();
-    if (!outDir.empty()) fs::create_directories(outDir);
+    if (!outDir.empty()) {
+        boost::system::error_code ec;
+        fs::create_directories(outDir, ec);
+        if (!fs::is_directory(outDir)) {
+            pAnimMgr->stop();
+            LOG_DPRINTLN("render> cannot create output directory %s: %s",
+                         outDir.string().c_str(), ec.message().c_str());
+            return 1;
+        }
+    }
 
     qsys::CameraPtr pCam = pScene->getCamera(startCam);
     ExporterPtr pExporter = makeExporter(pScene, opts, pCam->isPerspec());

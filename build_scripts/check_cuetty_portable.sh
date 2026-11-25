@@ -8,7 +8,9 @@
 #     background only (the embedded data was actually read);
 #   - the scene's animation in two shards written to separate directories,
 #     each of which must hold exactly the frames of its own range (a shard
-#     that rendered every frame, or none, fails).
+#     that rendered every frame, or none, fails);
+#   - four shards started at once into one new directory, which together
+#     must leave every frame.
 #
 # Pixel values are not compared: they change with every umbreon change.
 #
@@ -58,6 +60,20 @@ expect_frames()
 }
 expect_frames "$WORK/s0" 0 4
 expect_frames "$WORK/s1" 5 8
+
+# An array job starts its tasks together, and they all create the same
+# output directory: start four shards at once into one that does not exist
+# yet. (This catches the race only when the timing hits it, as it did on a
+# real cluster; it never fails a correct build.)
+pids=()
+for i in 0 1 2 3; do
+    "$CUETTY" "${MOVIE_OPTS[@]}" --movie "$WORK/shared/sub/movie" --shard $i/4 &
+    pids+=($!)
+done
+for pid in "${pids[@]}"; do
+    wait "$pid"
+done
+expect_frames "$WORK/shared/sub" 0 8
 
 rm -rf "$WORK"
 echo "cuetty portable check: OK"

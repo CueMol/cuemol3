@@ -377,7 +377,7 @@ int internal_main(int argc, const char *argv[])
         return rc;
     }
 
-    printf("=== Terminated normaly ===\n");
+    printf("=== Terminated normally ===\n");
     return 0;
 }
 

@@ -28,6 +28,9 @@ Requirements:
 - An **x86-64-v3 CPU** (AVX2, FMA, BMI1/2: Intel Haswell / AMD Zen or later).
   cuetty checks this at start-up and exits with status 1 on an older CPU.
 - No GPU and no display. The OIDN denoiser runs on the CPU.
+- Memory: a 1200x1200 image at the default settings (supersampling 3, GI
+  with the OIDN denoiser) peaked at about 3 GB; it grows with the pixel
+  count times the supersampling. Size `--mem` of a job from that.
 
 **Get the scene's data onto the node.** A `.qsc` refers to the files its
 molecules came from unless they were embedded when it was saved. Save the

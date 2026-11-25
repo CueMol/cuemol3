@@ -211,7 +211,9 @@ int fini_qlib() noexcept
 {
     try {
         qlib::fini();
-        std::cerr << "=== Terminated normaly ===" << std::endl;
+        // Debug log only: the caller reports how the program ended (cuetty
+        // printed this too, and on an error both lines appeared).
+        MB_DPRINTLN("=== qlib::fini() OK ===");
     } catch (const qlib::LException &e) {
         LOG_DPRINTLN("fini_qlib> Caught exception <%s>", typeid(e).name());
         LOG_DPRINTLN("fini_qlib> Reason: %s", e.getMsg().c_str());
