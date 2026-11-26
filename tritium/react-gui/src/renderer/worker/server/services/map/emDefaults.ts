@@ -116,13 +116,40 @@ function setMapCenterToView(scene: Scene, rend: unknown): boolean {
     try {
         const view = scene.getView(uid) as View | null;
         if (!view) return false;
+        return setRendCenterToView(view, rend);
+    } catch (e) {
+        log.warn('[worker] setMapCenterToView: view lookup failed:', e);
+        return false;
+    }
+}
+
+/** Point one map renderer's display box at `view`'s centre. */
+function setRendCenterToView(view: View, rend: unknown): boolean {
+    try {
         const center = (view as unknown as { getViewCenter(): unknown }).getViewCenter();
         if (!center) return false;
         (rend as Bag).center = center;
         return true;
     } catch (e) {
-        log.warn('[worker] setMapCenterToView: center write failed:', e);
+        log.warn('[worker] setRendCenterToView: center write failed:', e);
         return false;
+    }
+}
+
+/**
+ * Draw every renderer of a crystallographic map around `view`'s centre (the
+ * "Set map center" policy), for a map fetched into a scene whose model is
+ * already on screen: Get PDB loads the coordinates first and centres the view
+ * on them, so the map comes to the model instead of the view going to the
+ * unit cell.
+ */
+export function setMapRenderersCenterToView(obj: unknown, view: View): void {
+    const o = obj as { getRendCount?: () => number; getRendererByIndex?: (i: number) => unknown };
+    if (typeof o.getRendCount !== 'function' || typeof o.getRendererByIndex !== 'function') return;
+    const n = o.getRendCount();
+    for (let i = 0; i < n; ++i) {
+        const rend = o.getRendererByIndex(i);
+        if (rend) setRendCenterToView(view, rend);
     }
 }
 
