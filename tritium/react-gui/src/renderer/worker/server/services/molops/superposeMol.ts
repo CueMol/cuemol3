@@ -13,6 +13,10 @@
  * `MolSuperposeDialog` (via `ObjectSelect` + `MolSelList`); this service only
  * performs the C++ mutation so it can be wrapped in a single undo step.
  *
+ * The result carries the statistics C++ keeps for the superposition
+ * (`getLastSuperposeJSON`: RMSD, aligned residues or atoms, rotation, and
+ * the TM-scores for US-align), which the `superpose` op prints.
+ *
  * The UXP "Write RMSD info file" feature (LSQ-only `calcRMSD` to a file) is
  * intentionally not ported yet -- it needs a native save dialog. See the
  * superposition ADR for the deferral.
@@ -28,7 +32,7 @@ import { getSceneOrNull, getViewOrNull } from '@renderer/worker/server/services/
 import { makeSel } from '@renderer/worker/server/services/helpers/makeSel';
 import { withUndoTxn } from '../withUndoTxn';
 import { recordOp } from '@renderer/worker/server/actions/serviceOps';
-import type { SuperposeAlgo } from '@renderer/worker/shared/superposeTypes';
+import type { SuperposeAlgo, SuperposeStats } from '@renderer/worker/shared/superposeTypes';
 import { refuseTrajectory } from '@renderer/worker/server/services/helpers/refuseTrajectory';
 
 export type { SuperposeAlgo } from '@renderer/worker/shared/superposeTypes';
@@ -58,6 +62,20 @@ export interface SuperposeMolResult {
     ok: boolean;
     /** Populated with the failure reason when ok=false. */
     error?: string;
+    /** What the superposition achieved; absent when C++ reported nothing readable. */
+    stats?: SuperposeStats;
+}
+
+/** The statistics C++ kept for the superposition that just ran, if readable. */
+function readStats(mgr: MolAnlManager): SuperposeStats | undefined {
+    try {
+        const json = mgr.getLastSuperposeJSON();
+        if (!json) return undefined;
+        const v = JSON.parse(json) as SuperposeStats;
+        return typeof v.rmsd === 'number' && typeof v.nalgn === 'number' ? v : undefined;
+    } catch {
+        return undefined;
+    }
 }
 
 /**
@@ -129,10 +147,13 @@ export function superposeMol(
         return { ok: false, error: String(e) };
     }
 
+    // Read before anything else can run a superposition on the singleton.
+    const stats = readStats(mgr);
+
     if (args.autoRecenter) {
         const view = getViewOrNull(ctx, args.viewId);
         if (view) tryFitView2(mov, view as unknown as View, msel);
     }
 
-    return { ok: true };
+    return stats ? { ok: true, stats } : { ok: true };
 }

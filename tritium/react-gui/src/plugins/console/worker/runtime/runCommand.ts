@@ -138,6 +138,25 @@ interface Submission {
   /** A scene command the run stopped at, and what followed it (CmdContext.requestScene). */
   sceneRequest?: SceneRequest
   rest?: string
+  /**
+   * `deferAtEnd` commands the submission ends with, held until its
+   * transaction has committed (`runDeferred`).
+   */
+  deferred: DeferredCall[]
+  /** How many qax files are running; a command inside one is never deferred. */
+  qaxDepth: number
+}
+
+/** A command held until the transaction has committed. */
+interface DeferredCall {
+  spec: ConsoleCommand
+  bound: Record<string, string>
+}
+
+/** Why a command cannot follow a held one, which has to end the submission. */
+function afterDeferredError(held: DeferredCall): string {
+  return `Error: ${held.spec.name} must come at the end of the script; ` +
+    'the commands after it cannot run in the same transaction'
 }
 
 /** The command a line names in this dialect, as its syntax reads it. */
@@ -197,7 +216,16 @@ function qaxRunner(sub: Submission, depth: number): QaxRunner {
   return {
     ctx: sub.ctx,
     cmdContext: () => cc,
-    runLine: (text) => runLines(sub, sub.dialect.syntax.split(text), depth + 1),
+    runLine: async (text) => {
+      // A qax file run alone on its line never reaches runText's end, where
+      // held commands run, so nothing inside one is held.
+      sub.qaxDepth += 1
+      try {
+        return await runLines(sub, sub.dialect.syntax.split(text), depth + 1)
+      } finally {
+        sub.qaxDepth -= 1
+      }
+    },
     error: (text) => sub.sink.push('error', text),
   }
 }
@@ -207,6 +235,9 @@ function qaxRunner(sub: Submission, depth: number): QaxRunner {
  * other commands on the line): its actions become part of this one.
  */
 async function runQaxInline(sub: Submission, resolved: string, depth: number): Promise<CmdOutcome> {
+  // Its actions do not all pass through runLines, which keeps a held
+  // command last; refuse here instead.
+  if (sub.deferred.length > 0) return { ok: false, error: afterDeferredError(sub.deferred[0]) }
   const refusal = scriptRefusal(sub.dialect, resolved)
   if (refusal !== null) return { ok: false, error: refusal }
   const doc = readQaxFile(resolved)
@@ -320,9 +351,16 @@ async function runLines(sub: Submission, commands: DialectLine[], depth: number)
       return false
     }
     const bound = result.args
-    // A lone one of these was handled before the transaction opened.
-    if (spec.outsideTxn?.(bound)) {
-      sink.push('error', `Error: this ${spec.name} must be the only command on the line`)
+    // A lone one of these was handled before the transaction opened; one
+    // that may end a script is held until the transaction has committed.
+    const outside = spec.outsideTxn?.(bound) ?? false
+    const defer = outside && spec.deferAtEnd === true && sub.qaxDepth === 0
+    if (outside && !defer) {
+      sink.push('error', `Error: this ${spec.name} must be the only command on the line; run it on its own after the script`)
+      return false
+    }
+    if (!defer && sub.deferred.length > 0) {
+      sink.push('error', afterDeferredError(sub.deferred[0]))
       return false
     }
 
@@ -330,6 +368,10 @@ async function runLines(sub: Submission, commands: DialectLine[], depth: number)
     // runs the script again.
     if (depth === 0 && !cmd.quiet && !spec.unlogged) {
       if (!writeLog(cmd.display)) sink.push('warning', 'Warning: the log file could not be written; logging stopped')
+    }
+    if (defer) {
+      sub.deferred.push({ spec, bound })
+      continue
     }
 
     let commandMutated = false
@@ -366,6 +408,45 @@ async function runLines(sub: Submission, commands: DialectLine[], depth: number)
     }
     // The panel does the scene command, then submits the rest itself.
     if (sub.sceneRequest) return true
+  }
+  return true
+}
+
+/**
+ * Run one command that cannot run inside a transaction, with none open: alone
+ * on its line (`runStandalone`), or held until a submission's transaction has
+ * committed (`runDeferred`). A failure is printed to `sink`.
+ */
+async function runOutsideTxn(
+  ctx: WorkerContext,
+  args: RunCommandArgs,
+  dir: WorkDir,
+  sink: EntrySink,
+  spec: ConsoleCommand,
+  bound: Record<string, string>,
+): Promise<{ outcome: CmdOutcome; openScene?: string }> {
+  let openScene: string | undefined
+  const cc = makeCmdContext(args, dir, sink, {
+    markMutated: () => undefined,
+    runScript: () => Promise.resolve({ ok: false, error: 'Error: a script cannot run from here' }),
+    openScene: (filePath) => { openScene = filePath },
+    requestScene: () => false,
+  })
+  const outcome = await runExclusive(() => runSpec(spec, ctx, bound, cc))
+  if (!outcome.ok && outcome.error !== '') sink.push('error', outcome.error)
+  return openScene !== undefined ? { outcome, openScene } : { outcome }
+}
+
+/**
+ * Run the commands a submission held (`deferAtEnd`), in order, now that its
+ * transaction has committed. The first failure stops the rest.
+ *
+ * @returns whether every one ran.
+ */
+async function runDeferred(sub: Submission): Promise<boolean> {
+  for (const held of sub.deferred) {
+    const { outcome } = await runOutsideTxn(sub.ctx, sub.args, sub.dir, sub.sink, held.spec, held.bound)
+    if (!outcome.ok) return false
   }
   return true
 }
@@ -417,15 +498,7 @@ async function runStandalone(
   echo()
   if (!cmd.quiet) writeLog(cmd.display)
   const sink = new EntrySink(entries)
-  let openScene: string | undefined
-  const cc = makeCmdContext(args, dir, sink, {
-    markMutated: () => undefined,
-    runScript: () => Promise.resolve({ ok: false, error: 'Error: a script cannot run from here' }),
-    openScene: (filePath) => { openScene = filePath },
-    requestScene: () => false,
-  })
-  const outcome = await runExclusive(() => runSpec(spec, ctx, bound, cc))
-  if (!outcome.ok) sink.push('error', outcome.error)
+  const { outcome, openScene } = await runOutsideTxn(ctx, args, dir, sink, spec, bound)
   return ok({
     entries,
     mutated: false,
@@ -472,6 +545,7 @@ async function runQaxStandalone(
   const entries: ConsoleEntry[] = []
   const sub: Submission = {
     dialect, ctx, args, entries, sink: new EntrySink(entries), mutated: false, interrupted: false, dir: workDirFor(args),
+    deferred: [], qaxDepth: 0,
   }
   if (!cmd.quiet) entries.push({ kind: 'echo', text: `${dialect.meta.prompt} ${cmd.display}` })
   const cwdOut = (): { cwd?: string } => (args.cwd !== undefined ? { cwd: sub.dir.get() } : {})
@@ -539,6 +613,7 @@ async function runWithoutScene(
   const entries: ConsoleEntry[] = []
   const sub: Submission = {
     dialect, ctx, args, entries, sink: new EntrySink(entries), mutated: false, interrupted: false, dir: workDirFor(args),
+    deferred: [], qaxDepth: 0,
   }
   beginRun(args.runId)
   let completed: boolean
@@ -654,6 +729,8 @@ async function runText(
     mutated: false,
     interrupted: false,
     dir: workDirFor(args),
+    deferred: [],
+    qaxDepth: 0,
   }
 
   beginRun(args.runId)
@@ -671,6 +748,8 @@ async function runText(
   } finally {
     endRun(args.runId)
   }
+  // A failed or stopped run saves nothing.
+  if (completed && sub.deferred.length > 0) completed = await runDeferred(sub)
 
   return ok({
     entries,

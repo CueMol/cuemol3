@@ -163,6 +163,7 @@ export const saveSceneOp = defineOp({
   expose: { tool: false, console: true, mcp: true },
   group: 'files',
   outsideTxn: () => true,
+  deferAtEnd: true,
   aliases: [{ name: 'save', summary: 'Save the scene: save ~/work/session.qsc' }],
   run(ctx, args, oc) {
     const target = outputPath(oc, args.path, '.qsc')

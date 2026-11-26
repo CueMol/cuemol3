@@ -279,6 +279,29 @@ TEST_F(SSMSuperposeTest, UsePropSetsXformMatNotRawCoords)
     expectCoordsNear(collectCAPos(mov), refCA, 1.0e-2);
 }
 
+// getLastSuperposeJSON reports the statistics of the superposition that just
+// ran (here LSQ, whose numbers are known exactly), and a superposition that
+// fails clears the previous one's so a caller cannot read stale numbers.
+TEST_F(SSMSuperposeTest, LastSuperposeJSONReportsTheLastRun)
+{
+    MolCoordPtr ref = loadCrambin("ref");
+    MolCoordPtr mov = loadCrambin("mov");
+    mov->xformByMat(makeKnownXform());
+    const int nCA = static_cast<int>(collectCAPos(ref).size());
+
+    auto *mgr = molanl::MolAnlManager::getInstance();
+    mgr->superposeLSQ1(ref, caSel(), mov, caSel(), false);
+
+    const LString js = mgr->getLastSuperposeJSON();
+    EXPECT_TRUE(js.startsWith("{\"algo\":\"LSQ\",\"rmsd\":0.0000")) << js.c_str();
+    EXPECT_GE(js.indexOf(LString::format("\"nalgn\":%d,", nCA)), 0) << js.c_str();
+    EXPECT_GE(js.indexOf("\"rotation\":35.0"), 0) << js.c_str();
+
+    // Selections of different sizes cannot be paired atom for atom.
+    EXPECT_ANY_THROW(mgr->superposeLSQ1(ref, caSel(), mov, supSel(), false));
+    EXPECT_TRUE(mgr->getLastSuperposeJSON().isEmpty());
+}
+
 // A residue modelled with two residue types at one position
 // (microheterogeneity, as 1EJG has PRO/SER at 22 and LEU/ILE at 25) must not
 // break SSM. The alternate-location atom of the second type used to reach

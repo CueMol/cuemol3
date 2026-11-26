@@ -57,6 +57,12 @@ export interface PaintRendererSelectionArgs {
     rendId: number;
     /** CueMol color value string, e.g. "#FFF", "hsb(0, 1.0, 1.0)". */
     colorValue: string;
+    /**
+     * The atoms to paint, as a selection expression. Given (the add_paint
+     * op), it is compiled and the molecule's current selection is left
+     * alone; omitted (the Paint menu), the current selection is painted.
+     */
+    selStr?: string;
 }
 
 export interface PaintRendererSelectionResult {
@@ -78,6 +84,12 @@ export interface PaintObjectSelectionArgs {
     objId: number;
     /** CueMol color value string, e.g. "#FFF", "hsb(0, 1.0, 1.0)". */
     colorValue: string;
+    /**
+     * The atoms to paint, as a selection expression. Given (the add_paint
+     * op), it is compiled and the molecule's current selection is left
+     * alone; omitted (the Paint menu), the current selection is painted.
+     */
+    selStr?: string;
 }
 
 export interface PaintObjectSelectionResult {

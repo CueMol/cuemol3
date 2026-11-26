@@ -11,15 +11,12 @@ import { createRendererOnObject } from '@renderer/worker/server/services/rend/cr
 import type { MapCenterPolicy } from '@renderer/worker/shared/fileOpenTypes'
 import { changeRendererType as changeRendererTypeService } from '@renderer/worker/server/services/rend/changeRendererType'
 import { getRendererChangeTypes } from '@renderer/worker/server/services/rend/getRendererChangeTypes'
-import {
-  coloringStyleNames,
-  getRendererPaintInfo,
-} from '@renderer/worker/server/services/coloring/panelList'
+import { coloringStyleNames } from '@renderer/worker/server/services/coloring/panelList'
 import { setGenericProp } from '@renderer/worker/server/services/props/write'
 import { setColoringProp, setRendererColoring } from '@renderer/worker/server/services/coloring/applyColoring'
 import { paintObjectSelection, paintRendererSelection } from '@renderer/worker/server/services/coloring/paintCrud'
-import { applyMolSelString } from '@renderer/worker/server/services/select/applyMolSelString'
-import { getMolFromRenderer, getObjectColoringClassName } from '@renderer/worker/server/services/coloring/colorTargets'
+import { getSelHitCount } from '@renderer/worker/server/services/select/getSelHitCount'
+import { getColoringClassName, getMolFromRenderer, getObjectColoringClassName } from '@renderer/worker/server/services/coloring/colorTargets'
 import type { MolCoord } from '@cuemol/core/src/wrappers/MolCoord'
 import type { Renderer } from '@cuemol/core/src/wrappers/Renderer'
 import { getSceneOrNull } from '@renderer/worker/server/services/helpers/sceneResolver'
@@ -399,28 +396,21 @@ export const paintSelection = defineOp({
       return { ok: false, error: `That ${args.nodeType} is not on a MolCoord object, so it cannot be painted.` }
     }
 
-    // The paint service reads the region from the MolCoord object's current
-    // selection rather than taking it as an argument, so it has to be set
-    // first. This is a visible side effect: the user sees the selection
-    // change, the same as if they had made it by hand.
-    const applied = applyMolSelString(ctx, {
-      sceneId: oc.sceneId,
-      molId: mol.uid,
-      selStr: args.selection,
-    })
-    if (!applied.ok) {
-      return {
-        ok: false,
-        error: 'That selection could not be applied. Check it with count_selection.',
-      }
-    }
+    // The expression goes to the paint service as it is; the molecule's own
+    // selection is left alone, so a script does not end with its last paint
+    // highlighted. Checked before the colouring is switched below, so a bad
+    // expression changes nothing.
+    const hits = getSelHitCount(ctx, { sceneId: oc.sceneId, molId: mol.uid, selStr: args.selection }).count
+    if (hits === null) return { ok: false, error: 'That selection could not be read. Check it with count_selection.' }
+    if (hits === 0) return { ok: false, error: 'That selection matches no atoms. Check it with count_selection.' }
 
     // Painting needs a PaintColoring to insert into; anything else has no
     // per-selection entries. Switching costs the renderer's previous
-    // colouring, which is why it is only done when it is not one already.
-    const canPaint = onObject
-      ? getObjectColoringClassName(mol) === 'PaintColoring'
-      : getRendererPaintInfo(ctx, { sceneId: oc.sceneId, rendId: args.nodeId }).canPaint
+    // colouring (and the colours painted so far), which is why it is decided
+    // by the colouring class alone -- not by the Paint menu's gate, which
+    // also wants a current selection.
+    const coloringClass = onObject ? getObjectColoringClassName(mol) : getColoringClassName(node as Renderer)
+    const canPaint = coloringClass === 'PaintColoring'
     if (!canPaint) {
       const switched = setRendererColoring(ctx, { ...target, coloringId: 'paint-type-paint' })
       if (!switched.ok) {
@@ -429,8 +419,8 @@ export const paintSelection = defineOp({
     }
 
     const painted = onObject
-      ? paintObjectSelection(ctx, { sceneId: oc.sceneId, objId: args.nodeId, colorValue: args.color })
-      : paintRendererSelection(ctx, { sceneId: oc.sceneId, rendId: args.nodeId, colorValue: args.color })
+      ? paintObjectSelection(ctx, { sceneId: oc.sceneId, objId: args.nodeId, colorValue: args.color, selStr: args.selection })
+      : paintRendererSelection(ctx, { sceneId: oc.sceneId, rendId: args.nodeId, colorValue: args.color, selStr: args.selection })
     if (!painted.ok) {
       return {
         ok: false,

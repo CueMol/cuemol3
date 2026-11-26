@@ -490,6 +490,7 @@ function opCommand(op: AnyOp, alias?: OpAlias): ConsoleCommand {
     // The file a load op opens lists what it can open first.
     completions: names.map((n) => completionOf(params[n], related(params), n === filesParam)),
     ...(op.outsideTxn ? { outsideTxn: (bound: Record<string, string>) => op.outsideTxn?.(loneFile(bound)) ?? false } : {}),
+    ...(op.deferAtEnd ? { deferAtEnd: true } : {}),
     async run(ctx, bound, cc): Promise<CmdOutcome> {
       /** One run of the op; the reason it failed, or null. */
       const runOnce = async (b: Readonly<Record<string, string>>, label?: string): Promise<string | null> => {

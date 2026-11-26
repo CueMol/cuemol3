@@ -157,7 +157,7 @@ export interface AnimElementTypeProps {
   ignorecenter?: boolean;
   ignorezoom?: boolean;
   ignoreslab?: boolean; // CamMotion
-  rend?: string; // ShowHideAnim / SlideInOutAnim
+  rend?: string; // ShowHideAnim / SlideInOutAnim / RealPropAnim / RendXformAnim
   hide?: boolean;
   fade?: boolean;
   tgtAlpha?: number; // ShowHideAnim
@@ -165,7 +165,7 @@ export interface AnimElementTypeProps {
   distance?: number; // SlideInOutAnim
   mol?: string;
   startValue?: number;
-  endValue?: number; // MolAnim
+  endValue?: number; // MolAnim / RealPropAnim
 }
 
 /**

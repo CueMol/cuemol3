@@ -20,6 +20,7 @@ import { withUndoTxn } from '@renderer/worker/server/services/withUndoTxn'
 import { DEFAULT_SCENE_STYLE_SET } from '@renderer/worker/server/services/select/saveSelDef'
 import { normalizeServiceResult } from '@renderer/worker/shared/serviceResult'
 import { DEFAULT_SUPERPOSE_ALGO, USALIGN_PIVOTS } from '@renderer/worker/shared/superposeTypes'
+import type { SuperposeStats } from '@renderer/worker/shared/superposeTypes'
 import { failedWith } from '../errors'
 import { defineOp } from '../op'
 import type { OpOutcome } from '../op'
@@ -36,6 +37,18 @@ const SURF_PROBE = 1.4
 /** Secondary structure kinds, in `MolAnlManager.setProt2ndry` order. */
 const SEC_TYPES = ['coil', 'strand', 'helix', 'helix310', 'helixpi'] as const
 
+/** The line `superpose` prints: how well the two fit, in the algorithm's own terms. */
+export function superposeStatsLine(s: SuperposeStats): string {
+  const over = s.algo === 'LSQ' ? `${s.nalgn} atoms` : `${s.nalgn} residues`
+  let line = `${s.algo}: RMSD ${s.rmsd.toFixed(2)} A over ${over}`
+  if (s.tm_ref !== undefined && s.tm_mov !== undefined) {
+    line += `, TM-score ${s.tm_ref.toFixed(3)} (ref) / ${s.tm_mov.toFixed(3)} (mov)`
+  }
+  if (s.seqid !== undefined) line += `, seq id ${Math.round(s.seqid * 100)}%`
+  if (s.rotation >= 0) line += `, rotated ${s.rotation.toFixed(1)} deg`
+  return line
+}
+
 export const superpose = defineOp({
   name: 'superpose',
   description:
@@ -43,7 +56,8 @@ export const superpose = defineOp({
     'the structural alignment itself and handles proteins and nucleic acids (RNA/DNA); SSM matches by ' +
     'secondary structure (proteins only); LSQ fits the selected atoms in order, so the ' +
     'two selections must pair up atom for atom (e.g. the same residues\' CA atoms). The moving ' +
-    'object\'s coordinates change.',
+    'object\'s coordinates change. Returns the fit: RMSD, the aligned residues (atoms for LSQ), the ' +
+    'rotation and, for USalign, the TM-scores.',
   params: {
     movId: objectId('Uid of the MolCoord object to move.', 'MolCoord'),
     refId: objectId('Uid of the reference MolCoord object, which stays put.', 'MolCoord'),
@@ -65,6 +79,7 @@ export const superpose = defineOp({
   describe: (_a, n) => `Superpose ${n('movId')} onto ${n('refId')}`,
   expose: { tool: 'molops', console: true },
   group: 'molecule',
+  format: (data) => (data && typeof data === 'object' && 'rmsd' in data ? [superposeStatsLine(data as SuperposeStats)] : []),
   async run(ctx, args, oc) {
     const algo = args.algo ?? DEFAULT_SUPERPOSE_ALGO
     const dflt = algo === 'LSQ' ? 'name CA' : '*'
@@ -80,7 +95,11 @@ export const superpose = defineOp({
       useprop: args.keepAsProperty ?? false,
       autoRecenter: args.recenter === true,
     })
-    return normalizeServiceResult(res, 'The superposition failed. Check the ids and selections.')
+    // A failure must stay a failure (CLI and MCP read ok); only a success
+    // carries the statistics.
+    const norm = normalizeServiceResult(res, 'The superposition failed. Check the ids and selections.')
+    if (!norm.ok) return norm
+    return res.stats ? { ok: true, data: res.stats } : { ok: true }
   },
 })
 
