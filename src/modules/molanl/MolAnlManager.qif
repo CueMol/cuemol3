@@ -42,6 +42,11 @@ runtime_class MolAnlManager
   /// Superpose LSQ
   void superposeLSQ1(object<MolCoord$> pmol_ref, object<MolSelection$> psel_ref, object<MolCoord$> pmol_mov, object<MolSelection$> psel_mov, boolean useprop);
 
+  /// Statistics of the last superposeUSalign1 / superposeSSM1 / superposeLSQ1 as JSON
+  /// (algo, rmsd, nalgn, rotation; USalign: tm_ref, tm_mov, seqid, nucleic; SSM: ngaps).
+  /// Empty when the last one failed.
+  string getLastSuperposeJSON();
+
   real calcRMSD(object<MolCoord$> pmol_ref, object<MolSelection$> psel_ref, object<MolCoord$> pmol_mov, object<MolSelection$> psel_mov, string path) => calcRMSDScr;
 
   //////////////////////////

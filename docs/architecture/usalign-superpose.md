@@ -60,6 +60,12 @@ string superposeUSalignJSON(MolCoord$ ref, MolSelection$ refSel, MolCoord$ mov, 
   undo は呼び出し側の txn で包む (SSM と同じ)
 - `superposeUSalignJSON` は何も動かさず、統計を JSON で返す:
   `{"tm_ref", "tm_mov", "rmsd", "nalgn", "seqid", "nucleic"}` (`tm_ref` は ref の長さで正規化した TM-score)
+- `getLastSuperposeJSON()` は、直前の `superposeUSalign1` / `superposeSSM1` / `superposeLSQ1` の統計を
+  JSON で返す (重ねたのと同じ計算の結果なので、統計のためにもう一度計算しない)。共通のキーは
+  `algo` / `rmsd` / `nalgn` (USalign・SSM は対応した残基数、LSQ は fit した原子数) / `rotation`
+  (回転角。度、求まらなければ -1)、USalign は加えて `tm_ref` / `tm_mov` / `seqid` / `nucleic`、SSM は `ngaps`。
+  各関数の先頭で空にし、成功したときだけ書くので、失敗 (例外) の後は空。singleton の状態なので、
+  呼んだ直後に読む
 - C++ からは `superposeUSalign_impl` が `usalign::Result` (TM-score 2 種, RMSD, 整列長, seqID,
   核酸かどうか, 整列文字列) を返す
 - 呼び出しのオプションは CLI の単量体の既定値と同じ (`-i`/`-a`/`-u`/`-d` なし、fast でない、
@@ -81,9 +87,14 @@ Python では `cuemol.mol_util.usalign_fit(ref, refSel, mov, movSel, pivot="auto
   (US-align 以外では disabled)。履歴 (`molSuperposeHistory.ts`) は `pivot` も保存し、既知の値でなければ
   既定 (`USalign` / `auto`) に戻す
 - **catalog op `superpose`**: `algo` の既定が USalign になり、`pivot` 引数 (enum) を持つ。既定の selection は
-  USalign / SSM が `*`、LSQ が `name CA`
+  USalign / SSM が `*`、LSQ が `name CA`。service (`superposeMol`) が重ねた直後に `getLastSuperposeJSON` を
+  読んで `stats` (`SuperposeStats`、`superposeTypes.ts`) として返し、op は成功時にそれを data にして
+  console には 1 行で出す (`USalign: RMSD 0.91 A over 46 residues, TM-score 0.893 (ref) / 0.893 (mov),
+  seq id 100%, rotated 82.3 deg`)。失敗 (selection の誤り、LSQ の原子数の不一致など) はエラーのまま返すので、
+  CLI / MCP に成功として届かない
 - **PyMOL 方言** `align` / `super`: US-align で重ね、`superposeUSalignJSON` の RMSD・整列残基数・TM-score を
-  表示する。`pair_fit` は LSQ のまま
+  表示する (`transform=0` で動かさずに出す経路があるので、`getLastSuperposeJSON` ではなくこちらを使う)。
+  `pair_fit` は LSQ のまま
 - dialog 内の旧来のボタン寸法規則 (`_dialog.css` の `.bp5-dialog-body .bp5-button`, 26px / `--fs-xl`) は
   `SegmentField` の segment を除外する (`.h3-form-btn` と同じ扱い)。これが無いと dialog の中でだけ
   segment が膨らむ

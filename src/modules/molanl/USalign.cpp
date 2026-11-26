@@ -197,11 +197,18 @@ Matrix4D MolAnlManager::superposeUSalign1(const MolCoordPtr &pmol_ref, const Sel
                                           const LString &pivot, bool bUseProp /*=false*/)
 {
   qsys::AutoStyleCtxt asc(pmol_ref->getSceneID());
+  m_lastSupJSON = LString();
 
   usalign::Result res =
       superposeUSalign_impl(pmol_ref, psel_ref, pmol_mov, psel_mov, pivot, true);
   const Matrix4D xfmat = toMatrix(res);
   applyXform(pmol_mov, xfmat, bUseProp);
+
+  m_lastSupJSON = LString::format(
+      "{\"algo\":\"USalign\",\"rmsd\":%.6f,\"nalgn\":%d,\"rotation\":%.6f,"
+      "\"tm_ref\":%.6f,\"tm_mov\":%.6f,\"seqid\":%.6f,\"nucleic\":%s}",
+      res.rmsd, res.nAligned, rotationDegree(xfmat),
+      res.tmRef, res.tmMov, res.seqId, res.nucleic ? "true" : "false");
   return xfmat;
 }
 

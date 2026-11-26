@@ -318,12 +318,28 @@ void *MolAnlManager::superposeSSM_impl(const MolCoordPtr &pmol_ref, const Select
   return pAln;
 }
 
+double MolAnlManager::rotationDegree(const Matrix4D &xfmat)
+{
+  const double e3 =  xfmat.aij(1,1) + xfmat.aij(2,2) + xfmat.aij(3,3) + 1.0;
+  if (e3<=0.0)
+    return -1.0;
+  // Clamp into acos() domain [-1,1] to avoid NaN from rounding/e3>4.
+  double cosv = sqrt(e3) * 0.5;
+  if (cosv > 1.0) cosv = 1.0;
+  else if (cosv < -1.0) cosv = -1.0;
+  const double phih = ::acos( cosv );
+  return qlib::toDegree(phih*2.0);
+}
+
 Matrix4D MolAnlManager::superposeSSM1(const MolCoordPtr &pmol_ref, const SelectionPtr &psel_ref,
 				      const MolCoordPtr &pmol_mov, const SelectionPtr &psel_mov, bool bUseProp/*=false*/)
 {
   qsys::AutoStyleCtxt asc(pmol_ref->getSceneID());
+  m_lastSupJSON = LString();
 
   Matrix4D xfmat;
+  double rmsd = 0.0;
+  int nalgn = 0, ngaps = 0;
   {
     CSSMAlign *pAln = (CSSMAlign *) superposeSSM_impl(pmol_ref, psel_ref, pmol_mov, psel_mov, True);
 
@@ -339,28 +355,26 @@ Matrix4D MolAnlManager::superposeSSM1(const MolCoordPtr &pmol_ref, const Selecti
     LOG_DPRINTLN(" Ngaps: %d", pAln->ngaps);
     //LOG_DPRINTLN(" Nres 1: %d 2: %d", pAln->nres1, pAln->nres2);
     //LOG_DPRINTLN(" Nsel 1: %d 2: %d", pAln->nsel1, pAln->nsel2);
+    rmsd = pAln->rmsd;
+    nalgn = pAln->nalgn;
+    ngaps = pAln->ngaps;
 
     delete pAln;
   }
   
-  {
-    const double e3 =  xfmat.aij(1,1) + xfmat.aij(2,2) + xfmat.aij(3,3) + 1.0;
-    if (e3>0.0) {
-      // Clamp into acos() domain [-1,1] to avoid NaN from rounding/e3>4.
-      double cosv = sqrt(e3) * 0.5;
-      if (cosv > 1.0) cosv = 1.0;
-      else if (cosv < -1.0) cosv = -1.0;
-      const double phih = ::acos( cosv );
-      LOG_DPRINTLN(" Rotation: %f degree", qlib::toDegree(phih*2.0));
-    }
-    else {
-      LOG_DPRINTLN(" Mat2Quat failed");
-    }
-  }
+  const double rot = rotationDegree(xfmat);
+  if (rot>=0.0)
+    LOG_DPRINTLN(" Rotation: %f degree", rot);
+  else
+    LOG_DPRINTLN(" Mat2Quat failed");
 
   LOG_DPRINTLN("========================");
 
   applyXform(pmol_mov, xfmat, bUseProp);
+
+  m_lastSupJSON = LString::format(
+      "{\"algo\":\"SSM\",\"rmsd\":%.6f,\"nalgn\":%d,\"ngaps\":%d,\"rotation\":%.6f}",
+      rmsd, nalgn, ngaps, rot);
   
   return xfmat;
 }
