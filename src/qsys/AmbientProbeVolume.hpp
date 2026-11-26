@@ -10,8 +10,8 @@
 // occludes). The shading side evaluates the cosine-weighted visibility around
 // a normal N as clamp(m0 + 2 * dot(m1, N), 0, 1) (1 when unoccluded, 1 for a
 // flat open surface). The grid is rebaked only when the scene geometry changes
-// (Scene::getOccluderGen); it spans the occluder spheres the renderers report
-// (Renderer::collectOcclusionSpheres).
+// (Scene::getOccluderGen); it spans the occluder bounds the renderers report
+// (Renderer::collectOccluderBounds).
 //
 
 #pragma once
@@ -56,11 +56,20 @@ public:
     /// Release the render targets; the next update bakes again.
     void release();
 
-    /// The occluder spheres the grid spans: those of the visible, opaque
-    /// renderers lit by a light (Renderer::collectOcclusionSpheres). A
+    /// The occluder bounds the grid spans: those of the visible, opaque
+    /// renderers lit by a light (Renderer::collectOccluderBounds). A
     /// translucent renderer (a veil) and one whose material has no diffuse
     /// and no specular light (nolighting, shadow) occlude nothing.
-    static void collectOccluderSpheres(const ScenePtr &pScene, std::vector<qlib::Vector4D> &sph);
+    static void collectOccluderBounds(const ScenePtr &pScene, std::vector<qlib::Vector4D> &sph);
+
+    /// Largest probe atlas side: the atlas is (nx * nz) x ny texels, which a
+    /// 3 A grid makes larger than the GL texture limit past ~380 A.
+    static constexpr int kMaxAtlasSize = 8192;
+
+    /// The probe spacing (>= spacing) that keeps the atlas of a grid spanning
+    /// extent[3] (A) plus pad probes on each side within maxAtlas: the larger
+    /// of the atlas width (nx * nz) and height (ny).
+    static double fitSpacing(const double extent[3], double spacing, int pad, int maxAtlas);
 
     /// The baked probes (nullptr before the first bake).
     gfx::RenderTarget *getAtlas() const;

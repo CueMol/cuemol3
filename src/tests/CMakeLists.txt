@@ -244,6 +244,7 @@ add_executable(test_surface
   modules/surface/test_reader_validation.cpp
   modules/surface/test_elepot_symop_fixes.cpp
   modules/surface/test_surf_atom_color.cpp
+  modules/surface/test_molsurf_occluder_bounds.cpp
 )
 target_include_directories(test_surface PRIVATE
   ${CMAKE_SOURCE_DIR}/src

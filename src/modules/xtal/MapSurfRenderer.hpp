@@ -17,6 +17,7 @@
 #include <modules/molstr/ColoringScheme.hpp>
 #include <modules/surface/MolSurfObj.hpp>
 #include <gfx/TrigGpuPrim.hpp>
+#include <qlib/Box3D.hpp>
 
 class MapSurfRenderer_wrap;
 
@@ -267,6 +268,10 @@ namespace xtal {
     /// line/point draw modes fall back to the display-list path
     void display(DisplayContext *pdc) override;
 
+    /// The box of the mesh cache in world coordinates (Fast GI probe bake
+    /// bounds), in fill mode only: line / dot modes occlude nothing.
+    void collectOccluderBounds(std::vector<qlib::Vector4D> &out) const override;
+
     /// Called just before this renderer is unloaded from the view
     void unloading() override;
 
@@ -333,6 +338,9 @@ namespace xtal {
     /// Mesh cache, flattened in slab order (empty + !m_bMeshCacheValid =
     /// rebuild needed)
     std::vector<CachedVert> m_meshCache;
+
+    /// Box of m_meshCache (cell-grid coordinates), for collectOccluderBounds
+    qlib::Box3D m_meshBox;
 
     /// Mesh cache validity (geometry level)
     bool m_bMeshCacheValid;
@@ -464,7 +472,11 @@ namespace xtal {
     Vector4D getGrdNorm2(int ix, int iy, int iz) const;
 
     void setupXformMat(DisplayContext *pdl);
+    /// m_xform = calcXformMat(m_pCMap)
     void setupXformMat();
+    /// Cell-grid -> world matrix of the mesh cache (as setupXformMat(pdl)),
+    /// for the map pMap and the current range start.
+    Matrix4D calcXformMat(ScalarObject *pMap) const;
 
   private:
     bool m_bGenSurfMode;

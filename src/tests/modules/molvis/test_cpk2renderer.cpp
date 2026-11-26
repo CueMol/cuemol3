@@ -88,12 +88,12 @@ TEST(CPK2RendererTest, ProbeGridSkipsLineAndUnlitRenderers)
     ASSERT_FALSE(pMol->createRenderer("simple").isnull());
 
     std::vector<qlib::Vector4D> sph;
-    qsys::AmbientProbeVolume::collectOccluderSpheres(pScene, sph);
+    qsys::AmbientProbeVolume::collectOccluderBounds(pScene, sph);
     EXPECT_EQ(sph.size(), 2u) << "the cpk atoms only";
 
     pCpk->setDefaultMaterial("nolighting");
     sph.clear();
-    qsys::AmbientProbeVolume::collectOccluderSpheres(pScene, sph);
+    qsys::AmbientProbeVolume::collectOccluderBounds(pScene, sph);
     EXPECT_TRUE(sph.empty());
 
     const qlib::uid_t uid = pScene->getUID();

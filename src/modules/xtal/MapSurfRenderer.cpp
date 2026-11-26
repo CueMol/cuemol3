@@ -686,6 +686,7 @@ void MapSurfRenderer::buildMeshCache()
 
   m_meshCache.clear();
   m_meshCache.reserve(nrec);
+  m_meshBox.setEmpty();
   for (size_t si=0; si<slabs.size(); ++si) {
     const MCVertBuf &buf = slabs[si];
     for (MCVertBuf::const_iterator it = buf.begin(); it != buf.end(); ++it) {
@@ -698,6 +699,7 @@ void MapSurfRenderer::buildMeshCache()
       cv.nz = (float) it->norm.z();
       cv.aid = -1;
       m_meshCache.push_back(cv);
+      m_meshBox.merge(it->pos);
     }
   }
 
@@ -1250,24 +1252,28 @@ bool MapSurfRenderer::updateGpuColors()
 
 void MapSurfRenderer::setupXformMat()
 {
-  ScalarObject *pMap = m_pCMap;
+  m_xform = calcXformMat(m_pCMap);
+}
+
+Matrix4D MapSurfRenderer::calcXformMat(ScalarObject *pMap) const
+{
   DensityMap *pXtal = dynamic_cast<DensityMap *>(pMap);
 
   // Apply the object's xform matrix first, to be consistent with
   // setupXformMat(pdl) used in the display-list path.
-  m_xform = pMap->getXformMatrix();
+  Matrix4D xf = pMap->getXformMatrix();
 
   // map origin (MRC ORIGIN for DensityMap; zero for crystallographic maps)
   {
     const Vector4D vorig = pMap->getOrigin();
     if (pXtal==NULL || !vorig.isZero3D())
-      m_xform.matprod( Matrix4D::makeTransMat(vorig) );
+      xf.matprod( Matrix4D::makeTransMat(vorig) );
   }
 
   //  setup frac-->orth matrix
   if (pXtal!=NULL) {
     Matrix3D orthmat = pXtal->getXtalInfo().getOrthMat();
-    m_xform.matprod( Matrix4D(orthmat) );
+    xf.matprod( Matrix4D(orthmat) );
   }
 
   {  
@@ -1282,12 +1288,29 @@ void MapSurfRenderer::setupXformMat()
                       pMap->getSecGridSize());
 
     //pdl->scale(vtmp);
-    m_xform.matprod( Matrix4D::makeScaleMat(vtmp) );
+    xf.matprod( Matrix4D::makeScaleMat(vtmp) );
 
     vtmp = Vector4D(m_nStCol, m_nStRow, m_nStSec);
     // pdl->translate(vtmp);
-    m_xform.matprod( Matrix4D::makeTransMat(vtmp) );
+    xf.matprod( Matrix4D::makeTransMat(vtmp) );
   }
+  return xf;
+}
+
+void MapSurfRenderer::collectOccluderBounds(std::vector<qlib::Vector4D> &out) const
+{
+  // Only the filled surface occludes: line / dot modes are drawn unlit and
+  // discarded in the probe bake.
+  if (m_nDrawMode!=MSRDRAW_FILL || !m_bMeshCacheValid || m_meshBox.isEmpty())
+    return;
+  // m_pCMap is cleared after each draw; the map comes from the client.
+  ScalarObject *pMap = getScalarObj();
+  if (pMap==NULL)
+    return;
+  // Cell-grid box -> world, as drawn: renderer xform * map xform.
+  Matrix4D xf = getXformMatrix();
+  xf.matprod(calcXformMat(pMap));
+  appendBoxCorners(m_meshBox.vstart, m_meshBox.vend, xf, out);
 }
 
 qsys::ObjectPtr MapSurfRenderer::generateSurfObj()

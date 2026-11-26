@@ -298,7 +298,7 @@ const std::vector<int> &MolRenderer::occlusionAtomIDs() const
   return m_occAids;
 }
 
-void MolRenderer::collectOcclusionSpheres(std::vector<qlib::Vector4D> &out) const
+void MolRenderer::collectOccluderBounds(std::vector<qlib::Vector4D> &out) const
 {
   MolCoordPtr pMol = getClientMol();
   if (pMol.isnull()) return;
