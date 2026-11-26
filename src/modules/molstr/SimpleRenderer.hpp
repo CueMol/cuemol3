@@ -121,8 +121,8 @@ public:
     const char *getTypeName() const override;
 
     /// Lines only (drawn without a normal): no occluder, so its atoms do not
-    /// widen the Fast GI probe grid (AmbientProbeVolume::collectOccluderSpheres).
-    void collectOcclusionSpheres(std::vector<qlib::Vector4D> &) const override {}
+    /// widen the Fast GI probe grid (AmbientProbeVolume::collectOccluderBounds).
+    void collectOccluderBounds(std::vector<qlib::Vector4D> &) const override {}
 
     //////////////////////////////////////////////////////
 

@@ -149,6 +149,8 @@ void MolSurfRenderer::render(DisplayContext *pdl)
     return;
   }
 
+  m_drawnBox.setEmpty();
+
   gfx::Mesh mesh;
   //mesh.setDefaultAlpha(getDefaultAlpha());
 
@@ -304,6 +306,11 @@ void MolSurfRenderer::render(DisplayContext *pdl)
 
     mesh.setFace(j, id[0], id[1], id[2]);
     ++j;
+    // The occluder bounds follow the faces drawn, not the vertices kept: a
+    // face with a vertex hidden by showsel is dropped above.
+    const MSFace &f = pSurf->getFaceAt(i);
+    for (int k : {f.id1, f.id2, f.id3})
+      m_drawnBox.merge(pSurf->getXformVertAt(k).v3d());
   }
   int nflast = j;
 
@@ -327,6 +334,13 @@ void MolSurfRenderer::render(DisplayContext *pdl)
   m_pMol = MolCoordPtr();
   m_pScaObj = NULL;
 
+}
+
+void MolSurfRenderer::collectOccluderBounds(std::vector<qlib::Vector4D> &out) const
+{
+  if (m_nDrawMode!=SFDRAW_FILL || m_drawnBox.isEmpty())
+    return;
+  appendBoxCorners(m_drawnBox.vstart, m_drawnBox.vend, getXformMatrix(), out);
 }
 
 Vector4D MolSurfRenderer::getCenter() const

@@ -133,11 +133,20 @@ namespace qsys {
     /// translucent veils are composited, so no veil colour lies over them.
     virtual bool isLabelOnTop() const { return false; }
 
-    /// Append the spheres this renderer draws as world-space occluders for the
-    /// baked ambient occlusion probes: (x, y, z) = centre, w = radius. They
-    /// set the probe grid bounds, collected once per bake (the bake itself
-    /// draws the real geometry). Default: none.
-    virtual void collectOcclusionSpheres(std::vector<qlib::Vector4D> &out) const {}
+    /// Append the world-space extent of what this renderer draws as an
+    /// occluder of the baked ambient occlusion probes, as spheres: (x, y, z)
+    /// = centre, w = radius (a mesh renderer gives the 8 corners of its box
+    /// with radius 0). They only set the probe grid and the bake camera
+    /// bounds, collected once per bake; the bake itself draws the real
+    /// geometry, so a renderer that reports nothing is clipped out of it.
+    /// Report only lit, filled triangles (a line or unlit drawing is
+    /// discarded in the bake and would only widen the grid). Default: none.
+    virtual void collectOccluderBounds(std::vector<qlib::Vector4D> &out) const {}
+
+    /// For a mesh renderer's collectOccluderBounds: append the 8 corners of
+    /// the box (vmin, vmax), transformed by xf, as radius-0 spheres.
+    static void appendBoxCorners(const qlib::Vector4D &vmin, const qlib::Vector4D &vmax,
+                                 const qlib::Matrix4D &xf, std::vector<qlib::Vector4D> &out);
 
     //////////
     // Hittest

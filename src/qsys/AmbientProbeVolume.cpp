@@ -69,7 +69,21 @@ void probeDir(int k, int nd, double d[3])
 
 }  // namespace
 
-void AmbientProbeVolume::collectOccluderSpheres(const ScenePtr &pScene,
+double AmbientProbeVolume::fitSpacing(const double extent[3], double spacing, int pad,
+                                      int maxAtlas)
+{
+    // Atlas layout (texel (x + z * nx, y)): see update().
+    double h = spacing;
+    for (int iter = 0; iter < 64; ++iter) {
+        int n[3];
+        for (int a = 0; a < 3; ++a) n[a] = int(std::ceil(extent[a] / h)) + 2 * pad;
+        if (std::max(n[0] * n[2], n[1]) <= maxAtlas) break;
+        h *= 1.1;
+    }
+    return h;
+}
+
+void AmbientProbeVolume::collectOccluderBounds(const ScenePtr &pScene,
                                                 std::vector<qlib::Vector4D> &sph)
 {
     for (auto oi = pScene->beginObj(); oi != pScene->endObj(); ++oi) {
@@ -85,7 +99,7 @@ void AmbientProbeVolume::collectOccluderSpheres(const ScenePtr &pScene,
             // and discarded in the bake (DisplayContext::setOccluderPass).
             const Scene::MaterialLight ml = pScene->getMaterialLight(pRend->getDefaultMaterial());
             if (ml.diffuse <= 0.0f && ml.specular <= 0.0f) continue;
-            pRend->collectOcclusionSpheres(sph);
+            pRend->collectOccluderBounds(sph);
         }
     }
 }
@@ -124,12 +138,12 @@ bool AmbientProbeVolume::update(gfx::DisplayContext *pdc, const ScenePtr &pScene
     m_bakedGen = gen;
     m_bakedSettings = settings;
 
-    // The occluder spheres give the grid bounds. Collecting them evaluates
+    // The occluder bounds give the grid bounds. Collecting them evaluates
     // every renderer's selection over its atoms (~60 ms for the 5 default
     // renderers of a 59k-atom structure), so it runs only here, once per bake.
     const auto t0 = std::chrono::steady_clock::now();
     std::vector<qlib::Vector4D> sph;
-    collectOccluderSpheres(pScene, sph);
+    collectOccluderBounds(pScene, sph);
     if (sph.empty()) {
         // Nothing to bake; stays so until the geometry changes.
         releaseTargets();
@@ -138,8 +152,8 @@ bool AmbientProbeVolume::update(gfx::DisplayContext *pdc, const ScenePtr &pScene
     const double collectMs =
         std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
 
-    // Grid placement: the bounds of the spheres plus 2 probes.
-    const double h = spacing;
+    // Grid placement: the bounds of the spheres plus 2 probes, the spacing
+    // widened when the atlas would exceed kMaxAtlasSize (a large map surface).
     const int PAD = 2;
     double lo[3] = {1e30, 1e30, 1e30}, hi[3] = {-1e30, -1e30, -1e30};
     for (const auto &v : sph) {
@@ -148,6 +162,8 @@ bool AmbientProbeVolume::update(gfx::DisplayContext *pdc, const ScenePtr &pScene
             hi[a] = std::max(hi[a], v.ai(a + 1) + v.w());
         }
     }
+    const double extent[3] = {hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]};
+    const double h = fitSpacing(extent, spacing, PAD, kMaxAtlasSize);
     gfx::ProbeBakeParams bp;
     double rad2 = 0.0;
     for (int a = 0; a < 3; ++a) {
@@ -266,7 +282,7 @@ bool AmbientProbeVolume::update(gfx::DisplayContext *pdc, const ScenePtr &pScene
     LOG_DPRINTLN("AO probes (GPU, %s): %d spheres (collected in %.0f ms), %dx%dx%d probes of "
                  "%.1f A, baked in %.0f ms (CPU side, GPU not awaited)",
                  settleSec > 0.0 ? "live" : "export", int(sph.size()), collectMs, m_dim[0],
-                 m_dim[1], m_dim[2], spacing, ms);
+                 m_dim[1], m_dim[2], h, ms);
     return true;
 }
 
