@@ -161,6 +161,12 @@ export interface ConsoleCommand {
    */
   outsideTxn?: (args: Record<string, string>) => boolean
   /**
+   * An `outsideTxn` command that may also end a script (or a line of several
+   * commands): it is held until the transaction has committed, then run.
+   * Not inside a qax file, whose replay never reaches that point.
+   */
+  deferAtEnd?: boolean
+  /**
    * `undo` / `redo`: the runtime runs a lone one outside the submission's
    * transaction, since it moves the undo stack; `run` is reached only when
    * one shares a line with other commands, where it cannot run.

@@ -175,6 +175,14 @@ export interface Op<P extends ParamMap = ParamMap> {
    */
   outsideTxn?(args: Readonly<Record<string, unknown>>): boolean
   /**
+   * An `outsideTxn` op a console script may end with: it is held until the
+   * script's transaction has committed and then run (`save_scene`, so a
+   * script can make a figure and save the scene). Only for an op that acts on
+   * the scene as it is when it runs; opening a scene is not one, since the
+   * window opens it only after the submission has answered.
+   */
+  deferAtEnd?: boolean
+  /**
    * Whether a successful call is kept in the action log although it does not
    * change the scene (`mutates` false): a change of view, which the undo
    * stack does not hold but which a replay has to repeat. A predicate for an
