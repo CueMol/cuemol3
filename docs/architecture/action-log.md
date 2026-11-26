@@ -135,8 +135,7 @@ helper)。
   二重にならない。
 - PyMOL / ChimeraX のコマンドは op を呼ぶので、呼んだ op の分だけ native の op が並ぶ。
   たとえば `show sticks` は `create_renderer ... name=pym:sticks, selection=...` と `set_renderer_styles`
-  として、`color red, resn ALA` は renderer ごとの `add_paint` と、元の選択に戻す `set_mol_selection`
-  として記録される。PyMOL の入力文字列は、内部データにも qax にも持たない。行の `label` (`pym: ...`)
+  として、`color red, resn ALA` は renderer ごとの `add_paint` として記録される。PyMOL の入力文字列は、内部データにも qax にも持たない。行の `label` (`pym: ...`)
   に残るだけ。
 
 対応している service:
@@ -164,7 +163,7 @@ helper)。
 | `applyRendererStyleList` (Edit Style ダイアログ) | `set_renderer_styles` (style の並び全体を `,` 区切りで) |
 | coloring scheme の property (`coloring/applyColoring.ts` の `setColoringProp`。Color pane の CPK / Rainbow / B-factor の欄) | `set_coloring_prop` (対象の renderer か object、property 名、値)。style から借りた着色なら、先にその node 専用の着色に切り替えてから書く (GUI と同じ) |
 | 着色 (`coloring/applyColoring.ts`、`colorTargets.ts`、`multiGrad.ts`) | `set_renderer_coloring` / `set_elepot_coloring` / `set_default_color`。coloring の target・elepot の property・multigrad の color map は `set_node_prop`。着色と paint の op は対象を `nodeId` + `nodeType` (`renderer` / `object`) で取るので、Color pane で object を対象にした変更も記録する (style と elepot は renderer のみ)。CPK の dark / light gray は CPK と `set_coloring_prop col_C` の 2 つ。既定の paint 表と multigrad への切り替えは `set_renderer_coloring` の mode `paint-type-paint` / `paint-type-multigrad`、multigrad の node の編集は `set_multigrad_nodes` (`"値 色; 値 色"`)。style は Paint の style と CPK の style (`DefaultCPKColoring` ほか。`list_coloring_styles` が両方を出す) |
-| paint の表 (`coloring/paintCrud.ts`、`paintClipboard.ts`) | `set_paint` / `remove_paint` (複数行は 1 行ずつ) / `move_paint` / `clear_paint`。行の挿入と貼り付けは行ごとの `add_paint_at` (挿入位置 `at`。`add_paint` と違い molecule の selection を変えない)。番号は 1 始まり |
+| paint の表 (`coloring/paintCrud.ts`、`paintClipboard.ts`) | `set_paint` / `remove_paint` (複数行は 1 行ずつ) / `move_paint` / `clear_paint`。行の挿入と貼り付けは行ごとの `add_paint_at` (挿入位置 `at`)。番号は 1 始まり |
 | 分子の編集 (`molops/`) | `rename_chain`、`renumber_residues`、`delete_atoms`、`merge_molecules`、`set_secondary_structure`、`create_surface` / `recalc_surface` (`backend` 付き)、`cut_surface`、`set_symmetry`、`show_symmetry`、`show_unit_cell`、`create_symmetry_copy` (operator の番号は表示範囲で変わるので 4x4 の行列で記録)、`analyze_interactions` (dialog の設定をすべて: 最小距離、最大の数、label set、2 つ目の object / selection) |
 | morph (`morph/morphMol.ts`) | `add_morph_frame` / `remove_morph_frame` / `convert_to_morph` |
 | APBS (`apbs/run.ts`) | `calc_elepot`。pot file を読む txn で記録する。温度・誘電率・水素の扱いも引数に入れる |

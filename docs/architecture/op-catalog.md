@@ -199,7 +199,17 @@ selection を selector として読む) のため)、`complete` (Tab。書き戻
 理由を返した知らないコマンドは、`Warning: <理由>; skipped` と出して飛ばし、残りを実行する (txn はそのまま 1 つ。
 今これを使うのは ChX: [console-chimerax-dialect](console-chimerax-dialect.md) §1)。
 lone `undo` / `redo` と `outsideTxn` のコマンドは txn の外、script は最大 8 段のネスト、Stop で
-ダウンロードも中断。
+ダウンロードも中断。`outsideTxn` のコマンドは他と同じ行・script に置けない (`Error: this <name> must be the
+only command on the line; run it on its own after the script`) が、op が `deferAtEnd` を持つもの
+(`save_scene` だけ) は投入の**末尾**に置ける: runtime はそれを txn の commit 後まで持ち越して順に実行する
+(`runCommand.ts` の `runDeferred`)。図を作って保存するまでを 1 本の script にするため。
+- 持ち越した後に通常のコマンドが来たら `must come at the end of the script` で止める。判定は
+  「持ち越しが空でない状態で通常のコマンドが来た」なので、入れ子の script でも投入全体の末尾かで決まる
+- txn が失敗・中断したら持ち越しは実行しない (保存しない)
+- qax の中 (`<cmd>`) では持ち越さず従来どおりエラー。qax を単独で流す経路は txn ごとに実行し、
+  持ち越しを実行する箇所を通らないため。持ち越しがある状態で qax を実行するのも同じ理由で断る
+- シーンファイルの `load_file` は持ち越さない: worker は `openScene` の要求を返すだけで、窓が開くのは
+  応答の後なので、後続の `save_scene` が開く前のシーンを保存してしまう
 terminal からは thin client `tritium_cli` で同じ runtime を使える (作業ディレクトリは client 側。
 [local-api-server.md](local-api-server.md) §5)。
 
@@ -359,13 +369,25 @@ Animation panel と element inspector が使う service をそのまま呼ぶの
 再生・停止・時刻移動は既存の `animate`。
 
 - `list_anims`: 長さ・再生状態・loop・開始カメラと、要素ごとの番号 (1 から)・名前・型・`#uid`・
-  絶対時刻 (相対時刻と追従先)。時刻の参照が解決しないときはその理由。
+  絶対時刻 (相対時刻と追従先)。時刻の参照が解決しないときはその理由。対象 (`rend` / `endcam` / `mol`)
+  が今のシーンで解決しない要素には `[No renderer "x".]` などを添える (保存後に renderer を消した場合など、
+  再生しても何も起きない要素)。
+- `list_anim_props element` (`anim_props`): 要素の property を `set_anim_prop` の名前と型で並べる表
+  (読んだ行をそのまま書き戻せる)。`startMs` / `endMs` は `set_anim_time` で書く相対時刻。見つからない対象には
+  `not found` を添える。inspector の読み出し (`getAnimElementDetail`) を使い、専用の inspector 欄の無い
+  `RealPropAnim` (`rend` / `startValue` / `endValue`) と `RendXformAnim` (`rend`) も読む。
 - `add_anim type [, name] [, before]`: `spin` / `camera` / `show` / `hide` / `slidein` / `slideout` /
   `mol` / `wait`。直前の要素に追従する (panel の追加と同じ)。
 - `remove_anim` / `move_anim element, by|to|end` / `set_anim_time element, startMs, endMs` (追従先からの相対 ms)。
 - `set_anim_prop element, prop, value`: inspector で書ける property (`name`、`timeRefName`、`disabled`、
   `quadric`、`angle`、`axis` (`"0 1 0"`)、`endcam`、`ignore*`、`rend`、`hide`、`fade`、`tgtAlpha`、
   `direction`、`distance`、`mol`、`startValue`、`endValue`)。値は property の型に変換する。
+  `rend` / `endcam` / `mol` は名前を再生時と同じ解決で確かめ、無ければエラーにする
+  (`services/anim/targets.ts` の `findMissingTarget`。C++ は名前を持つだけで再生時に引くので、打ち間違いは
+  黙って何も再生しない)。`rend` はカンマ区切りの `obj/rend` か object 名なしの `rend`
+  (`Object::getRendByName` / `Scene::getRendByName`。renderer group も引ける)、`endcam` は scene のカメラ、
+  `mol` は MorphMol の object。空は「なし」として通す。あとから作る renderer を先に指定したいときは
+  検証しない `set_anim_generic_prop` を使う。
 - `set_anim_options [loop] [, startCamera]`。
 - 要素は `list_anims` の番号、`#uid`、名前で指定する (同名が複数なら番号か uid を求める)。
   `list_morph_frames` などの番号も同じく 1 から。
@@ -382,7 +404,12 @@ dialog・context menu・panel が使う service をそのまま呼ぶ (undo の�
 - `create_group objId [, name]`、`create_surface_from_map rendId` (map の isosurf のみ)、`recalc_surface surfId [, density] [, backend]`
 - `list_interactions` / `remove_interaction rendId, number` (距離・角度・二面角の個別削除)
 - `list_paint` / `set_paint` / `remove_paint` / `move_paint` (paint の各エントリー。原子は最初に一致したエントリーの色)、
-  `add_paint_at nodeId, selection, color [, at]` (`at` 番の前に挿入、null で末尾。`add_paint` と違い selection を変えない)、
+  `add_paint_at nodeId, selection, color [, at]` (`at` 番の前に挿入、null で末尾)、
+  (`add_paint` も含め、paint の op は molecule の selection を変えない。`add_paint` は selection 式を
+  paint service (`paintRendererSelection` / `paintObjectSelection` の `selStr`) に直接渡し、原子に当たるかを
+  先に確かめてから、配色が `PaintColoring` でないときだけ切り替える。判定は配色の class だけで行う: Paint
+  メニューの判定 (`getRendererPaintInfo`) は molecule の選択が空だと偽になるので、それを使うと 2 回目の
+  `add_paint` で配色が作り直され 1 回目の色が消える。GUI の Paint メニューは従来どおり今の選択を塗る)、
   `set_multigrad_nodes rendId, nodes` (`"-1 blue; 0 white; 1 red"`)
 - `set_atom_label objId, atoms, on` (原子 1 つの名前ラベル)、`set_atom_labels objId, selection, format, rendererName` (selection の原子すべてに書式付きの名前ラベル。format が null なら外す。rendererName の `*namelabel` が無ければ DefaultLabel の style で作る。null は navigate tool の名前の無い renderer。PyMOL の `label`)、`measure_selections objId, selections, label` (selection どうし。`"a; b"`)、
   `measure_geometry` の `atomObjects` (2 つ目以降の原子の object。object をまたぐ計測)
