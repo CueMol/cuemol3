@@ -15,8 +15,9 @@
  * thread, and with it any way to collapse the chain again. The next page is
  * added when the chain's last row ("Loading more...") scrolls into view.
  * Center / Zoom drive `selectAndFocusMol` (set the selection, then move
- * the view to it) using the active mol-view's id. Properties stays a stub -- UXP's
- * `onBtnPropCmd` is empty.
+ * the view to it) using the active mol-view's id. Properties opens the one
+ * selected row (chain / residue / atom) in the inspector, read-only; it is
+ * off for none or several rows. (UXP's `onBtnPropCmd` was empty.)
  *
  * @module MolStructPane
  */
@@ -39,9 +40,11 @@ import {
     encodeChainId,
     encodeResidueId,
     encodeAtomId,
+    decodeMolTreeId,
     selStrFromTree,
     type MolTreeId,
 } from "@renderer/features/selection/molStruct/selStrFromTree";
+import { useInspectorActions } from "@renderer/state/inspector";
 import { useCueMol } from "@renderer/hooks/cuemol/useCueMol";
 import { useActiveScene } from "@renderer/state/workspace";
 
@@ -475,6 +478,18 @@ export const MolStructPane: React.FC<MolStructPaneProps> = ({ collapsed, onToggl
         });
     }, [cm, canApply, hasView, selectedIds, residueOrder, activeSceneId, activeMolViewId, selectedMolId]);
 
+    // Properties shows exactly the one selected row. Not the anchor: it stays
+    // on a row Cmd/Ctrl+click took out of the selection, and on the start of
+    // a Shift range.
+    const { showMolStruct } = useInspectorActions();
+    const propPart =
+        selectedIds.size === 1 ? decodeMolTreeId(selectedIds.values().next().value as MolTreeId) : null;
+    const canShowProps = propPart !== null && selectedMolId !== undefined && activeSceneId !== undefined;
+    const onProperties = useCallback(() => {
+        if (!propPart || selectedMolId === undefined || activeSceneId === undefined) return;
+        showMolStruct(activeSceneId, selectedMolId, propPart);
+    }, [propPart, selectedMolId, activeSceneId, showMolStruct]);
+
     return (
         <div className="sp-pane">
             <PaneSectionHeader
@@ -520,7 +535,8 @@ export const MolStructPane: React.FC<MolStructPaneProps> = ({ collapsed, onToggl
                                 small
                                 icon={<AppIcon name="ui.properties" aria-hidden />}
                                 className="section-action-btn"
-                                disabled
+                                disabled={!canShowProps}
+                                onClick={onProperties}
                             />
                         </Tooltip>
                     </ButtonGroup>
