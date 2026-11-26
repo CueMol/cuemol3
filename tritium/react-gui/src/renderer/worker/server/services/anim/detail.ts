@@ -171,6 +171,16 @@ function readTypeProps(obj: AnimObj, type: AnimElementType): AnimElementTypeProp
       tp.startValue = safeNum(() => w.startValue as number);
       tp.endValue = safeNum(() => w.endValue as number);
       break;
+    // No inspector section of their own, but set_anim_prop writes these and
+    // list_anim_props reads them back.
+    case "RealPropAnim":
+      tp.rend = safeStr(() => w.rend as string);
+      tp.startValue = safeNum(() => w.startValue as number);
+      tp.endValue = safeNum(() => w.endValue as number);
+      break;
+    case "RendXformAnim":
+      tp.rend = safeStr(() => w.rend as string);
+      break;
     default:
       break; // Noop / unknown: no type props
   }

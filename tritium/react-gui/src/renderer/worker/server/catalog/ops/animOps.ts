@@ -16,8 +16,10 @@ import {
   moveElement,
   removeElement,
 } from '@renderer/worker/server/services/anim/edit'
-import { setAnimElementProp } from '@renderer/worker/server/services/anim/detail'
+import { findByUid, getAnimElementDetail, setAnimElementProp } from '@renderer/worker/server/services/anim/detail'
 import { resetAnimElementGenericProps, setAnimElementGenericProp } from '@renderer/worker/server/services/anim/genericProps'
+import { resolveSceneMgr } from '@renderer/worker/server/services/anim/resolve'
+import { elementTargetError, findMissingTarget } from '@renderer/worker/server/services/anim/targets'
 import { listTimeline } from '@renderer/worker/server/services/anim/timeline'
 import { setLoop, setStartCam } from '@renderer/worker/server/services/anim/transport'
 import type { AnimElementPropKey } from '@renderer/worker/server/services/anim/types'
@@ -53,7 +55,7 @@ const CHOICE_PROPS: Readonly<Record<string, readonly string[]>> = {
   pattern: ['rock', 'nutate', 'wobble'],
   envelope: ['none', 'grow', 'shrink'],
 }
-const SET_PROPS = [...TEXT_PROPS, ...BOOL_PROPS, ...NUMBER_PROPS, 'axis', 'pattern', 'envelope'] as const
+export const SET_PROPS = [...TEXT_PROPS, ...BOOL_PROPS, ...NUMBER_PROPS, 'axis', 'pattern', 'envelope'] as const
 
 /** What a failed edit says when the service gives no reason. */
 const ANIM_FAILED = 'The animation could not be changed.'
@@ -75,8 +77,11 @@ function element(ctx: WorkerContext, sceneId: number, spec: string): AnimElement
   return typeof found === 'string' ? { error: found } : found
 }
 
+/** An element as `list_anims` lists it: with why its target does not resolve, if so. */
+type ListedElement = Omit<AnimElement, 'index'> & { targetError?: string }
+
 /** `list_anims`'s lines: the manager, then one element per line. */
-function timelineLines(t: AnimTimeline): string[] {
+function timelineLines(t: Omit<AnimTimeline, 'elements'> & { elements: ListedElement[] }): string[] {
   const m = t.mgr
   const lines = [
     `length ${m.lengthMs} ms, ${m.playState}${m.loop ? ', loop' : ''}${m.startcam ? `, start camera ${m.startcam}` : ''}`,
@@ -86,7 +91,8 @@ function timelineLines(t: AnimTimeline): string[] {
     const after = e.timeRefName ? ` after ${e.timeRefName}` : ''
     const off = e.disabled ? '  (disabled)' : ''
     const bad = e.resolveError ? `  [${e.resolveError}]` : ''
-    lines.push(`${i + 1}  ${e.name}  ${e.type}  #${e.uid}  ${e.absStartMs}-${e.absEndMs} ms (${e.startMs}-${e.endMs}${after})${off}${bad}`)
+    const target = e.targetError ? `  [${e.targetError}]` : ''
+    lines.push(`${i + 1}  ${e.name}  ${e.type}  #${e.uid}  ${e.absStartMs}-${e.absEndMs} ms (${e.startMs}-${e.endMs}${after})${off}${bad}${target}`)
   })
   if (t.resolveError) lines.push(`Cannot play: ${t.resolveError}`)
   return lines
@@ -99,11 +105,19 @@ export const animList = defineOp({
   mutates: false,
   expose: { tool: false, console: true, mcp: true },
   group: 'animation',
-  format: (data) => timelineLines(data as AnimTimeline),
+  format: (data) => timelineLines(data as Parameters<typeof timelineLines>[0]),
   run(ctx, _args, oc) {
     // Number the elements from 1, as the other anim_* ops take them.
+    // A target that no longer resolves (a renderer removed since the scene
+    // was saved) plays nothing, silently; say so on the element's line.
     const t = timeline(ctx, oc.sceneId)
-    return { ok: true, data: { ...t, elements: numbered(t.elements.map(({ index: _index, ...e }) => e)) } }
+    const sm = resolveSceneMgr(ctx, oc.sceneId)
+    const elements = t.elements.map(({ index: _index, ...e }): ListedElement => {
+      const hit = sm ? findByUid(sm.mgr, e.uid) : null
+      const targetError = sm && hit ? elementTargetError(sm.scene, hit.obj, e.type) : null
+      return targetError !== null ? { ...e, targetError } : e
+    })
+    return { ok: true, data: { ...t, elements: numbered(elements) } }
   },
 })
 
@@ -255,12 +269,76 @@ export const animSet = defineOp({
     if ('error' in e) return { ok: false, error: e.error }
     const value = readPropValue(args.prop, args.value)
     if (typeof value === 'object' && 'error' in value) return { ok: false, error: value.error }
+    if (args.prop === 'rend' || args.prop === 'endcam' || args.prop === 'mol') {
+      // C++ keeps the name and resolves it only at playback, where a typo
+      // just plays nothing; check it the way playback will.
+      const sm = resolveSceneMgr(ctx, oc.sceneId)
+      const missing = sm ? findMissingTarget(sm.scene, args.prop, value as string) : null
+      if (missing !== null) return { ok: false, error: missing }
+    }
     return normalizeServiceResult(setAnimElementProp(ctx, {
       sceneId: oc.sceneId,
       uid: e.uid,
       prop: args.prop as AnimElementPropKey,
       value,
     }), ANIM_FAILED)
+  },
+})
+
+/**
+ * An element's properties as `list_anim_props` lists them: each under the
+ * name `set_anim_prop` takes, valued as it takes it, so a line can be written
+ * back as it reads. Null when the element is gone.
+ */
+export function elementProps(ctx: WorkerContext, sceneId: number, uid: number): { name: string; type: string; uid: number; properties: { prop: string; value: string | number | boolean; note?: string }[] } | null {
+  const res = getAnimElementDetail(ctx, { sceneId, uid })
+  if (!res.ok) return null
+  const { common, typeProps } = res.detail
+  const props: { prop: string; value: string | number | boolean; note?: string }[] = [
+    { prop: 'name', value: common.name },
+    { prop: 'timeRefName', value: common.timeRefName },
+    { prop: 'startMs', value: common.startMs, note: 'set_anim_time' },
+    { prop: 'endMs', value: common.endMs, note: 'set_anim_time' },
+    { prop: 'disabled', value: common.disabled },
+    { prop: 'quadric', value: common.quadric },
+  ]
+  const { axisX, axisY, axisZ, ...rest } = typeProps
+  if (axisX !== undefined) props.push({ prop: 'axis', value: `${axisX} ${axisY ?? 0} ${axisZ ?? 0}` })
+  const sm = resolveSceneMgr(ctx, sceneId)
+  for (const [prop, value] of Object.entries(rest)) {
+    if (value === undefined) continue
+    const missing = sm && (prop === 'rend' || prop === 'endcam' || prop === 'mol')
+      ? findMissingTarget(sm.scene, prop, String(value))
+      : null
+    props.push({ prop, value, ...(missing !== null ? { note: 'not found' } : {}) })
+  }
+  return { name: common.name, type: common.type, uid: common.uid, properties: props }
+}
+
+export const animProps = defineOp({
+  name: 'list_anim_props',
+  description:
+    'List the properties of an animation element under the names set_anim_prop takes, with their ' +
+    'current values (startMs / endMs are relative to the element it follows; set them with set_anim_time).',
+  params: { element: string(ELEMENT_DESC) },
+  mutates: false,
+  expose: { tool: false, console: true, mcp: true },
+  group: 'animation',
+  aliases: [{ name: 'anim_props', summary: 'List the properties of an animation element: anim_props spin1' }],
+  table(data) {
+    const d = data as NonNullable<ReturnType<typeof elementProps>>
+    return {
+      title: `${d.name} (${d.type})  #${d.uid}`,
+      head: ['Property', 'Value', 'Note'],
+      rows: d.properties.map((p) => [p.prop, String(p.value), p.note ?? '']),
+    }
+  },
+  run(ctx, args, oc) {
+    const e = element(ctx, oc.sceneId, args.element)
+    if ('error' in e) return { ok: false, error: e.error }
+    const props = elementProps(ctx, oc.sceneId, e.uid)
+    if (props === null) return { ok: false, error: 'That animation element is gone.' }
+    return { ok: true, data: props }
   },
 })
 
@@ -340,4 +418,4 @@ export const animOptions = defineOp({
   },
 })
 
-export const ANIM_OPS = [animList, animAdd, animRemove, animMove, animTime, animSet, animGenericSet, animReset, animOptions]
+export const ANIM_OPS = [animList, animProps, animAdd, animRemove, animMove, animTime, animSet, animGenericSet, animReset, animOptions]
