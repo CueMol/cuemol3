@@ -11,7 +11,7 @@ import { streamFetchToReader, cancelStream } from '@renderer/worker/server/servi
 import { applyReaderOptions } from '@renderer/worker/server/services/helpers/applyReaderOptions';
 import { fail, failFrom, ok, type Result } from '@renderer/worker/shared/result';
 import { getSceneOrNull } from '@renderer/worker/server/services/helpers/sceneResolver';
-import { formatLoad, recordOp } from '@renderer/worker/server/actions/serviceOps';
+import { formatLoad, recordOp, recordedRendererName } from '@renderer/worker/server/actions/serviceOps';
 import { pickCoordUrl } from '@renderer/worker/shared/pdbUrls';
 import { setPlddtMolColoring } from '@renderer/worker/server/services/coloring/plddtColoring';
 
@@ -70,7 +70,7 @@ function recordFetch(ctx: WorkerContext, sceneId: number, args: StreamLoadFromUr
     const renderer = {
         rendererType: rend.presetName ? null : rend.rendererType || null,
         selection: rend.selectionEnabled ? rend.selection : null,
-        rendererName: rend.presetName || !rend.rendererName ? null : rend.rendererName,
+        rendererName: recordedRendererName(ctx, sceneId, rend),
         preset: rend.presetName ? rend.presetName : null,
         centerView: rend.centerView ? null : false,
     };

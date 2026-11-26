@@ -53,6 +53,8 @@ vi.mock('@renderer/worker/server/services/file/loadObject', () => ({
 import { loadCcp4, loadMtz } from './loadFormatOps'
 
 const oc = { sceneId: 1 } as OpContext
+// An empty scene: the unnamed renderer is numbered against it.
+const ctx = { sceMgr: { getScene: () => ({ getRendByName: () => null }) } } as never
 const RENDER = { rendererType: null, selection: null, name: null, rendererName: null, preset: null, centerView: null, mapCenterPolicy: null }
 
 beforeEach(() => {
@@ -63,7 +65,7 @@ beforeEach(() => {
 describe('format load ops', () => {
   it('load_ccp4 reads with ccp4map even when the content would sniff as another reader', async () => {
     const args = { ...RENDER, path: '/w/emd.map', normalize: null, truncateMin: null, truncateMax: null, mapType: null, subsample: null }
-    expect(await loadCcp4.run({} as never, args, oc)).toMatchObject({ ok: true })
+    expect(await loadCcp4.run(ctx, args, oc)).toMatchObject({ ok: true })
 
     expect(pickReaderName).not.toHaveBeenCalled()
     expect(loads).toHaveLength(1)
@@ -72,7 +74,7 @@ describe('format load ops', () => {
 
   it('load_mtz writes the given options over the defaults and turns on the column it names', async () => {
     const args = { ...RENDER, path: '/w/a.mtz', columnF: 'FWT', columnPhi: 'PHWT', columnWeight: null, resolutionLimit: null, gridSpacing: null }
-    expect(await loadMtz.run({} as never, args, oc)).toMatchObject({ ok: true })
+    expect(await loadMtz.run(ctx, args, oc)).toMatchObject({ ok: true })
 
     expect(loads[0].readerName).toBe('mtzmap')
     expect(loads[0].options.format.options).toMatchObject({ columnF: 'FWT', columnPhi: 'PHWT', phaseEnabled: true, weightEnabled: false, resolutionLimit: 2 })
