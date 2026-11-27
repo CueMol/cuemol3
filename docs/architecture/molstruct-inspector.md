@@ -9,6 +9,8 @@ Mol Struct pane の Properties ボタンで、選んだ chain・residue・atom �
 - Properties は tree の行が**ちょうど 1 つ**選ばれているときだけ押せ、その行を開く
   (`MolStructPane.tsx`)。0 行・複数行では押せない。anchor (`anchorId`) は使わない: Cmd/Ctrl+クリックで
   選択から外した行や Shift+クリックの範囲の始点に残り、選ばれていない行を開いてしまうため。
+- tree の行をダブルクリックすると、その行を開く (scene tree や Action history と同じ操作)。
+  placeholder の行 (`Loading...` など) では何もしない。
 - inspector の target は `{ kind: 'molStruct', sceneId, molId, part }`
   (`state/inspector/InspectorProvider.tsx`)。`part` (`MolStructRef`、`worker/shared/molStructInfo.ts`) は
   tree の id を `decodeMolTreeId` で分けたもの。chain / residue / atom には uid が無いので、分子の uid と

@@ -17,7 +17,8 @@
  * Center / Zoom drive `selectAndFocusMol` (set the selection, then move
  * the view to it) using the active mol-view's id. Properties opens the one
  * selected row (chain / residue / atom) in the inspector, read-only; it is
- * off for none or several rows. (UXP's `onBtnPropCmd` was empty.)
+ * off for none or several rows. Double-clicking a row opens that row, as in
+ * the other tree panes. (UXP's `onBtnPropCmd` was empty.)
  *
  * @module MolStructPane
  */
@@ -490,6 +491,17 @@ export const MolStructPane: React.FC<MolStructPaneProps> = ({ collapsed, onToggl
         showMolStruct(activeSceneId, selectedMolId, propPart);
     }, [propPart, selectedMolId, activeSceneId, showMolStruct]);
 
+    // Double-clicking a row shows its properties, as in the other tree panes
+    // (scene tree, action history). The placeholder rows have nothing to show.
+    const handleNodeDoubleClick = useCallback(
+        (node: TreeNodeInfo) => {
+            if (node.disabled || selectedMolId === undefined || activeSceneId === undefined) return;
+            const part = decodeMolTreeId(String(node.id));
+            if (part) showMolStruct(activeSceneId, selectedMolId, part);
+        },
+        [selectedMolId, activeSceneId, showMolStruct],
+    );
+
     return (
         <div className="sp-pane">
             <PaneSectionHeader
@@ -558,6 +570,7 @@ export const MolStructPane: React.FC<MolStructPaneProps> = ({ collapsed, onToggl
                         <ListboxTree
                             contents={treeContents}
                             onNodeClick={handleNodeClick}
+                            onNodeDoubleClick={handleNodeDoubleClick}
                             onNodeExpand={handleNodeExpand}
                             onNodeCollapse={handleNodeCollapse}
                             className="mol-tree"
