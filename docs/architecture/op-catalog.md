@@ -315,7 +315,7 @@ native の生成コマンドは通らない)。worker service は読み取りに
 はその場で ray tracing する。
 
 **panel**: toolbar の CueMol / PyMOL 切り替え、または `native` / `pymol` と打つと切り替わる。
-選択は plugin preference (`console.dialect`)、履歴は dialect ごと (PyMOL は旧 key を引き継ぐ)。
+選択は plugin preference (`console.dialect`)、履歴は dialect ごと (PyMOL は旧 key を引き継ぐ)。`Ctrl-R` で履歴を検索できる ([console-history-search.md](console-history-search.md))。
 
 ## 5.1 コマンド名の規約
 

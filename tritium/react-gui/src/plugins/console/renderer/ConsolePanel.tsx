@@ -17,6 +17,13 @@
  * Shift+Tab and the arrows walk, Enter accepts, Esc backs out of, and any
  * other key accepts and goes on. A click accepts one too.
  *
+ * Ctrl-R searches the history as zsh's incremental search does
+ * (@cuemol/console-kit historySearch.ts, shared with tritium_cli): typing
+ * narrows, Ctrl-R again goes further back, Backspace undoes a step, Enter
+ * runs the match, Esc / Ctrl-G go back to what was typed, and any other key
+ * keeps the match and does what it does. The prompt's wrapper claims Ctrl-R
+ * (`data-own-keys`) so that on Windows / Linux it is not Reload Scene here.
+ *
  * The console speaks one dialect at a time: native (CueMol's own commands,
  * generated from the op catalogue) or PyMOL. The switch in the toolbar, or
  * typing just `native` or `pymol`, changes it; the choice is a plugin
@@ -24,8 +31,18 @@
  */
 
 import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { layoutSections, menuText, moveMenu } from '@cuemol/console-kit'
-import type { CompletionMenu, MenuMove } from '@cuemol/console-kit'
+import {
+  backspaceSearch,
+  layoutSections,
+  menuText,
+  moveMenu,
+  repeatSearch,
+  searchLine,
+  searchPrompt,
+  startSearch,
+  typeSearch,
+} from '@cuemol/console-kit'
+import type { CompletionMenu, HistorySearch, MenuMove } from '@cuemol/console-kit'
 import { AppIcon } from '@renderer/h3-kit/primitives'
 import { FormButton, SegmentField, TextAreaField, isImeKey } from '@renderer/h3-kit/form'
 import { usePluginPrefs } from '@renderer/plugin-host/api'
@@ -113,6 +130,12 @@ export const ConsolePanel: BottomTabComponent = ({
   const [notes, setNotes] = useState<ConsoleEntry[] | null>(null)
   // The last Tab's candidates, listed or walked; null when none are shown.
   const [menuView, setMenuView] = useState<MenuView | null>(null)
+  // Ctrl-R in progress; null when not searching.
+  const [search, setSearch] = useState<HistorySearch | null>(null)
+  // The pattern the last search ended with, for an empty Ctrl-R.
+  const lastPatternRef = useRef('')
+  // The frame that will select a search's match; cancelled when the search ends.
+  const searchFrameRef = useRef(0)
   const stripRef = useRef<HTMLDivElement>(null)
   // The strip's width in characters, for the grid.
   const [cells, setCells] = useState(80)
@@ -129,6 +152,8 @@ export const ConsolePanel: BottomTabComponent = ({
       if (next === dialect) return
       setPref(DIALECT_PREF, next)
       setRecall(IDLE)
+      // Its history numbers belong to the other dialect.
+      setSearch(null)
       consoleSession.notice(`Now speaking ${metaOf(metas, next).label} commands.`)
     },
     [dialect, metas, setPref],
@@ -149,6 +174,38 @@ export const ConsolePanel: BottomTabComponent = ({
       if (el) el.setSelectionRange(caret, caret)
     })
   }, [])
+
+  /** Show a search's line, its match selected (zsh highlights it). */
+  const showSearch = useCallback((s: HistorySearch) => {
+    setSearch(s)
+    const { line, caret, matchLength } = searchLine(s, history.getHistory())
+    consoleSession.setDraft(line)
+    cancelAnimationFrame(searchFrameRef.current)
+    searchFrameRef.current = requestAnimationFrame(() => inputRef.current?.setSelectionRange(caret, caret + matchLength))
+  }, [history])
+
+  /**
+   * End the search keeping the line, with Up / Down to go on from the match
+   * (the state is returned too, for a key handled in the same event, which
+   * still sees the old `recall`). The selection is dropped at once, not a
+   * frame later: the key about to be handled reads or moves the caret.
+   */
+  const endSearch = useCallback(
+    (s: HistorySearch, el?: HTMLTextAreaElement): RecallState => {
+      if (s.pattern !== '') lastPatternRef.current = s.pattern
+      // A selection still to come from the last keystroke would undo the caret move below.
+      cancelAnimationFrame(searchFrameRef.current)
+      setSearch(null)
+      const next: RecallState = s.index === null ? IDLE : { index: s.index, stashedDraft: s.original }
+      setRecall(next)
+      if (el) {
+        const { caret } = searchLine(s, history.getHistory())
+        el.setSelectionRange(caret, caret)
+      }
+      return next
+    },
+    [history],
+  )
 
   /** Show a recalled line and put the caret at its end. */
   const showRecalled = useCallback(
@@ -282,6 +339,8 @@ export const ConsolePanel: BottomTabComponent = ({
       acceptMenu()
       return
     }
+    // Enter in a search runs its line (TextAreaField takes Enter before onKeyDown).
+    if (search) endSearch(search, inputRef.current ?? undefined)
     const text = draft.trim()
     if (text === '' || running || !runner) return
     // Switching is the panel's business, not a command either dialect knows.
@@ -298,7 +357,7 @@ export const ConsolePanel: BottomTabComponent = ({
     closeMenu()
     consoleSession.setDraft('')
     runner(text, dialect)
-  }, [draft, running, runner, dialect, metas, history, switchDialect, menuView, acceptMenu, closeMenu])
+  }, [draft, running, runner, dialect, metas, history, switchDialect, menuView, acceptMenu, closeMenu, search, endSearch])
 
   // Typing accepts what the menu shows and goes on from there.
   const handleChange = useCallback(
@@ -306,6 +365,8 @@ export const ConsolePanel: BottomTabComponent = ({
       consoleSession.setDraft(value)
       setRecall(IDLE)
       closeMenu()
+      // An IME's text or a paste lands in the line: the search is over.
+      setSearch(null)
     },
     [closeMenu],
   )
@@ -315,6 +376,47 @@ export const ConsolePanel: BottomTabComponent = ({
       // While converting, these keys belong to the IME: the arrows pick a
       // candidate and Tab accepts one.
       if (isImeKey(e.nativeEvent)) return
+
+      const plainCtrl = e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey
+      const hist = history.getHistory()
+      // The recall state for Up / Down below: a search that ends on this key
+      // hands over its own (`recall` is still the old one in this event).
+      let recallNow = recall
+      if (search) {
+        const el = e.currentTarget
+        if (plainCtrl && e.key.toLowerCase() === 'r') {
+          e.preventDefault()
+          showSearch(repeatSearch(search, hist, lastPatternRef.current))
+          return
+        }
+        if (e.key === 'Escape' || (plainCtrl && e.key.toLowerCase() === 'g')) {
+          e.preventDefault()
+          if (search.pattern !== '') lastPatternRef.current = search.pattern
+          cancelAnimationFrame(searchFrameRef.current)
+          setSearch(null)
+          setRecall(IDLE)
+          showText(search.original, search.original.length)
+          return
+        }
+        if (e.key === 'Backspace' && !(e.ctrlKey || e.metaKey || e.altKey)) {
+          e.preventDefault()
+          showSearch(backspaceSearch(search))
+          return
+        }
+        if (e.key.length === 1 && !(e.ctrlKey || e.metaKey || e.altKey)) {
+          e.preventDefault()
+          showSearch(typeSearch(search, e.key, hist))
+          return
+        }
+        if (['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) return
+        // Any other key keeps the match and does what it does.
+        recallNow = endSearch(search, el)
+      } else if (plainCtrl && e.key.toLowerCase() === 'r') {
+        e.preventDefault()
+        closeMenu()
+        showSearch(startSearch(e.currentTarget.value))
+        return
+      }
 
       const walking = menuView !== null && menuView.menu.selected >= 0
       if (e.key === 'Escape' && (menuView || notes)) {
@@ -357,7 +459,7 @@ export const ConsolePanel: BottomTabComponent = ({
       const recalled = history.getHistory()
       if (e.key === 'ArrowUp') {
         if (!onFirstLine) return
-        const step = recallUp(recall, el.value, recalled)
+        const step = recallUp(recallNow, el.value, recalled)
         if (!step) return
         e.preventDefault()
         setRecall(step.state)
@@ -365,13 +467,13 @@ export const ConsolePanel: BottomTabComponent = ({
         return
       }
       if (!onLastLine) return
-      const step = recallDown(recall, recalled)
+      const step = recallDown(recallNow, recalled)
       if (!step) return
       e.preventDefault()
       setRecall(step.state)
       showRecalled(step.draft)
     },
-    [recall, showRecalled, completeAtCaret, history, menuView, notes, showMenu, closeMenu, walkMenu],
+    [recall, showRecalled, completeAtCaret, history, menuView, notes, showMenu, closeMenu, walkMenu, search, showSearch, endSearch, showText],
   )
 
   const focusPrompt = useCallback(() => inputRef.current?.focus(), [])
@@ -448,8 +550,9 @@ export const ConsolePanel: BottomTabComponent = ({
         <ConsoleTranscript lines={lines} />
       </div>
 
-      {(menuView || notes) && (
+      {(menuView || notes || search) && (
         <div ref={stripRef} className="console-completions type-console" role="status" aria-label="Completions">
+          {search && <div className="console-line console-line-search">{searchPrompt(search)}</div>}
           {notes?.map((line, i) => (
             <div key={i} className={`console-line console-line-${line.kind}`}>{line.text}</div>
           ))}
@@ -484,7 +587,8 @@ export const ConsolePanel: BottomTabComponent = ({
         </div>
       )}
 
-      <div className="console-prompt">
+      {/* Ctrl-R is the history search here, not Reload Scene (Windows / Linux menu keys). */}
+      <div className="console-prompt" data-own-keys="ctrl+r">
         <span className="console-prompt-symbol type-console" aria-hidden>
           {meta.prompt}
         </span>

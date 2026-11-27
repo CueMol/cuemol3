@@ -32,6 +32,8 @@ architecture, it belongs here.
   `completion.ts` が段組みとメニューの状態遷移を持つ。ファイル名の一致規則 (dot file、
   大小無視の再試行、load の拡張子優先、cd はディレクトリだけ)。
 
+- [Console の履歴の検索 (Ctrl-R)](console-history-search.md) (日本語) -- console panel と tritium_cli の、zsh と同じインクリメンタル検索。console-kit の状態遷移、Windows / Linux のメニューの `Ctrl-R` との分け方 (`data-own-keys`)
+
 - [Console の help と Markdown 出力](console-help-markdown.md) (日本語) -- `format: 'markdown'` の
   entry を `@cuemol/console-kit` の `markdown.ts` (`marked` の lexer) で読み、panel は React、
   tritium_cli は ANSI で描く。help は主題 -> コマンド -> 引数の 3 段で、op のコマンドの説明は
