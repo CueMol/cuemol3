@@ -133,12 +133,22 @@ function readJsonArg(name: string, p: Param<unknown>, value: unknown): { value: 
  * off may send a number as a string or leave an argument out, which is read
  * leniently here rather than trusted.
  *
+ * @param opts.nullString - read the string "null" in an optional argument as
+ *   null. A model sometimes writes the null of a nullable argument as that
+ *   string; without this a free-text argument would take it as a name. For
+ *   the model-facing callers (MCP, the agent); not for a replayed record,
+ *   where "null" is a value the op really took.
  * @returns the typed arguments, or the reason they could not be read.
  */
-export function readToolArgs(op: AnyOp, input: Record<string, unknown>): Record<string, unknown> | string {
+export function readToolArgs(
+  op: AnyOp,
+  input: Record<string, unknown>,
+  opts: { nullString?: boolean } = {},
+): Record<string, unknown> | string {
   const out: Record<string, unknown> = {}
   for (const [name, p] of Object.entries(op.params as ParamMap)) {
-    const read = readJsonArg(name, p, input[name])
+    const value = opts.nullString && p.optional && input[name] === 'null' ? null : input[name]
+    const read = readJsonArg(name, p, value)
     if (typeof read === 'string') return read
     out[name] = read.value
   }
