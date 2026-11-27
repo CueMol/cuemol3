@@ -512,22 +512,43 @@ describe("AnimationPanel inspector wiring", () => {
     mockEdit = defaultEdit();
   });
 
-  it("emits the selected element uid to the inspector, null on deselect", () => {
+  it("shows the element the user selects (again on a re-click), and clears on an empty-lane click", () => {
     inspector.showAnimElement.mockClear();
     inspector.clearAnimElement.mockClear();
     const { container, unmount } = mountTree(
       <AnimationPanel cm={cm} activeSceneId={1} activeMolViewId={2} />,
     );
-    expect(inspector.clearAnimElement).toHaveBeenCalledWith(1); // mount: nothing selected
-    inspector.showAnimElement.mockClear();
-    inspector.clearAnimElement.mockClear();
+    // Mounting selects nothing and leaves the Inspector alone.
+    expect(inspector.clearAnimElement).not.toHaveBeenCalled();
     const row = container.querySelector(".anim-label-row") as HTMLElement;
     act(() => row.click()); // select uid 1
     expect(inspector.showAnimElement).toHaveBeenCalledWith(1, 1);
     inspector.showAnimElement.mockClear();
-    inspector.clearAnimElement.mockClear();
-    act(() => row.click()); // toggle deselect
+    // A re-click brings the element back after the Inspector moved elsewhere.
+    act(() => row.click());
+    expect(inspector.showAnimElement).toHaveBeenCalledWith(1, 1);
+    act(() => (container.querySelector(".anim-lane") as HTMLElement).click());
     expect(inspector.clearAnimElement).toHaveBeenCalledWith(1);
+    unmount();
+  });
+
+  it("does not take the Inspector back when the timeline is refetched", () => {
+    // The timeline refetches on every scene / camera event (a scene property
+    // edited in the Inspector, say); re-showing the selected element there
+    // took the Inspector away from the scene being edited.
+    inspector.showAnimElement.mockClear();
+    const { container, root, unmount } = mountTree(
+      <AnimationPanel cm={cm} activeSceneId={1} activeMolViewId={2} />,
+    );
+    act(() => (container.querySelector(".anim-label-row") as HTMLElement).click());
+    expect(inspector.showAnimElement).toHaveBeenCalledTimes(1);
+    mockTimeline = timeline([el({ uid: 1, index: 0 })]); // same element, fresh array
+    act(() =>
+      root.render(
+        <AnimationPanel cm={cm} activeSceneId={1} activeMolViewId={2} />,
+      ),
+    );
+    expect(inspector.showAnimElement).toHaveBeenCalledTimes(1);
     unmount();
   });
 
@@ -550,7 +571,7 @@ describe("AnimationPanel inspector wiring", () => {
     unmount();
   });
 
-  it("resets the selection on scene switch", () => {
+  it("resets the panel selection on scene switch, leaving the Inspector to restore that scene's page", () => {
     inspector.showAnimElement.mockClear();
     inspector.clearAnimElement.mockClear();
     const { container, root, unmount } = mountTree(
@@ -564,7 +585,9 @@ describe("AnimationPanel inspector wiring", () => {
         <AnimationPanel cm={cm} activeSceneId={9} activeMolViewId={2} />,
       ),
     );
-    expect(inspector.clearAnimElement).toHaveBeenCalledWith(9);
+    // Clearing here would also drop what scene 9 was showing.
+    expect(inspector.clearAnimElement).not.toHaveBeenCalled();
+    expect(container.querySelector(".anim-label-row.is-selected")).toBeNull();
     unmount();
   });
 });
