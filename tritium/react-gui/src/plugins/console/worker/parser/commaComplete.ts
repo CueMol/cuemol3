@@ -13,7 +13,12 @@
  * What belongs to the grammar is here: reading the partial line the way
  * execution reads it (`scanArgs`, `assignArgs`), and writing a choice back
  * -- `, ` after a value while parameters remain, `name=` for a parameter,
- * quoting what would end an argument. Listing, matching and settling the
+ * quoting what would end an argument. A list of words (nodes, files) and a
+ * selection are closed with `, ` too, though a space would also be valid
+ * there (another word, the expression going on): the next argument is the
+ * likelier wish, and the user who wants the space deletes the comma. Not
+ * inside a bracket or a quote, and not when the text after the caret goes on
+ * with the same argument. Listing, matching and settling the
  * candidates is the dialect-free engine (`completion/engine.ts`).
  *
  * With `fileFallback` (PyMOL's habit), anything the catalogue cannot answer
@@ -27,7 +32,7 @@ import { interpretShortcut } from './shortcut'
 import { expandGlob, pathWord, refWord, splitPathWords } from '../runtime/paths'
 import { assignArgs, nextPositional } from './bindArgs'
 import type { ArgRule } from './bindArgs'
-import { scanArgs } from './parseArgs'
+import { opensGroup, scanArgs } from './parseArgs'
 import type { CompletionItem, ConsoleCommand } from '../runtime/types'
 import { commonPrefix } from '@cuemol/console-kit'
 import { complain, fileOffers, kindsOf, settle } from '../completion/engine'
@@ -133,8 +138,13 @@ function completeArgument(
   // The parameter a value typed here goes to: the one named, or the next by position.
   const target = current.name ?? nextPositional(spec.params, scanned.args, rule)
   const known = target !== null && spec.params.some((p) => p.name === target)
-  // Whether a parameter is still open once `p` is given: then a value ends with `, `.
-  const moreAfter = (p: string) => spec.params.some((q) => q.name !== p && !given.has(q.name))
+  // Whether a parameter is still open once `p` is given: then a value ends
+  // with `, `. One filled in from another argument (a node's kind) is not
+  // typed, so it does not count.
+  const moreAfter = (p: string) => spec.params.some((q) => q.name !== p && !given.has(q.name) && !q.implied)
+  // The text after the caret goes on with this argument (another word, the
+  // rest of an expression) rather than starting the next one.
+  const restContinues = /^\s*[^\s,]/.test(cc.rest ?? '')
 
   const groups: Group[] = []
   const text = current.text
@@ -145,8 +155,15 @@ function completeArgument(
 
   if (known && target !== null) {
     const entry = entryOf(target)
-    const sepFor = (then: CompletionItem['then']) =>
-      then === 'continue' || entry?.open ? '' : (entry?.suffix ?? (moreAfter(target) ? ', ' : ''))
+    // What closes the argument here, if anything: `, ` while parameters remain.
+    const closer = !restContinues && moreAfter(target) ? ', ' : null
+    const sepFor = (then: CompletionItem['then']) => {
+      if (then === 'continue') return ''
+      if (entry?.suffix !== undefined) return entry.suffix
+      // A selection goes on after a space; it is closed only at its top level.
+      if (entry?.open) return closer !== null && !opensGroup(text) ? closer : ''
+      return moreAfter(target) ? ', ' : ''
+    }
     const toOffers = (items: readonly (string | CompletionItem)[]) =>
       items.map((it): Offer =>
         typeof it === 'string'
@@ -170,17 +187,17 @@ function completeArgument(
           complain(messages, ` parser: no matches found: ${word.raw}`)
           return { replacement: null, messages }
         }
-        return { replacement: `${prefixAt(line, at, spec.name)}${expanded.join(' ')} `, messages }
+        return { replacement: `${prefixAt(line, at, spec.name)}${expanded.join(' ')}${closer ?? ' '}`, messages }
       }
       const typed = word?.value ?? ''
       if (entry.source === 'files') {
-        const offers = fileOffers(typed, cc.cwd, ' ', kindsOf(ctx, entry), (d, n) => pathWord(d + n))
+        const offers = fileOffers(typed, cc.cwd, closer ?? ' ', kindsOf(ctx, entry), (d, n) => pathWord(d + n))
         groups.push({ heading: 'files', pattern: word?.raw ?? '', regionStart: at, offers, plain: true })
       } else {
         const items = cc.dialect.candidates(entry.source, ctx, { ...sc, pattern: typed }) ?? []
         const offers = items.map((it): Offer => {
           const item = typeof it === 'string' ? { text: it, then: 'next' as const } : it
-          return { text: refWord(item.text), sep: item.then === 'continue' ? '' : ' ', kind: 'value' }
+          return { text: refWord(item.text), sep: item.then === 'continue' ? '' : (closer ?? ' '), kind: 'value' }
         })
         groups.push({ heading: entry.description, pattern: word?.raw ?? '', regionStart: at, offers })
       }

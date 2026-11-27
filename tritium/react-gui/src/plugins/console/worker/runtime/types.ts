@@ -105,7 +105,11 @@ export interface ArgCompletion {
    * remain unbound, else nothing.
    */
   suffix?: '' | ' ' | ', '
-  /** A value the user keeps typing into (a selection, a path): nothing follows it. */
+  /**
+   * A value the user keeps typing into (a selection), where a space goes on
+   * with it: a completed word gets `, ` only at its top level (not inside a
+   * bracket or a quote) while parameters remain, else nothing.
+   */
   open?: boolean
   /**
    * For `files`: `openable` lists the files a load opens (by the readers'

@@ -51,11 +51,20 @@ const NEWLINE = '\n'
 /**
  * The completed text before the caret, without a separator the text after
  * the caret already starts with (`, ` before `,`, a space before a space).
+ * Only the caret's line counts: the newline before the next line is not a
+ * space that would make the one after `, ` redundant.
  */
 function joinBeforeCaret(completed: string, rest: string): string {
-  if (completed.endsWith(', ') && /^\s*,/.test(rest)) return completed.slice(0, -2)
-  if (completed.endsWith(' ') && /^\s/.test(rest)) return completed.slice(0, -1)
+  const sameLine = restOfLine(rest)
+  if (completed.endsWith(', ') && /^\s*,/.test(sameLine)) return completed.slice(0, -2)
+  if (completed.endsWith(' ') && /^\s/.test(sameLine)) return completed.slice(0, -1)
   return completed
+}
+
+/** The text after the caret up to the end of its line. */
+function restOfLine(rest: string): string {
+  const end = rest.indexOf(NEWLINE)
+  return end < 0 ? rest : rest.slice(0, end)
 }
 
 /** The keys that walk an open menu. */
@@ -224,6 +233,7 @@ export const ConsolePanel: BottomTabComponent = ({
       const caret = el.selectionStart ?? value.length
       const start = value.lastIndexOf(NEWLINE, caret - 1) + 1
       const line = value.slice(start, caret)
+      const rest = value.slice(caret)
 
       consoleServices
         .invoke(
@@ -236,6 +246,8 @@ export const ConsolePanel: BottomTabComponent = ({
             sceneId: activeSceneId ?? 0,
             viewId: activeMolViewId ?? 0,
             line,
+            // Only this line: a later line is another command, not more of this argument.
+            rest: restOfLine(rest),
           },
           { quiet: true },
         )
@@ -246,7 +258,6 @@ export const ConsolePanel: BottomTabComponent = ({
             return
           }
           setNotes(res.messages.length > 0 ? res.messages : null)
-          const rest = value.slice(caret)
           const head = res.replacement === null ? line : joinBeforeCaret(res.replacement, rest)
           const before = value.slice(0, start)
           if (res.candidates && res.candidates.length > 1) {

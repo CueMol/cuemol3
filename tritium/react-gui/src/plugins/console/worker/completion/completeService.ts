@@ -24,6 +24,7 @@ export function complete(ctx: WorkerContext, args: CompleteArgs): CompleteResult
     viewId: args.viewId,
     cwd: args.cwd ?? currentDir(),
     dialect,
+    rest: args.rest ?? '',
   })
   return ok(outcome)
 }

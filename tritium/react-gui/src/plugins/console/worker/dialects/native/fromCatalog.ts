@@ -485,7 +485,8 @@ function opCommand(op: AnyOp, alias?: OpAlias): ConsoleCommand {
   const specs: ParamSpec[] = names.map((n) => {
     const p = params[n]
     const optional = p.optional || derivable.has(n) || defaults[n] !== undefined
-    return optional ? { name: n, default: '' } : { name: n }
+    const spec: ParamSpec = optional ? { name: n, default: '' } : { name: n }
+    return derivable.has(n) ? { ...spec, implied: true } : spec
   })
   const optionalNames = new Set(specs.filter((sp) => sp.default !== undefined).map((sp) => sp.name))
   /**
