@@ -120,6 +120,10 @@ defineOp({
   (`catalog/argValues.ts`) で検査する。整数に 1.5、真偽値に `maybe` は、どちらから来ても断る。
   文字列の真偽値・数値は `parseBoolText` / `parseNumberText` (空は数値にしない) で読み、property 値・
   アニメーションの property・reader のオプション・PyMOL dialect も同じ関数を使う。
+- MCP と agent の JSON の引数では、省略できる引数の文字列 `"null"` を null と同じに読む
+  (`readToolArgs(op, input, { nullString: true })`)。モデルは nullable の引数の null を文字列で書くことがあり、
+  自由な文字列の引数ではそれが名前として通ってしまう (`preset: "null"`)。qax の再生はこれをしない
+  (記録の `"null"` は op が実際に受け取った値)。console の native で引用符の無い `null` を省略とするのと揃う。
 - 入力ファイルのパスは `callerPath` (`catalog/outputFile.ts`) で絶対パスにする: `~` は home、相対は
   desktop から (console は自分の cwd で解決済み)。出力の `outputPath` と同じ基準。
 - 一覧の番号は 1 から (`worker/shared/numbered.ts` の `numbered` / `pickByNumber` / `checkPosition` /
@@ -507,6 +511,15 @@ set は名前で指す。同じ名前があれば scene の set を global (syst
     水 -> `simple` (結合の無い原子は十字)。group 名は GUI の preset と同じ命名 (`defaultpym_1`)。
     `rendererType` か `selection` を指定すれば従来どおり renderer 1 本、分子でない object はその object の
     既定 renderer (map なら `contour`)。明示の `preset` はこれより優先する。
+  - load / fetch の op は、指定した renderer (preset・`rendererType`) を必ず作る (`requireRenderer`。
+    `applyRendererArgs` が付ける)。読み取ったオブジェクトがそれを持てるかを、シーンに足す前に確かめる
+    (`services/rend/requiredRenderer.ts`。preset はそのクラスの `-rendpreset`、種類はファイルを開くダイアログと
+    同じ一覧で、内部用の `*group` は含まない)。持てなければシーンを変えずに失敗し、使えるものを
+    `Available: ...` で並べる。シーンに足す前に断るのは、agent のターンのように外側に undo transaction が
+    あると、内側の rollback では足したオブジェクトが残るため。確かめた後で作成が失敗したときは、
+    オブジェクトを `destroyObject` で消してから失敗する。GUI の読み込みは厳密にせず、renderer が作れなくても
+    オブジェクトを残す (DEV_ISSUES 23)。fetch の op の失敗の文言は、ダウンロードの失敗だけに
+    `1EMA could not be downloaded:` を付ける。
     PyMOL との差: organic の nb_spheres、50 原子未満 / 50 万原子超の特例、炭素の object 色は無い。
     GUI の File Open は対象外 (履歴の無いときの初期値は `simple` のまま)。
   - オプションを変えるときは形式ごとの op (console / MCP、agent には出さない)。引数名は `fileOpenTypes.ts` の
