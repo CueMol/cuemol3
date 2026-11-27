@@ -330,6 +330,11 @@ read-only (the manager derives it). Editing while playing ends in a pause, as
     `AnimMgrState` and `useAnimEdit` forwards it to `useAnimTransport.adoptMgr`.
     Without that hand-off the header select would show a stale "(none)" whenever
     a transport op had already latched a live snapshot.
+  - The other way round, a refetched timeline whose manager state differs from
+    the last one (compared by value) drops the latched snapshot: it was read
+    after the reply, and an edit that changes the length (an element's
+    duration) fires no transport reply, so the header's total length would
+    otherwise stay at the value of the last play / seek / add.
   - No seeding happens when no view is active (`viewId` omitted).
 
 

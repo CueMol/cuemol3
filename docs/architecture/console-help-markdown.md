@@ -52,7 +52,7 @@ console panel と `tritium_cli` は、`format: 'markdown'` の付いた出力だ
 |---|---|
 | `help` | 主題 (`OP_GROUPS`) の表だけ: `help <subject>` / 主題名 / コマンド数。最後の行が `help syntax` |
 | `help <subject>` | その主題のコマンドの表 (Command / Summary、1 コマンド 1 行) |
-| `help syntax` | コマンドの書き方 (名前の付け方、カンマ区切り、node の指定、プロパティ) |
+| `help syntax` | コマンドの書き方 (名前の付け方、カンマ区切り、node の指定、省略を表す `null`、数値の並び、プロパティ) |
 | `help <command>` (`<command> ?`) | 見出し、書式 (code block)、本文、引数の表 (名前 / 型 / 既定値 / 説明)、alias の注記 (引用) |
 
 全コマンドを 1 ページに並べると長すぎて読めないため、`help` は主題の一覧で止める。
@@ -62,6 +62,8 @@ console panel と `tritium_cli` は、`format: 'markdown'` の付いた出力だ
 op から生成したコマンドの `help <command>` は、本文に op の `description`、引数の説明に `Param.description` を
 そのまま使う。これは MCP server と内蔵 agent が tool schema としてモデルに渡すのと同じ文字列で、console 用の
 説明文を別に持たない。文章を整えたいときは op の `description` 自体を書き直す (両方に効く)。
+モデルにだけ向けた文 (console では使えない `capture_view` を勧めるものなど) は op の `toolNote` に書き、
+help には出さない ([op-catalog.md](op-catalog.md) §3)。
 長い description (`set_node_prop` / `render_image` / `set_view` / `capture_view` / `measure_geometry`) は
 箇条書きと `code` だけの軽い Markdown で書いてある。見出しや表は使わない (MCP と agent には
 Markdown 原文のまま渡り、tool 定義は毎リクエスト送られるので、記号を増やすだけになる)。
