@@ -19,6 +19,7 @@ import {
   readToolArgs,
   TOOL_OPS,
   TOOLSETS,
+  toolDescription,
   toolSchema,
   toolsetOps,
 } from '@renderer/worker/server/catalog'
@@ -48,7 +49,7 @@ function opContextOf(turn: TurnContext): OpContext {
 function opTool(op: AnyOp): AgentTool {
   return {
     name: op.name,
-    description: op.description,
+    description: toolDescription(op),
     parameters: toolSchema(op),
     mutates: op.mutates,
     run(ctx, input, turn): Promise<ToolOutcome> | ToolOutcome {

@@ -96,6 +96,12 @@ export interface OpAlias {
   order?: readonly string[]
   /** One line for help; defaults to the op's first sentence. */
   summary?: string
+  /**
+   * The help subject to list it under, when people look for it somewhere
+   * other than the op's own (`set_bgcolor` under viewing, though `set_prop` is
+   * under properties). Defaults to the op's group.
+   */
+  group?: OpGroup
 }
 
 /** Which callers see an op. */
@@ -155,8 +161,14 @@ export interface Op<P extends ParamMap = ParamMap> {
   name: string
   /** The heading `help` lists it under. */
   group: OpGroup
-  /** What it does AND when to reach for it. A model has only this. */
+  /** What it does AND when to reach for it. A model has only this (and `toolNote`). */
   description: string
+  /**
+   * Text for a model only, added after `description` in the tool and MCP
+   * descriptions but not in the console's help: advice that names a tool a
+   * person at the console does not have (`capture_view`).
+   */
+  toolNote?: string
   params: P
   /**
    * Whether a successful call changes the scene. A caller that ran only
@@ -234,6 +246,11 @@ export interface Op<P extends ParamMap = ParamMap> {
 export type AnyOp = Op<any>
 
 /** Declare an op; the identity, there for inference of `run`'s arguments. */
+/** An op's description as a tool caller (the agent, an MCP client) reads it. */
+export function toolDescription(op: Pick<Op, 'description' | 'toolNote'>): string {
+  return op.toolNote ? `${op.description}\n\n${op.toolNote}` : op.description
+}
+
 export function defineOp<P extends ParamMap>(op: Op<P>): Op<P> {
   return op
 }
