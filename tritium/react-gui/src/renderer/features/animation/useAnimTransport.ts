@@ -89,6 +89,17 @@ export function useAnimTransport({
     setLiveMgr(null);
   }, [sceneId, viewId]);
 
+  // A refetched timeline that differs from the last one is read from the
+  // manager after any reply held here, so it supersedes it: otherwise a
+  // length changed by an edit (an element's duration) stays hidden behind the
+  // last play / seek reply. Compared by value, so a caller handing a fresh but
+  // equal object each render does not drop the reply. While playing, the next
+  // progress push takes over again.
+  const baseKey = baseMgr ? JSON.stringify(baseMgr) : "";
+  useEffect(() => {
+    setLiveMgr(null);
+  }, [baseKey]);
+
   const mgr = liveMgr ?? baseMgr ?? EMPTY_MGR;
   const isPlaying = mgr.playState === "play";
   const canControl = !!cm && sceneId !== undefined && viewId !== undefined;

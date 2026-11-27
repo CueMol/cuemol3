@@ -96,8 +96,9 @@ dialect の plugin は console の内部を `@plugins/console/worker/dialect-api
 ```ts
 defineOp({
   name, description, params, mutates,
+  toolNote?,                   // モデルにだけ見せる文 (tool と MCP の説明で description の後に足す)
   expose: { tool: 'core' | ToolsetId | false, console: boolean, mcp?: boolean },
-  aliases?: [{ name, fixed?, defaults?, order?, summary? }],
+  aliases?: [{ name, fixed?, defaults?, order?, summary?, group? }],
   group,                       // help の分類 (OP_GROUPS)
   outsideTxn?(args): boolean,  // txn の外で走らせる (例: .qsc の load)。console の文字列でも JSON の値でも呼ばれる
   format?(data): string[],     // console での表示 (無ければ汎用の key: value 表示)
@@ -105,6 +106,11 @@ defineOp({
 })
 ```
 
+- `description` は agent・MCP の tool 説明と console の help で共通。モデルにだけ向けた文 (console に無い
+  `capture_view` を勧める文など) は `toolNote` に書く。tool の説明は `toolDescription(op)` (description の後に
+  空行を挟んで toolNote) で、console の help と Summary は `description` だけを使う。
+- alias の `group` は、op と別の主題で探されるもの (`set_bgcolor` は `set_prop` の alias だが `viewing` に出す)。
+  省くと op の `group`。
 - `OpContext` は `sceneId` / `viewId` / `callId` / `markMutated` / `noteStream` / `streamId` と、
   UI を持つ呼び出し元だけが渡す `openScene`、中断を伝える `cancelled()`、書き込み先の制限
   `fileAccess` (`'any'` = console、既定は desktop のみ。`catalog/outputFile.ts`)。
@@ -220,6 +226,11 @@ terminal からは thin client `tritium_cli` で同じ runtime を使える (作
   既定 (`defaults`)・並べ替え (`order`) できる。ユーザー定義のコマンド列とは別物。
 - 引数は PyMOL と同じくカンマ区切り (`zoom 1crn, chain A and resid 10:20`)。selection が空白を
   含むため、空白区切りは採らない。括弧と引用符の中のカンマは区切りにしない (`parser/parseArgs.ts`)。
+- param の説明は JSON の呼び出し元に合わせて書く (`Null leaves it.`、`[x, y, z]`) ので、console もその書き方を
+  受け付ける。省略できる引数に引用符なしの `null` を書くと省略と同じ (bind 直後の文字列で判定するので、
+  引用符付きの `"null"` は `null` という名前のまま)。数値の並び (vec3 / quat) は `x y z` と `[x, y, z]` の
+  どちらでも書ける。逆向きに、記録や Copy as commands でコマンドを書き出す `quoteArg` (`catalog/cmlFormat.ts`)
+  は文字列の `null` を引用符で囲む。
 - 行の読み方は dialect ごと (`ConsoleDialect.syntax`、下記)。native と PyMOL はカンマ文法 (`parser/commaSyntax.ts`)
   を、引数の割り当て規則だけ変えて使う (`rule`、`parser/bindArgs.ts` の `assignArgs`):
   - native は **Python の呼び出しと同じ**: 位置引数は先頭から順に埋まり、名前付き (`name=value`) の後には書けない。
@@ -231,7 +242,7 @@ terminal からは thin client `tritium_cli` で同じ runtime を使える (作
   コマンド (`open_log`) として走り、`1a0m 1crn` という名前の log を書いたことがあるため。省略形は Tab の補完で
   使える (補完の規則は変えない)。PyMOL dialect は PyMOL のとおり省略形で実行する (PyMOL の script が使う)。
 - 主な alias: `show` / `hide`、`select`、`zoom` / `center`、`turn`、`view` / `slab` / `fit_slab`、
-  `load` (`.qsc` は panel が開く) / `fetch`、`set` / `get` (property path)、`props`、`scene`、
+  `load` (`.qsc` は panel が開く) / `fetch`、`set` / `get` (property path)、`set_bgcolor`、`props`、`scene`、
   `count`、`delete` / `rename` / `retype`、`render` (ray tracing / GI。Stop で中断)、
   `save` / `write`、`save_view` / `restore_view` / `cameras`、`projection` / `pan` / `focus`、
   `contour`、`define`、`style`。
@@ -340,6 +351,8 @@ op 名 (= console のコマンド名、MCP と agent の tool 名) と alias は
   - 1 語の動詞 (`load`、`save`、`write`、`delete`、`select`、`focus`、`turn`、`render`、`count`)。
   - 名詞だけの alias は「引数なしで表示、引数ありで設定」するものに限る (`scenes`、`cameras`、`props`、
     `scene`、`view`、`slab`、`projection`、`style`、`contour`)。作成や書き出しに名詞の alias は付けない。
+  - op 名と同じ形 (`動詞_目的語`) の alias は、汎用の op の特定の使い方を別の主題に出すときだけ
+    (`set_bgcolor` = `set_prop` の path が `bgcolor`。help の View に出す)。
   - PyMOL の語 (`ray`、`png`) は PyMOL dialect が持ち、native には入れない。
 
 ## 6. 未対応 (範囲外)
@@ -447,7 +460,9 @@ set は名前で指す。同じ名前があれば scene の set を global (syst
 ### 視点・frame・書き出しの op (PyMOL dialect の op 化で足したもの)
 
 - `set_view` の `rotation`: camera の向きを quaternion `[a, x, y, z]` で書く (param 種別 `quat`。`vec3` と同じく
-  console では空白区切り、qax では `a x y z`)。書く順は rotation -> center -> distance -> slab -> zoom
+  console では空白区切りか `[a, x, y, z]`、qax では `a x y z`)。`set_view` (と alias の `view`) の報告は zoom・slab・
+  distance・center に加えて `rotation [a, x, y, z]` (小数 4 桁) を出し、そのまま `rotation=` に貼り戻せる。
+  camera file (`.qcm`) の `rotation` 属性は x, y, z, w の順で、並びが違う (param の説明に書いてある)。書く順は rotation -> center -> distance -> slab -> zoom
   (`setViewXform`)。C++ の `View::setSlabDepth` が slab をその時点の distance の 2 倍までに切り詰めるので、
   distance を先に書かないと遠い視点の slab が欠ける。
 - `focus_nodes nodeIds` (console の `focus`): object・renderer・renderer group を混ぜて、向きを変えずに全部が

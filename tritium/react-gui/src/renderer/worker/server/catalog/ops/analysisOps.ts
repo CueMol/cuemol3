@@ -83,10 +83,10 @@ export const analyzeInteractionsOp = defineOp({
 export const exportImage = defineOp({
   name: 'export_image',
   description:
-    'Save a PNG of the current view to a file, only when the user asks for a file. To look at ' +
-    'the view yourself, use capture_view, which saves nothing. ' +
+    'Save a PNG of the current view to a file, only when the user asks for a file. ' +
     'Give a plain file name, which is saved to the desktop, or an absolute path where the ' +
     'caller allows one; the full path is reported back -- tell the user where it went.',
+  toolNote: 'To look at the view yourself, use capture_view, which saves nothing.',
   params: {
     path: path('The file, e.g. overview.png.'),
     width: optional(integer('Image width in pixels. Null uses the size of the view on screen.')),

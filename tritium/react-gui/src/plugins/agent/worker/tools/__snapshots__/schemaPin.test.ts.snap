@@ -103,7 +103,9 @@ exports[`the tool list sent to the model > is unchanged 1`] = `
     "parameters": "{"type":"object","properties":{"toolsets":{"type":"array","description":"The groups to switch on.","items":{"type":"string","enum":["analysis","files","coloring","view","map","molops","xtal","style","selection","render","anim"]}}},"required":["toolsets"],"additionalProperties":false}",
   },
   {
-    "description": "Save a PNG of the current view to a file, only when the user asks for a file. To look at the view yourself, use capture_view, which saves nothing. Give a plain file name, which is saved to the desktop, or an absolute path where the caller allows one; the full path is reported back -- tell the user where it went.",
+    "description": "Save a PNG of the current view to a file, only when the user asks for a file. Give a plain file name, which is saved to the desktop, or an absolute path where the caller allows one; the full path is reported back -- tell the user where it went.
+
+To look at the view yourself, use capture_view, which saves nothing.",
     "mutates": false,
     "name": "export_image",
     "parameters": "{"type":"object","properties":{"path":{"type":"string","description":"The file, e.g. overview.png."},"width":{"type":["integer","null"],"description":"Image width in pixels. Null uses the size of the view on screen."},"height":{"type":["integer","null"],"description":"Image height in pixels. Null uses the size of the view on screen."}},"required":["path","width","height"],"additionalProperties":false}",
@@ -269,7 +271,9 @@ Use \`capture_view\` to look at the view quickly instead.",
     "parameters": "{"type":"object","properties":{"fileName":{"type":"string","description":"PNG file to write. A bare name is saved to the desktop."},"width":{"type":["integer","null"],"description":"Width in pixels. Null keeps the scene's render size."},"height":{"type":["integer","null"],"description":"Height in pixels. Null keeps the scene's render size."},"style":{"type":["string","null"],"enum":["gi","npr",null],"description":"gi (default): photorealistic lighting; npr: hatched illustration."}},"required":["fileName","width","height","style"],"additionalProperties":false}",
   },
   {
-    "description": "Turn the view about a screen axis: x runs left to right, y bottom to top, z out of the screen toward the viewer. Use it to show the structure from another side; capture_view tells you which way it went.",
+    "description": "Turn the view about a screen axis: x runs left to right, y bottom to top, z out of the screen toward the viewer. Use it to show the structure from another side.
+
+capture_view tells you which way it went.",
     "mutates": false,
     "name": "rotate_view",
     "parameters": "{"type":"object","properties":{"axis":{"type":"string","enum":["x","y","z"],"description":"Screen axis to turn about."},"angle":{"type":"number","description":"Angle in degrees; negative turns the other way."}},"required":["axis","angle"],"additionalProperties":false}",
@@ -375,7 +379,7 @@ Call \`list_node_props\` first: the property name, its type, and the allowed val
 Give only what should change; with nothing given it just reports the current values.",
     "mutates": false,
     "name": "set_view",
-    "parameters": "{"type":"object","properties":{"zoom":{"type":["number","null"],"description":"New zoom in angstroms. Null leaves it."},"slab":{"type":["number","null"],"description":"New slab depth in angstroms. Null leaves it."},"distance":{"type":["number","null"],"description":"New eye-to-centre distance in angstroms. Null leaves it."},"center":{"type":["array","null"],"description":"New centre [x, y, z] in angstroms. Null leaves it.","items":{"type":"number"}},"rotation":{"type":["array","null"],"description":"New camera rotation as a quaternion [a, x, y, z] (a the scalar part; [1, 0, 0, 0] faces the default way). Null leaves it.","items":{"type":"number"}},"fitSlab":{"type":["boolean","null"],"description":"True fits the slab to the MolCoord objects. Do not also give slab."},"objId":{"type":["integer","null"],"description":"With fitSlab: fit to this object only. Null fits every MolCoord object."}},"required":["zoom","slab","distance","center","rotation","fitSlab","objId"],"additionalProperties":false}",
+    "parameters": "{"type":"object","properties":{"zoom":{"type":["number","null"],"description":"New zoom in angstroms. Null leaves it."},"slab":{"type":["number","null"],"description":"New slab depth in angstroms. Null leaves it."},"distance":{"type":["number","null"],"description":"New eye-to-centre distance in angstroms. Null leaves it."},"center":{"type":["array","null"],"description":"New centre [x, y, z] in angstroms. Null leaves it.","items":{"type":"number"}},"rotation":{"type":["array","null"],"description":"New camera rotation as a quaternion [a, x, y, z] (a the scalar part; [1, 0, 0, 0] faces the default way), the order the reply reports it in. A camera file (.qcm) writes its rotation as x, y, z, w instead. Null leaves it.","items":{"type":"number"}},"fitSlab":{"type":["boolean","null"],"description":"True fits the slab to the MolCoord objects. Do not also give slab."},"objId":{"type":["integer","null"],"description":"With fitSlab: fit to this object only. Null fits every MolCoord object."}},"required":["zoom","slab","distance","center","rotation","fitSlab","objId"],"additionalProperties":false}",
   },
   {
     "description": "Show or hide one object, renderer, or renderer group. Hiding an object hides everything drawn from it. Use this rather than deleting something the user may want back.",

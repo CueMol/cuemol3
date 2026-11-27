@@ -25,6 +25,7 @@ import {
   runExclusive,
   runInTxn,
   serializeToolOutput,
+  toolDescription,
   toolSchema,
   TXN_BUSY_MESSAGE,
   txnBusy,
@@ -55,7 +56,7 @@ function listTools(): Result<ListToolsOutcome> {
   return ok({
     tools: MCP_OPS.map((op) => ({
       name: op.name,
-      description: op.description,
+      description: toolDescription(op),
       inputSchema: toolSchema(op) as unknown as Record<string, unknown>,
     })),
   })
