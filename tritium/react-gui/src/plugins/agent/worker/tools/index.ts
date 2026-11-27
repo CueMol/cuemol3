@@ -53,7 +53,7 @@ function opTool(op: AnyOp): AgentTool {
     parameters: toolSchema(op),
     mutates: op.mutates,
     run(ctx, input, turn): Promise<ToolOutcome> | ToolOutcome {
-      const args = readToolArgs(op, input)
+      const args = readToolArgs(op, input, { nullString: true })
       if (typeof args === 'string') return { ok: false, error: args }
       return invokeOp(op, ctx, args, opContextOf(turn))
     },

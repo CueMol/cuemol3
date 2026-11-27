@@ -80,6 +80,20 @@ function seedDisorderTarget(mol: any, rend: Renderer, rendererType: string): voi
 }
 
 /**
+ * The molecule's post-processing (default paint, `*selection`) when its
+ * renderer could not be created: a new molecule kept without a renderer must
+ * still get its default colours, or a renderer added later draws it white.
+ * Skipped when the caller will remove the object again (`requireRenderer`):
+ * the paint writes missing colours into the scene's style set, which
+ * removing the object does not undo.
+ */
+function postProcAfterFailure(ctx: WorkerContext, mol: any, rendOpts: RendererOptions, newObj: boolean): void {
+    if (rendOpts.requireRenderer) return;
+    if (NON_MOL_CLASSES.includes(safeRead(() => mol.getClassName() as string) ?? '')) return;
+    molPostProc(ctx, mol, newObj, safeRead(() => (mol.getScene() as Scene | null)?.uid) ?? 0);
+}
+
+/**
  * Create the renderer (or preset renderer group) the options ask for on
  * `mol`, with its default style, selection and molecule post-processing.
  *
@@ -90,7 +104,8 @@ function seedDisorderTarget(mol: any, rend: Renderer, rendererType: string): voi
  *   added to an existing molecule keeps `mol.coloring`, which the existing
  *   renderers paint from (`$molcol`); resetting it lost the user's colours
  *   (UXP `result.new_obj`, false for New Renderer).
- * @returns the new renderer, or null when it could not be created
+ * @returns the new renderer, or null when it could not be created (the
+ *   molecule is post-processed all the same; see `postProcAfterFailure`)
  */
 export function setupRenderer(
     ctx: WorkerContext,
@@ -115,9 +130,13 @@ export function setupRenderer(
         } catch (e) {
             // C++ throws on an unknown style or a non-rendpreset type.
             log.warn(`createPresetRenderer('${rendOpts.presetName}') failed:`, e);
+            postProcAfterFailure(ctx, mol, rendOpts, newObj);
             return null;
         }
-        if (!rend) return null;
+        if (!rend) {
+            postProcAfterFailure(ctx, mol, rendOpts, newObj);
+            return null;
+        }
         // No name assignment (C++ setName(grp_name) already did it) and no
         // applyStyles (children carry styles from the preset definition;
         // UXP's setDefaultStyles is a no-op on a *group). The dialog's
@@ -133,9 +152,16 @@ export function setupRenderer(
 
     // Direct method call -- avoids the `cmd.target_object = mol` setter
     // that would corrupt mol.m_thisname (see file header).
-    const rend = mol.createRenderer(rendOpts.rendererType) as Renderer | null;
+    let rend: Renderer | null = null;
+    try {
+        rend = mol.createRenderer(rendOpts.rendererType) as Renderer | null;
+    } catch (e) {
+        // C++ RendererFactory::create throws on an unregistered type.
+        log.warn(`createRenderer('${rendOpts.rendererType}') failed:`, e);
+    }
     if (!rend) {
         log.warn(`Failed to create renderer of type '${rendOpts.rendererType}'`);
+        postProcAfterFailure(ctx, mol, rendOpts, newObj);
         return null;
     }
 

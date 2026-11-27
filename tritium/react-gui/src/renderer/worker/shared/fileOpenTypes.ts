@@ -112,6 +112,13 @@ export interface RendererOptions {
    * and the child-name prefix. Undefined -> plain single-renderer create.
    */
   presetName?: string;
+  /**
+   * The load must create this renderer (an op's load, whose caller named it):
+   * a preset or type the object cannot have fails the load before the object
+   * is added, and an unexpected creation failure removes it again. Unset (the
+   * dialogs) keeps the object without a renderer.
+   */
+  requireRenderer?: boolean;
 }
 
 /** One preset entry offered in the renderer-type dropdown. */

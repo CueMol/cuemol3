@@ -10,7 +10,9 @@
  *     silently broke coloring undo)
  *   - rend.name + applyStyles + recenter-views happen in the same order
  *     as `NewRendererCommand::run()`
- *   - the existing selection / molPostProc gates still hold
+ *   - the existing selection / molPostProc gates still hold, and a renderer
+ *     that cannot be created still leaves a new molecule post-processed
+ *     (its default paint), unless the load removes it again
  *
  * The "does NOT call getCmd('new_renderer')" assertion is the regression
  * tripwire for re-introducing the buggy command path.
@@ -77,11 +79,23 @@ describe('setupRenderer — direct API (no NewRendererCommand)', () => {
         expect(getCmd).not.toHaveBeenCalled()
     })
 
-    it('returns null and skips downstream work when createRenderer returns null', () => {
-        const { ctx, mol } = makeFixture({ className: 'MolCoord' })
+    it('returns null when createRenderer fails, still giving a new molecule its post-processing', () => {
+        const { ctx, mol, log } = makeFixture({ className: 'MolCoord' })
+        // An unregistered type: C++ RendererFactory::create throws.
+        mol.createRenderer.mockImplementationOnce(() => {
+            throw new Error('unknown renderer type')
+        })
+        expect(setupRenderer(ctx, mol as unknown, baseOpts, true)).toBeNull()
+        // No renderer to name or style, but the molecule keeps its default
+        // paint: a renderer added later must not draw it white.
+        expect(log).toEqual([])
+        expect(molPostProc).toHaveBeenCalledWith(ctx, mol, true, expect.any(Number))
+
+        // A load that will remove the object again writes nothing (the paint
+        // would leave colours in the scene's style set).
+        vi.mocked(molPostProc).mockClear()
         mol.createRenderer.mockReturnValueOnce(null)
-        const result = setupRenderer(ctx, mol as unknown, baseOpts, true)
-        expect(result).toBeNull()
+        expect(setupRenderer(ctx, mol as unknown, { ...baseOpts, requireRenderer: true }, true)).toBeNull()
         expect(molPostProc).not.toHaveBeenCalled()
     })
 
@@ -227,14 +241,14 @@ describe('setupRenderer — preset renderer group (presetName set)', () => {
         expect(focusAllViewsOnNode).toHaveBeenCalledWith(f.ctx, expect.anything(), f.rend().uid, 'renderer')
     })
 
-    it('returns null (no molPostProc) when createPresetRenderer throws', () => {
+    it('returns null when createPresetRenderer throws, and the new molecule still gets its default paint', () => {
         const f = makeFixture({ className: 'MolCoord' })
         f.mol.createPresetRenderer.mockImplementationOnce(() => {
             throw new Error('Unknown renderer preset')
         })
         const result = setupRenderer(f.ctx, f.mol as unknown, presetOpts, true)
         expect(result).toBeNull()
-        expect(molPostProc).not.toHaveBeenCalled()
+        expect(molPostProc).toHaveBeenCalledWith(f.ctx, f.mol, true, expect.any(Number))
     })
 })
 

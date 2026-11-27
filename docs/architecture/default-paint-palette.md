@@ -14,6 +14,11 @@ Okabe-Ito。
   `create_renderer` / `create_preset_renderer` の op。どれも `createRendererOnObject` を通る) は false で、
   `mol.coloring` を変えない。既存の renderer は `$molcol` でこの coloring から色を引くので、置き換えると
   ユーザーが編集した paint などが黙って消える (UXP も New Renderer では `result.new_obj = false`)。
+- renderer を作れなかったときも (プリセットや種類の作成が失敗・throw)、新しい分子には `molPostProc` を通す。
+  `setupRenderer` は `null` を返すが、分子には既定の paint と `*selection` が付く。付けないと、後から
+  `create_renderer` で足した renderer は `newObj` が false なので、分子を白で描く (DEV_ISSUES 22)。
+  例外は読み込みの op の厳密モード (`requireRenderer`) で、その分子は取り消すので通さない。paint の作成は
+  未定義の色をシーンの style set に書き込み、分子を消してもそれは残るため。
 - op `set_renderer_coloring` の mode `paint-type-paint` で `paintColor` を省略したとき (`applyColoring.ts` の
   `paint-type-paint`)。GUI のメニューには「自動」の項目は無い (下の「Paint coloring メニュー」)。
 - Paint coloring メニューで主色を選んだとき。`choice` 引数に、テーマの色名か `cuemol2` / `cuemol1` を渡す。
