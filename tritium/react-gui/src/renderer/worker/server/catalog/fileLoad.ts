@@ -120,13 +120,16 @@ export const LOAD_RENDERER_PARAMS = {
  * Write the renderer arguments a load op was given over the dialog's defaults.
  * An unnamed renderer is then named the way the GUI names it (scene-wide
  * unique, after the preset or type finally chosen), so the op and the dialog
- * give the same name.
+ * give the same name. An op's load must create that renderer
+ * (`requireRenderer`): a preset or type the object cannot have fails the
+ * load rather than leaving a molecule nobody can see.
  */
 export function applyRendererArgs(
   renderer: RendererOptions,
   args: Partial<LoadArgs>,
   scene: RendNameScope | null,
 ): void {
+  renderer.requireRenderer = true
   if (args.preset != null) renderer.presetName = args.preset
   if (args.centerView != null) renderer.centerView = args.centerView
   if (args.mapCenterPolicy != null) renderer.mapCenterPolicy = args.mapCenterPolicy

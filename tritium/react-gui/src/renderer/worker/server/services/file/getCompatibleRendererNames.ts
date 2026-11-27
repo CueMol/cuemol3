@@ -22,7 +22,7 @@
 import type { WorkerContext } from '@renderer/worker/server/types/WorkerContext';
 import type { ObjReader } from '@cuemol/core/src/wrappers/ObjReader';
 import { pickReaderName, OBJREADER_CATEGORY } from '@renderer/worker/server/services/helpers/pickReaderName';
-import { isInitialRendererType } from '@renderer/worker/server/services/helpers/rendererFilter';
+import { initialRendererTypes } from '@renderer/worker/server/services/rend/requiredRenderer';
 
 const log = console;
 
@@ -113,13 +113,6 @@ export function getCompatibleRendererNames(
 
     const objType = (tmpObj as any).getClassName?.() ?? '';
 
-    const rendTypesStr = tmpObj.searchCompatibleRendererNames();
-    if (!rendTypesStr) return { types: [], objType, readerName, formatDescr };
-
-    const types = rendTypesStr
-        .split(',')
-        .map((s: string) => s.trim())
-        .filter(isInitialRendererType);
-
+    const types = initialRendererTypes(tmpObj);
     return { types, objType, readerName, formatDescr };
 }

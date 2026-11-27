@@ -37,6 +37,9 @@ interface FetchArgs {
  *
  * @param load - a gzip-compressed body, and the database entry to record the
  *   download as (`fetch_entry`) rather than its URL
+ * @param label - what a failed download is reported as (`1EMA could not be
+ *   downloaded: ...`); a renderer the object cannot have is reported as it
+ *   is, since the download itself worked
  */
 async function fetchInto(
   ctx: WorkerContext,
@@ -47,6 +50,7 @@ async function fetchInto(
   args: FetchArgs,
   setFormat: (format: FileOpenOptions['format']) => FileOpenOptions['format'] = (f) => f,
   load: Pick<StreamLoadFromUrlArgs, 'gzip' | 'entry'> = {},
+  label?: string,
 ): Promise<OpOutcome> {
   const options = buildHeadlessFileOpenOptions(ctx, {
     readerName,
@@ -63,7 +67,11 @@ async function fetchInto(
   oc.noteStream(reqId)
 
   const result = await streamLoadFromUrl(ctx, { reqId, url, readerName, objectName: name, sceneId: oc.sceneId, options, ...load })
-  if (!result.ok) return { ok: false, error: result.error || `${url} could not be downloaded.` }
+  if (!result.ok) {
+    if (result.code === 'invalid-args') return { ok: false, error: result.error }
+    if (label) return { ok: false, error: `${label} could not be downloaded: ${result.error}` }
+    return { ok: false, error: result.error || `${url} could not be downloaded.` }
+  }
   return { ok: true, data: { objectId: result.objId, name } }
 }
 
@@ -106,13 +114,11 @@ export const fetchPdb = defineOp({
     }
     const spec = pickCoordUrl(pdbId, args.format === 'pdb' ? 'RCSB_PDB' : 'RCSB_CIF')
     const { loadModel, loadAnisou, loadAltConf, loadSegid, build2ndry, autoTopology } = args
-    const done = await fetchInto(ctx, oc, spec.url, spec.readerName, args.name?.trim() || pdbId, args, (f) => {
+    return fetchInto(ctx, oc, spec.url, spec.readerName, args.name?.trim() || pdbId, args, (f) => {
       if (f.kind === 'pdb') return { ...f, options: withValues(f.options, { loadModel, loadAnisou, loadAltConf, loadSegid, build2ndry, autoTopology }) }
       if (f.kind === 'mmcif') return { ...f, options: withValues(f.options, { loadModel, loadAnisou, loadAltConf, build2ndry, autoTopology }) }
       return f
-    })
-    if (!done.ok) return { ok: false, error: `${pdbId.toUpperCase()} could not be downloaded: ${done.error}` }
-    return done
+    }, {}, pdbId.toUpperCase())
   },
 })
 
@@ -168,12 +174,10 @@ export const fetchEntry = defineOp({
     const r = structureFetch(args.source, args.id, args.format)
     if (!r.ok) return { ok: false, error: r.error }
     const { url, readerName, gzip, name: defaultName } = r.spec
-    const done = await fetchInto(ctx, oc, url, readerName, args.name?.trim() || defaultName, args, undefined, {
+    return fetchInto(ctx, oc, url, readerName, args.name?.trim() || defaultName, args, undefined, {
       gzip,
       entry: { source: args.source, id: args.id.trim(), format: args.format, defaultName },
-    })
-    if (!done.ok) return { ok: false, error: `${args.source}:${args.id} could not be downloaded: ${done.error}` }
-    return done
+    }, `${args.source}:${args.id}`)
   },
 })
 
