@@ -43,6 +43,18 @@ architecture, it belongs here.
   qsc には `<camera>` 要素の並び順として保存する (object / renderer と同じ仕組み)。
   save / apply の with show/hide 版を含むツールバー、drag での並べ替え、既存名の上書き挙動。
 
+- [Mol Struct の Properties](molstruct-inspector.md) (日本語) --
+  Mol Struct pane の Properties で、1 つ選んだ chain / residue / atom を inspector に読み取り専用で出す
+  (残基の二次構造、原子の座標・B-factor・occupancy など)。`MolResidue.getPropStr` を script に公開。
+
+- [Renderer の既定名](renderer-default-name.md) (日本語) --
+  名前を指定しない renderer の名前は scene 全体で一意な `<型名 or preset 接頭辞><n>`。dialog・
+  `add_renderer`・load / fetch 系の op で同じ規則。記録は既定名なら null、利用者が付けた名前は残す。
+
+- [分子ビューのクリックとダブルクリックの判定](view-mouse-clicks.md) (日本語) --
+  `MouseEventHandler` のダブルクリックは 500 ms 以内・同じボタン・4 px 以内の 2 回目の単クリック。
+  ダブルクリックは 1 回目を使い切る。
+
 - [Camera inspector](camera-inspector.md) (日本語) --
   Camera pane の Property / 右クリックで camera を inspector に出す (Name、Source、読み取り専用の
   View、visibility flags)。visibility flags の dialog を inspector の Visibility section に置き換え、

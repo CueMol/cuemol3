@@ -20,7 +20,9 @@
  * scene-tree node or the View) use the migrated UXP `generic-propdlg`
  * editor; `animElement` targets use `AnimElementInspector`; `actionStep`
  * targets (an undo step) use the read-only `ActionStepInspector`; `camera`
- * targets (a named camera) use `CameraInspector`.
+ * targets (a named camera) use `CameraInspector`; `molStruct` targets (a
+ * chain / residue / atom from the Mol Struct pane) use the read-only
+ * `MolStructInspector`.
  *
  * @module InspectorPanel
  */
@@ -35,6 +37,7 @@ import { GenericTab } from "./GenericTab";
 import { AnimElementInspector } from "./AnimElementInspector";
 import { ActionStepInspector } from "./ActionStepInspector";
 import { CameraInspector } from "./CameraInspector";
+import { MolStructInspector } from "./MolStructInspector";
 import { InspectorResetAllButton } from "./InspectorResetAllButton";
 import { modifiedKeys } from "./propModel";
 import { ColorPickerProvider } from "@renderer/h3-kit/colorpicker";
@@ -49,7 +52,7 @@ import { useActiveScene } from "@renderer/state/workspace";
 type InspectorMode = "properties" | "generic";
 
 /** Kind of context the inspector is currently editing. */
-export type InspectorTargetKind = "node" | "animElement" | "actionStep" | "camera";
+export type InspectorTargetKind = "node" | "animElement" | "actionStep" | "camera" | "molStruct";
 
 
 // ------------------------------------------------------------
@@ -79,6 +82,8 @@ const InspectorPanelComponent: React.FC = () => {
     setStepHeader: onStepHeaderChange,
     clearCamera,
     setCameraHeader: onCameraHeaderChange,
+    clearMolStruct,
+    setMolStructHeader: onMolStructHeaderChange,
   } = useInspectorActions();
   const { cm } = useCueMol();
   const { activeSceneId: sceneId } = useActiveScene();
@@ -97,6 +102,11 @@ const InspectorPanelComponent: React.FC = () => {
   const onCameraGone = useCallback(() => {
     if (cameraSceneId !== undefined) clearCamera(cameraSceneId);
   }, [clearCamera, cameraSceneId]);
+  const molStruct = target?.kind === "molStruct" ? target : null;
+  const molStructSceneId = molStruct?.sceneId;
+  const onMolStructGone = useCallback(() => {
+    if (molStructSceneId !== undefined) clearMolStruct(molStructSceneId);
+  }, [clearMolStruct, molStructSceneId]);
 
   /**
    * Writer for the structured page. It presents a renderer group's `visible`
@@ -137,7 +147,9 @@ const InspectorPanelComponent: React.FC = () => {
           ? `anim:${target.sceneId}:${target.uid}`
           : target.kind === "camera"
             ? `camera:${target.sceneId}:${target.name}`
-            : `step:${target.sceneId}:${target.stepId}:${target.entryIndex ?? ""}`;
+            : target.kind === "molStruct"
+              ? `mol:${target.sceneId}:${target.molId}:${JSON.stringify(target.part)}`
+              : `step:${target.sceneId}:${target.stepId}:${target.entryIndex ?? ""}`;
   useEffect(() => {
     if (targetKey !== null) setMode(defaultMode);
   }, [targetKey, defaultMode]);
@@ -187,6 +199,21 @@ const InspectorPanelComponent: React.FC = () => {
           entryIndex={actionStep.entryIndex}
           onHeaderChange={onStepHeaderChange}
         />
+      ) : molStruct ? (
+        /* -- Chain / residue / atom target (read-only) -- */
+        cm ? (
+          <MolStructInspector
+            key={`${molStruct.molId}:${JSON.stringify(molStruct.part)}`}
+            cm={cm}
+            sceneId={molStruct.sceneId}
+            molId={molStruct.molId}
+            part={molStruct.part}
+            onGone={onMolStructGone}
+            onHeaderChange={onMolStructHeaderChange}
+          />
+        ) : (
+          <div className="inspector-empty">No molecule.</div>
+        )
       ) : camera ? (
         /* -- Named camera target (self-contained page) -- */
         cm ? (

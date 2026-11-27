@@ -186,6 +186,15 @@ namespace molstr {
     // @return number of property names added to param names.
     int getResPropNames(std::set<LString> &names) const;
 
+    /// Get a string property for scripting (empty when the property is not set).
+    LString getPropStrScr(const LString &propname) const
+    {
+      LString value;
+      if (!getPropStr(propname.c_str(), value))
+        return LString();
+      return value;
+    }
+
     //////////////////////////////////////////////////////////
     // other operations
 

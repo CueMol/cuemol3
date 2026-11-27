@@ -422,8 +422,13 @@ export function GetPdbDialog({ visible, onConfirm, onCancel }: Props): React.JSX
   const coordOn = showCoord && (isPdb ? coordEnabled : true)
   const xtalOn = section === 'xtal' && (map2fofcEnabled || mapFofcEnabled)
   const emSelected = section === 'em' ? emdbIds.filter((id) => !emOff.has(id)) : []
+  // Wait for the EMDB record of a selected map, which carries its recommended
+  // level: pressed earlier, the map would be drawn at the top-1% level. A
+  // record that could not be read ('error') does not hold the download.
+  // (An EMDB ID typed directly shows no map row until its record is read.)
+  const emdbReading = emSelected.some((id) => emdbInfo[id] === 'loading')
   const canSubmit = isPdb
-    ? accession !== null && (coordOn || xtalOn || emSelected.length > 0)
+    ? accession !== null && (coordOn || xtalOn || emSelected.length > 0) && !emdbReading
     : coordOn
 
   const toggleEm = (id: string, on: boolean): void => {

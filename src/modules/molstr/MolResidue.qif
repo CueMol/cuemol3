@@ -34,6 +34,9 @@ runtime_class MolResidue
 
   string getAtomsJSON();
 
+  /// String property of the residue (e.g. "secondary"); empty when not set.
+  string getPropStr(string name) => getPropStrScr;
+
   object<Vector> getPivotPos() => getPivotPosScr;
 
   object<MolAtom$> getAtom(string aname) => getAtom;

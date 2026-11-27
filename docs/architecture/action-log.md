@@ -154,7 +154,7 @@ helper)。
 | `superposeMol` | `superpose`。transform (xformMat) として保つときは `keepAsProperty` |
 | `createRendererOnObject` | `create_renderer` (type・name・selection・`centerView`)。group 指定があれば、続けて `group` の `set_node_prop`。preset は `create_preset_renderer` (preset・group 名・`centerView`) |
 | `changeRendererType` | `set_renderer_type` |
-| `loadObject` (File > Open) | 形式ごとの load の op (`load_pdb` / `load_mmcif` / `load_mtz` / `load_ccp4` / `load_msms` / `load_psf` / `load_amber`、どれでもなければ `load_file`) に、dialog の形式のオプションと renderer の選択 (type・selection・`rendererName`・`preset`・`centerView`・`mapCenterPolicy`) を入れる。形式ごとの op は reader を自分で選ぶ。`load_file` には dialog が読んだ reader を `reader` として入れる (再生で拡張子から別の reader が選ばれないように) |
+| `loadObject` (File > Open) | 形式ごとの load の op (`load_pdb` / `load_mmcif` / `load_mtz` / `load_ccp4` / `load_msms` / `load_psf` / `load_amber`、どれでもなければ `load_file`) に、dialog の形式のオプションと renderer の選択 (type・selection・`rendererName`・`preset`・`centerView`・`mapCenterPolicy`) を入れる。形式ごとの op は reader を自分で選ぶ。`load_file` には dialog が読んだ reader を `reader` として入れる (再生で拡張子から別の reader が選ばれないように)。`rendererName` は既定名 ([Renderer の既定名](renderer-default-name.md)) なら null、利用者が付けた名前なら preset の group でも記録する (`recordedRendererName`。Get PDB の `fetch_pdb` / `fetch_entry` も同じ) |
 | `viewXform` (回転・平行移動) | 0 でない軸ごとの `rotate_view`、`pan_view` |
 | map の property (`map/props.ts`) | renderer への `set_node_prop`。Re-centre は `recenter_map` (中心は再生したときの view の中心) |
 | 背景色 (`scene/sceneBgColor.ts`、メニューの背景色) | scene の `set_node_prop bgcolor` (色名のまま)。Color proofing は切り替えた後の `use_colproof` (と既定の `icc_filename`) の `set_node_prop` |

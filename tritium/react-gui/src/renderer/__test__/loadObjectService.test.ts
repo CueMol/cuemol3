@@ -66,6 +66,8 @@ function makeFixture(opts: { readThrows?: boolean; obj?: Record<string, unknown>
         commitUndoTxn: vi.fn(() => calls.push('commit')),
         rollbackUndoTxn: vi.fn(() => calls.push('rollback')),
         addObject: vi.fn(() => calls.push('addObject')),
+        // The recorded renderer name is compared with the scene's default.
+        getRendByName: vi.fn(() => null),
     }
 
     const createHandler = vi.fn(() => reader)

@@ -20,6 +20,7 @@ vi.mock('@renderer/hooks/cuemol/useCueMolEventListener', () => ({
 }))
 vi.mock('@renderer/hooks/cuemol/useCueMol', async () => (await import('@renderer/__test__/helpers/paneEnv')).mockCueMolModule())
 vi.mock('@renderer/state/workspace', async () => (await import('@renderer/__test__/helpers/paneEnv')).mockWorkspaceModule())
+vi.mock('@renderer/state/inspector', async () => (await import('@renderer/__test__/helpers/paneEnv')).mockInspectorModule())
 
 import { MolStructPane, RESIDUE_PAGE } from '@renderer/features/selection/MolStructPane'
 import { mountTree, flushPromises } from '@renderer/__test__/helpers/testHarness'

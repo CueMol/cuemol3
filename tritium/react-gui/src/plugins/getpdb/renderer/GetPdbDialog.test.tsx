@@ -118,6 +118,37 @@ describe('GetPdbDialog', () => {
     })
   })
 
+  it('Download waits for a selected EMDB map record, but not for one that could not be read', () => {
+    const findDownload = (c: HTMLElement) =>
+      Array.from(c.querySelectorAll('button')).find((b) => b.textContent === 'Download') as HTMLButtonElement
+    // Pressed while the record is read, the map would be drawn at the top-1%
+    // level instead of the recommended one.
+    lookupState = {
+      lookup: {
+        status: 'pdb',
+        accession: { kind: 'pdb', id: '5irx' },
+        entry: {
+          id: '5irx', title: '', methods: ['ELECTRON MICROSCOPY'], resolution: 2.95,
+          emdbIds: ['EMD-8118'], pdbFormatAvailable: true, kind: 'em',
+        },
+      },
+      emdbInfo: { 'EMD-8118': 'loading' },
+    }
+    const first = mount()
+    typeId(first.container, '5irx')
+    expect(findDownload(first.container).disabled).toBe(true)
+    first.unmount()
+
+    // An EMDB ID typed directly whose lookup failed: the top-1% path stays open.
+    lookupState = {
+      lookup: { status: 'error', accession: { kind: 'emdb', id: 'EMD-8118', num: '8118' }, message: 'offline' },
+      emdbInfo: {},
+    }
+    const second = mount()
+    typeId(second.container, 'EMD-8118')
+    expect(findDownload(second.container).disabled).toBe(false)
+  })
+
   it('Enter searches keywords not yet searched; a picked hit is downloaded as that entry', () => {
     const first = mount()
     typeId(first.container, 'photosystem I')

@@ -10,6 +10,8 @@ import { PDB_ID_RE, pickCoordUrl } from '@renderer/worker/shared/pdbUrls'
 import { STRUCTURE_SOURCES, structureFetch } from '@renderer/worker/shared/dbSources'
 import type { StreamLoadFromUrlArgs } from '@renderer/worker/server/services/file/streamLoadFromUrl'
 import { buildHeadlessFileOpenOptions } from '@renderer/worker/server/services/file/headlessOpen'
+import { getSceneOrNull } from '@renderer/worker/server/services/helpers/sceneResolver'
+import type { RendNameScope } from '@renderer/worker/server/services/rend/defaultRendererName'
 import { defineOp } from '../op'
 import { LOAD_RENDERER_PARAMS, NULL_RENDERER_DOC, applyRendererArgs, loadObjectFile, openTarget, readerTarget, SCENE_FILE_RE } from '../fileLoad'
 import type { OpContext, OpOutcome } from '../op'
@@ -52,7 +54,7 @@ async function fetchInto(
     rendererType: args.rendererType,
     selection: args.selection,
   })
-  applyRendererArgs(options.renderer, args)
+  applyRendererArgs(options.renderer, args, getSceneOrNull(ctx, oc.sceneId) as unknown as RendNameScope | null)
   options.format = setFormat(options.format)
 
   // Registered with the caller so that stopping it aborts this download
