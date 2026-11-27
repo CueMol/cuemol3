@@ -5,11 +5,15 @@
  * Runs the real listener on a free port. The checks are the security
  * contract (no token, a foreign origin, an endpoint that is off) and the one
  * path every endpoint shares: an MCP request relayed to the window as
- * `{ endpoint, kind, payload }` with the window's answer sent back.
+ * `{ endpoint, kind, payload }` with the window's answer sent back. And the
+ * info file: a server that stops leaves another CueMol's file alone.
  */
 
 import { describe, it, expect, afterEach } from 'vitest'
 import * as net from 'net'
+import * as fs from 'fs'
+import * as os from 'os'
+import * as nodePath from 'path'
 import { EditLock } from './editLock'
 import { createLocalApiServer } from './server'
 import type { LocalApiServer } from './server'
@@ -110,5 +114,31 @@ describe('the local API server', () => {
       content: [{ type: 'text', text: JSON.stringify({ ok: false, error: 'CueMol is not ready yet.' }) }],
       isError: true,
     })
+  })
+})
+
+describe('the info file', () => {
+  it("is removed on stop only when this process wrote it", async () => {
+    const dir = fs.mkdtempSync(nodePath.join(os.tmpdir(), 'localapi-'))
+    const infoFile = nodePath.join(dir, 'local-api.json')
+    try {
+      const port = await freePort()
+      server = createLocalApiServer({ handlers: [mcpEndpoint(fakeRelay([]), '0.0.0', new EditLock())], token: () => TOKEN, port, infoFile })
+      await server.setEndpoint('mcp', true)
+      expect(JSON.parse(fs.readFileSync(infoFile, 'utf8')).pid).toBe(process.pid)
+      await server.stop()
+      expect(fs.existsSync(infoFile)).toBe(false)
+
+      // Another CueMol (an installed one beside a development build) wrote it.
+      const other = JSON.stringify({ port: port + 1, token: 't', pid: process.pid + 1, endpoints: ['mcp'] })
+      fs.writeFileSync(infoFile, other)
+      server = createLocalApiServer({ handlers: [mcpEndpoint(fakeRelay([]), '0.0.0', new EditLock())], token: () => TOKEN, port: await freePort(), infoFile })
+      await server.setEndpoint('mcp', true)
+      fs.writeFileSync(infoFile, other)
+      await server.stop()
+      expect(fs.readFileSync(infoFile, 'utf8')).toBe(other)
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
