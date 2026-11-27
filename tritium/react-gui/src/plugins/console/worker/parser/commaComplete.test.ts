@@ -265,9 +265,13 @@ describe('native argument completion', () => {
     expect(listed(out)).toBe('argument: rendererType= selection=')
   })
 
-  it('reads a bracket as execution does, and adds nothing after the last parameter or an open one', () => {
+  it('reads a bracket as execution does, and closes a selection with a comma only at its top level', () => {
     expect(runNative('load f.pdb, cartoon, (prot').replacement).toBe('load f.pdb, cartoon, (protein')
     expect(runNative('load f.pdb, cartoon, (protein, lig').replacement).toBe('load f.pdb, cartoon, (protein, ligand')
+    // rendererType is still to come: a comma ends the expression, unless it would land in a bracket or a quote.
+    expect(runNative('load f.pdb, selection=prot').replacement).toBe('load f.pdb, selection=protein, ')
+    expect(runNative('load f.pdb, selection=(prot').replacement).toBe('load f.pdb, selection=(protein')
+    expect(runNative('load f.pdb, selection="protein or lig').replacement).toBe('load f.pdb, selection="protein or ligand')
   })
 
   it('does not fall back to files where a parameter offers nothing', () => {
@@ -333,14 +337,19 @@ describe('file completion', () => {
     } as unknown as ConsoleDialect
     const go = (line: string) => completeLine(ctx, line, { ...cc, cwd: dir, dialect: files })
 
-    // The pattern becomes every match, then a space for the next word.
-    expect(go('load 1c*').replacement).toBe('load 1cbs.pdb 1crn.pdb ')
-    expect(go('load x.pdb */*').replacement).toBe('load x.pdb My\\ Data/2abc.pdb ')
+    // The pattern becomes every match; `name` is still to come, so a comma
+    // closes the list (deleting it and typing a space adds another word).
+    expect(go('load 1c*').replacement).toBe('load 1cbs.pdb 1crn.pdb, ')
+    expect(go('load x.pdb */*').replacement).toBe('load x.pdb My\\ Data/2abc.pdb, ')
     expect(printed(go('load zz*').messages)).toContain('no matches found: zz*')
-    // A file ends a word with a space, not a comma; a space in a name is escaped.
-    expect(go('load 1crn.pdb 1cb').replacement).toBe('load 1crn.pdb 1cbs.pdb ')
+    // The last word of the list; a space in a name is escaped, a directory goes on.
+    expect(go('load 1crn.pdb 1cb').replacement).toBe('load 1crn.pdb 1cbs.pdb, ')
     expect(go('load My').replacement).toBe('load My\\ Data/')
-    expect(go('load My\\ Data/').replacement).toBe('load My\\ Data/2abc.pdb ')
+    expect(go('load My\\ Data/').replacement).toBe('load My\\ Data/2abc.pdb, ')
+    // Text after the caret that goes on with the list keeps the space; a comma there does not.
+    const mid = (line: string, rest: string) => completeLine(ctx, line, { ...cc, cwd: dir, dialect: files, rest })
+    expect(mid('load 1cb', ' 1crn.pdb, x').replacement).toBe('load 1cbs.pdb ')
+    expect(mid('load 1cb', ', x').replacement).toBe('load 1cbs.pdb, ')
   })
 
   it('expands a node pattern through the dialect and writes names as list words', () => {
@@ -365,5 +374,24 @@ describe('file completion', () => {
     expect(go('hide 1crn */c*').replacement).toBe('hide 1crn 1crn/cartoon1 my\\ mol ')
     expect(expand.mock.calls.at(-1)?.[2]).toMatchObject({ pattern: '*/c*' })
     expect(go('hide 1crn my').replacement).toBe('hide 1crn my\\ mol ')
+  })
+
+  it('does not close a list with a comma when only a parameter filled in from it is left', () => {
+    const nodes = {
+      argRule: 'python',
+      fileFallback: false,
+      commands: () => [{
+        name: 'delete_node',
+        // The node's kind comes from its name (native's typeParam).
+        params: [{ name: 'nodeId' }, { name: 'nodeType', default: '', implied: true }],
+        mode: 'strict',
+        mutates: true,
+        summary: 'stub',
+        completions: [{ source: 'nodes', description: 'node', list: true }, null],
+        run: () => ({ ok: true }),
+      }],
+      candidates: () => ['my mol', '1crn'],
+    } as unknown as ConsoleDialect
+    expect(completeLine(ctx, 'delete_node 1c', { ...cc, dialect: nodes }).replacement).toBe('delete_node 1crn ')
   })
 })

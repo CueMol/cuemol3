@@ -5,7 +5,8 @@
  * The two ends of one wire format live in different packages (the client in
  * tritium/cli), so they are run against each other: the client
  * finds the server through the info file the server writes, its request
- * reaches the window as a `console` / `run` relay, and the answer comes back.
+ * reaches the window as a `console` / `run` relay, and the answer comes back;
+ * a completion request keeps the text after the cursor on the way.
  * When the endpoint is off the client says how to turn it on. `quit` goes to
  * main's /app/quit and reports whether the app's save prompt let it go.
  */
@@ -78,6 +79,11 @@ describe('tritium_cli and the console endpoint', () => {
     expect(asked).toEqual([
       { endpoint: 'console', kind: 'run', payload: { dialect: 'native', text: 'cd data; pwd', cwd: '/' } },
     ])
+
+    // Tab's request keeps the text after the cursor (it decides whether a list is closed with `, `).
+    await post('/console/complete', { dialect: 'native', line: 'zoom 1cr', rest: ' 2abc', cwd: '/' })
+    expect(asked.at(-1)).toEqual({ endpoint: 'console', kind: 'complete', payload: { dialect: 'native', line: 'zoom 1cr', rest: ' 2abc', cwd: '/' } })
+    await expect(post('/console/complete', { dialect: 'native', line: 'zoom', rest: 5, cwd: '/' })).rejects.toThrow(/rest must be a string/)
 
     await server.setEndpoint('console', false)
     await expect(post('/console/run', { dialect: 'native', text: 'pwd', cwd: '/' })).rejects.toThrow(

@@ -156,7 +156,7 @@ type MenuInterface = readline.Interface & {
  * rows around the selection. Keys reach readline through `_ttyWrite`, which
  * this wraps to see them first.
  */
-function installCompletion(rl: MenuInterface, complete: (line: string) => Promise<ConsoleCompleteResponse>): void {
+function installCompletion(rl: MenuInterface, complete: (line: string, rest: string) => Promise<ConsoleCompleteResponse>): void {
   const out = process.stdout
   const ttyWrite = rl._ttyWrite.bind(rl)
   /** Lines drawn under the prompt. */
@@ -257,7 +257,7 @@ function installCompletion(rl: MenuInterface, complete: (line: string) => Promis
   const tab = () => {
     const line = rl.line.slice(0, rl.cursor)
     const rest = rl.line.slice(rl.cursor)
-    complete(line)
+    complete(line, rest)
       .then((res) => {
         // Typed on while asking: the answer is for a line that is gone.
         if (rl.line.slice(0, rl.cursor) !== line) return
@@ -566,8 +566,8 @@ async function interactive(appInfo: ConsoleInfoResponse | null): Promise<number>
     historySize: HISTORY_SIZE,
     removeHistoryDuplicates: true,
   })
-  installCompletion(rl as MenuInterface, (line) =>
-    post<ConsoleCompleteResponse>('/console/complete', { dialect: session.dialect, line, cwd: session.cwd }),
+  installCompletion(rl as MenuInterface, (line, rest) =>
+    post<ConsoleCompleteResponse>('/console/complete', { dialect: session.dialect, line, rest, cwd: session.cwd }),
   )
   const prompt = () => {
     rl.setPrompt(promptText())
