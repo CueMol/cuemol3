@@ -99,6 +99,17 @@ SEM_CHANGED=4` と **連番**で、OR したビットマスクにならない。
   Animation の `handleRulerMouseDown` ライフサイクルと同型。
 - 表示 frame = `scrubFrame ?? committedFrame` (Animation の `liveMgr ?? baseMgr` と同型)。
 
+## header (transport の行) の幅
+
+header は 1 行のまま折り返さない (Animation panel の header と同じ)。pane が狭いと、Loop / Speed ->
+zoom (Fit / - / +) -> Frame の順に、末尾の「more」popover に移る (`usePriorityOverflow`、
+`renderer/hooks/react/`。plugin からも使えるよう Animation panel から移した)。target の select と再生
+ボタンは常に残る。
+
+- target の select は固定幅 (`--mdtraj-target-w`、200px)。trajectory の名前で行の幅が変わらないように。
+- header の幅が 560px 以下 (container query `mdtraj-transport`) では select を `--mdtraj-target-w-narrow`
+  (112px) にし、`Trajectory` の見出しを隠す。狭い pane でも再生ボタンと「more」が入るようにするため。
+
 ## 構成 (実装ファイル)
 
 以下はすべて `tritium/react-gui/src/plugins/mdtools/` 配下。

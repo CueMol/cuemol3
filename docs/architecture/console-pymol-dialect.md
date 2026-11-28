@@ -294,6 +294,8 @@ camera の操作は undo しない ([ADR-0025](../migration/adr/ADR-0025-view-pa
   console が始めた `rock` の loop も元に戻す。[rock-spin-anim.md](rock-spin-anim.md)
 - `frame n` / `count_states`: MorphMol と trajectory の `frame` / `nframe` を直接読み書きする
   (mdtools plugin を import しない)。PyMOL の state は 1 から、CueMol の frame は 0 から。範囲外は丸めて warn。
+- `load_traj` (`trajCommands.ts`) と、`load` に渡した trajectory ファイル: MD Tools の op `add_traj_block` に
+  変換する。`state` 1 で置き換え、0 で追加。[md-trajectory-console-ops.md](md-trajectory-console-ops.md) §4
 
 ### 画像、script、その他 (`miscCommands.ts` / `rayCommands.ts`)
 
