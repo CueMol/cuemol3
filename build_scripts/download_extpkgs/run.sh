@@ -83,7 +83,7 @@ else
     exit 1
 fi
 
-wget --progress=dot:mega -c https://www.osxexperts.net/${FFMPEG_DIST}.zip
+wget --progress=dot:mega -c $THIRDPARTY_MIRROR_URL/${FFMPEG_DIST}.zip
 if [ $RUNNER_OS = "macOS" ]; then
     xattr -cr ${FFMPEG_DIST}.zip
 fi
