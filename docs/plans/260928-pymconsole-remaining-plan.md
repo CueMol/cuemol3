@@ -12,11 +12,9 @@ Status: **未着手 / 後日**。PyMOL dialect にまだ無いコマンドと、
 
 調査報告の Tier 2 では「MD trajectory ブランチの統合待ち」で後回しにしたもの。mdtools
 (`src/modules/mdtools/`、GUI は `plugins/mdtools/`) が develop に入ったので着手できる。
-`count_states` は実装済み。
 
 | PyMOL | 状況 | 見込み |
 |---|---|---|
-| `load_traj` | 未実装 | mdtools の開くフロー (`docs/architecture/md-trajectory-open-dialog.md`) の headless 版 |
 | `intra_fit` | 未実装 | frame ごとの重ね合わせ。C++ 側に同等機能があるか要調査 |
 | `smooth` | 未実装 | frame の移動平均。同上 |
 | `split_states` / `join_states` | 未実装 | CueMol の trajectory / multi-model の持ち方との対応を要調査 |

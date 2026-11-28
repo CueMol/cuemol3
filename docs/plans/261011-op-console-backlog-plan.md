@@ -18,7 +18,6 @@ op ごとの記録と qax での再生は実装済み ([action-log.md](../archit
 | ファイルへのバッチ実行 | フォルダ・マクロ・出力 (画像 / 保存) を指定するダイアログ。ファイルごとに 読み込み -> マクロ -> 出力 -> 片付け を繰り返す。進捗の表示、中断、失敗したファイルの一覧 |
 | 録画ボタン | 開始で History に印を付け、終了で印から今までを選んだ状態にして Save to Actions を開く。記録の仕組みは History と共有し、録画中であることはステータスバーに出す |
 | preset の追加 | 既存の op で表せず外したもの: chain ごとの色、初期表示 (simple) に戻す、輪郭線 (renderer を一括で指す op)、重ね合わせ (object 2 つ) |
-| 記録の対応表の拡充 | [261013-action-record-coverage-plan.md](261013-action-record-coverage-plan.md) |
 | undo 履歴の永続化 | action log を scene と一緒に保存するか、別ファイルにするか |
 | qax の C++ 移行 | コマンド系とあわせて qax の読み書きを C++ に移す。golden file で同じ形式を検証する |
 | context 参照の ref | 意味型の ref で「アクティブな object」「現在の selection」を指せるようにする |
@@ -36,7 +35,6 @@ GUI の操作のうち、op の組み合わせで表せないもの (2026-11-06 
 | レンダリング | 動画・POV-Ray のレンダリング (`renderStart`) | `render_image` は Umbreon の静止画だけ |
 | レンダリング | Export の Umbreon 画像 (`exportScene`) | `export_scene` の format に `umbreon` が無い |
 | view | 対称分子の原子へ Center (`naviCenterAtSymm`) | symm renderer の原子を指す op が無い (視点なので記録はしない) |
-| MD | trajectory を開く・block の編集 (mdtools) | plugin から op を足す仕組みが無い |
 | agent | ラベル編集・結合編集、APBS・morph・アニメーション編集 | console / MCP の op はあるが agent には出していない (`tool: false`) |
 
 ## 3. MCP / agent

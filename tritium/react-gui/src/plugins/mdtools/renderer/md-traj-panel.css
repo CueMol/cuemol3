@@ -66,8 +66,56 @@
   color: var(--text-muted);
 }
 
-.mdtraj-zoom {
+/* Never wraps: groups that do not fit move into the "more" popover
+   (usePriorityOverflow), so nothing is clipped by the fixed row height. */
+.mdtraj-transport {
+  overflow: hidden;
+  container: mdtraj-transport / inline-size;
+}
+
+.mdtraj-transport > * {
+  flex-shrink: 0;
+}
+
+/* The target select has a fixed width (the row does not reflow with the
+   trajectory's name), narrower in a narrow pane, where the caption goes too:
+   the playback buttons and the "more" button must always fit. */
+.mdtraj-transport .mdtraj-target .h3-object-select {
+  min-width: 0;
+  width: var(--mdtraj-target-w);
+}
+
+@container mdtraj-transport (max-width: 560px) {
+  .mdtraj-transport .mdtraj-target .h3-object-select {
+    width: var(--mdtraj-target-w-narrow);
+  }
+
+  .mdtraj-target > .mdtraj-readout-label {
+    display: none;
+  }
+}
+
+.mdtraj-transport .h3-form-btn-row {
+  flex-wrap: nowrap;
+}
+
+/* Zoom and the "more" button sit at the right end; whichever comes first
+   takes the free space. */
+.mdtraj-zoom,
+.mdtraj-overflow {
   margin-left: auto;
+}
+
+.mdtraj-zoom + .mdtraj-overflow {
+  margin-left: 0;
+}
+
+/* "More" popover: the header groups that did not fit, one form row each. */
+.mdtraj-overflow-menu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
 }
 
 .mdtraj-error {

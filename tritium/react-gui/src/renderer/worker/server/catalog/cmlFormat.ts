@@ -97,6 +97,10 @@ export function formatCommand(
       parts.push(`${argName}=${nodeListText(args[argName] as number[], refs[argName])}`)
       continue
     }
+    if (p.kind === 'paths' && Array.isArray(args[argName])) {
+      parts.push(`${argName}=${(args[argName] as string[]).map((f) => listArg(f, true)).join(' ')}`)
+      continue
+    }
     const isRef = REF_SEMANTICS.has(p.semantic ?? '') && typeof args[argName] === 'number'
     const ref = isRef ? (refs[argName] ?? `#${String(args[argName])}`) : undefined
     // The arguments the console reads as lists (fromCatalog.ts).

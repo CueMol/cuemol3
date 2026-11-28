@@ -24,6 +24,7 @@ plugin console/worker/
          dialects/native/ op catalog から生成するコマンド + console 自前の builtin
          dialects/registry.ts  plugin が登録した dialect
          dialect-api.ts   dialect を足す plugin に公開する唯一の入口
+plugin mdtools/worker/trajOps.ts  plugin が足す op (registerPluginOps、md-trajectory-console-ops.md)
 plugin pymol-console/worker/     PyMOL 語彙のコマンド (書き込みは op を runOp で呼ぶ)、selection 翻訳 (sel/)
 plugin chimerax-console/worker/  ChimeraX 語彙のコマンド (op を invokeOp で呼ぶ)、atom spec 翻訳 (spec/)
 ```
@@ -39,6 +40,11 @@ dialect の plugin は console の内部を `@plugins/console/worker/dialect-api
 使わず、互いを import しない。ChimeraX dialect は worker service を許可した読み取り専用の補助だけ import する
 ([console-chimerax-dialect.md](console-chimerax-dialect.md) §1)。
 
+plugin は `registerPluginOps(pluginId, ops)` で op を足せる (mdtools の MD trajectory の op)。一覧は
+`allOps()` / `findOp()` / `toolOps()` / `toolsetOps()` / `mcpOps()` / `consoleCommandOps()` の関数で読み、
+module の評価時に固定しない (後から登録された op が入らなくなるため)。
+[md-trajectory-console-ops.md](md-trajectory-console-ops.md) §1。
+
 ## 2. param DSL
 
 | 種別 | 宣言 | JSON Schema | console での書き方 |
@@ -52,6 +58,7 @@ dialect の plugin は console の内部を `@plugins/console/worker/dialect-api
 | colour / path | `color` / `path` | string | 色名・`#rrggbb` / cwd 基準のパス |
 | renderer type | `rendererType` | string | 補完は対象 object の作成可能 type |
 | property | `propName` / `propValue` / `propPath` | string | `propPath` は `obj/rend.prop` / `obj.prop` / scene の `prop` (node の後ろに `.` で property) |
+| ファイルの列 | `paths` | string の配列 (空は不可) | `a.xtc b.xtc`、`run*.dcd` (空白区切り。パターンは展開する。1 回の op に全部を渡す)。qax ではファイル 1 つにつき `<arg>` 1 つ。[md-trajectory-console-ops.md](md-trajectory-console-ops.md) §2 |
 | 座標 | `vec3` | number の配列 (3 要素は読み込み時に検査) | `x y z` |
 | 原子列 | `atoms` | `{chain, resid, atomName}` の配列 | `A.20.CA A.21.CA` |
 

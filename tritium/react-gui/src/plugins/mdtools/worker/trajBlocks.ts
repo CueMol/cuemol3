@@ -12,6 +12,7 @@
 
 import type { WorkerContext } from '@renderer/worker/server/types/WorkerContext';
 import { OBJREADER_CATEGORY } from '@renderer/worker/server/services/helpers/pickReaderName';
+import { makeSel } from '@renderer/worker/server/services/helpers/makeSel';
 import { SINGLE_FRAME_READERS, TRAJ_READER_BY_EXT, fileExt } from '../trajFormats';
 
 export { TRAJ_READER_BY_EXT, fileExt };
@@ -43,7 +44,9 @@ export interface TrajAppendTarget {
  * or undefined when every one has a reader. Checked before a txn starts, so an
  * unsupported file is reported as such rather than as a failed read.
  */
-export function unsupportedTrajFormat(paths: readonly string[]): string | undefined {
+export function unsupportedTrajFormat(paths: readonly string[], reader?: string | null): string | undefined {
+    // A reader named by the caller reads every file, whatever its extension.
+    if (reader) return undefined;
     for (const p of paths) {
         const ext = fileExt(p);
         if (!TRAJ_READER_BY_EXT[ext]) return `unsupported trajectory format ".${ext}": ${p}`;
@@ -91,9 +94,11 @@ export function fileAtomCount(ctx: WorkerContext, path: string): number {
 }
 
 /**
- * Read one trajectory file (picked by extension) and append it to `traj`.
+ * Read one trajectory file and append it to `traj`.
  *
  * @param nevery - keep every Nth frame (1 = all)
+ * @param reader - the block reader to read it with; by default the one its
+ *   extension names
  * @throws on an unsupported extension, a missing reader or an atom-count mismatch
  */
 export function appendTrajFile(
@@ -101,14 +106,33 @@ export function appendTrajFile(
     traj: TrajAppendTarget,
     path: string,
     nevery: number,
+    reader?: string | null,
 ): void {
     const ext = fileExt(path);
-    const nick = TRAJ_READER_BY_EXT[ext];
+    const nick = reader || TRAJ_READER_BY_EXT[ext];
     if (!nick) throw new Error(`unsupported trajectory format ".${ext}": ${path}`);
-    const reader = blockReader(ctx, nick, traj);
+    const blockRd = blockReader(ctx, nick, traj);
     // A one-frame reader has no frame sampling (and no nevery property).
-    if (nevery > 1 && !SINGLE_FRAME_READERS.has(nick)) reader.nevery = nevery;
-    readAndAppend(reader, traj, path);
+    if (nevery > 1 && !SINGLE_FRAME_READERS.has(nick)) blockRd.nevery = nevery;
+    readAndAppend(blockRd, traj, path);
+}
+
+/** Minimal surface of a Trajectory a load selection is applied to. */
+interface LoadSelTarget {
+    applyLoadSel(sel: unknown): void;
+}
+
+/**
+ * Keep only the atoms `selStr` selects (`Trajectory::applyLoadSel`): the
+ * others are removed from the molecule for good, and every block reads only
+ * the kept atoms. Only before the first block is appended.
+ *
+ * @throws on a selection that does not parse, or once a block is there
+ */
+export function applyLoadSel(ctx: WorkerContext, sceneId: number, traj: unknown, selStr: string): void {
+    const sel = makeSel(ctx, selStr, sceneId);
+    if (!sel) throw new Error(`invalid selection: ${selStr}`);
+    (traj as LoadSelTarget).applyLoadSel(sel);
 }
 
 /**

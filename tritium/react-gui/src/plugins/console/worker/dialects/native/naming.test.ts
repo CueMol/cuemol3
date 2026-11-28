@@ -13,7 +13,7 @@ import { describe, it, expect, vi } from 'vitest'
 vi.mock('@cuemol/core/src/wrappers/wrapper-loader', () => ({ wrapper_map: {} }))
 vi.mock('@cuemol/core/src/BaseWrapper', () => ({ BaseWrapper: class {} }))
 
-import { OPS } from '@renderer/worker/server/catalog'
+import { allOps } from '@renderer/worker/server/catalog'
 import { OP_GROUPS } from '@renderer/worker/server/catalog/op'
 import { NATIVE_DIALECT } from './index'
 
@@ -33,9 +33,9 @@ const SHELL_NAMES = new Set(['cd', 'pwd', 'ls', 'scenes'])
 
 describe('command names', () => {
   it('start with a verb from the vocabulary, the op names and the builtins alike', () => {
-    const generated = new Set(OPS.flatMap((op) => [op.name, ...(op.aliases ?? []).map((a) => a.name)]))
+    const generated = new Set(allOps().flatMap((op) => [op.name, ...(op.aliases ?? []).map((a) => a.name)]))
     const builtins = NATIVE_DIALECT.commands().map((c) => c.name).filter((n) => !generated.has(n))
-    const names = [...OPS.map((op) => op.name), ...builtins].filter((n) => !SHELL_NAMES.has(n))
+    const names = [...allOps().map((op) => op.name), ...builtins].filter((n) => !SHELL_NAMES.has(n))
     expect(names.filter((n) => !VERBS.has(n.split('_')[0]))).toEqual([])
   })
 

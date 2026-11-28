@@ -68,8 +68,33 @@ export function openTarget(ctx: WorkerContext, raw: string): OpenTarget | { erro
   // Claimed by no reader at all: let the content decide, as File > Open does.
   const contentFirst = kind.kind === 'unsupported' ? true : kind.contentFirst
   const readerName = getCompatibleRendererNames(ctx, { filePath, contentFirst }).readerName
-  if (!readerName) return { error: `No reader can handle "${filePath}". Check the path and the format.` }
+  if (!readerName) {
+    // A trajectory reader's extension, kept out of the open filters (a DCD file has no content sniff).
+    if (trajectoryExtension(ctx, filePath)) return { error: trajectoryFramesError(filePath) }
+    return { error: `No reader can handle "${filePath}". Check the path and the format.` }
+  }
   return { scene: false, filePath, readerName, contentFirst }
+}
+
+/** A path of an object reader's extension that only the trajectory (TrajBlock) readers claim. */
+function trajectoryExtension(ctx: WorkerContext, filePath: string): boolean {
+  const ext = filePath.split(/[\\/]/).pop()?.split('.').pop()?.toLowerCase() ?? ''
+  if (!ext) return false
+  const withTraj = getOpenFilters(ctx, { catId: OBJREADER_CATEGORY, includeTrajReaders: true })[0]?.extensions ?? []
+  const without = getOpenFilters(ctx, { catId: OBJREADER_CATEGORY })[0]?.extensions ?? []
+  return withTraj.includes(ext) && !without.includes(ext)
+}
+
+/**
+ * Why a load refuses a file of MD trajectory frames: they belong to a
+ * molecule (a topology), so they open through the MD Tools ops.
+ */
+function trajectoryFramesError(filePath: string): string {
+  return (
+    `"${filePath}" holds MD trajectory frames, which cannot be opened on their own. ` +
+    'Open them with their topology (load_trajectory <topology>, <files>), or add them to a molecule ' +
+    'already open (add_traj_block <molecule>, <files>).'
+  )
 }
 
 /**
@@ -150,6 +175,10 @@ export function loadObjectFile(
   args: LoadArgs,
   adjust?: (format: FormatOptions) => FormatOptions | { error: string },
 ): OpOutcome {
+  // A TrajBlock reader (picked by extension, by content or by name) reads into a trajectory only.
+  if (getCompatibleRendererNames(ctx, { filePath: target.filePath, readerName: target.readerName }).objType === 'TrajBlock') {
+    return { ok: false, error: trajectoryFramesError(target.filePath) }
+  }
   const options = buildHeadlessFileOpenOptions(ctx, {
     readerName: target.readerName,
     objectName: args.name?.trim() || fileStem(target.filePath) || 'object',
@@ -170,5 +199,16 @@ export function loadObjectFile(
     contentFirst: target.contentFirst,
     readerName: target.readerName,
   })
-  return normalizeServiceResult(result, `"${target.filePath}" could not be opened.`)
+  const outcome = normalizeServiceResult(result, `"${target.filePath}" could not be opened.`)
+  // A topology read without coordinates (a .psf or .prmtop alone): every atom is at the origin.
+  if (outcome.ok && result.ok && result.noCoords) {
+    return {
+      ...outcome,
+      data: {
+        ...(outcome.data as Record<string, unknown>),
+        note: 'No coordinates: every atom is at the origin. Add them with add_traj_block <object>, <files>.',
+      },
+    }
+  }
+  return outcome
 }

@@ -26,7 +26,7 @@ import { AppIcon } from "@renderer/h3-kit/primitives";
 import { ButtonRow, Field, FormButton, SwitchField, SelectField, TimeField } from "@renderer/h3-kit/form";
 import type { AnimMgrState } from "@renderer/types";
 import { formatClock } from "./timelineGeometry";
-import { usePriorityOverflow } from "./usePriorityOverflow";
+import { usePriorityOverflow } from "@renderer/hooks/react/usePriorityOverflow";
 
 /**
  * Optional header groups, first to move into the "more" menu first when the

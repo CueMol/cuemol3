@@ -47,8 +47,8 @@ function byName(a: AnyOp, b: AnyOp): number {
   return a.name < b.name ? -1 : a.name > b.name ? 1 : 0
 }
 
-/** Every op. */
-export const OPS: readonly AnyOp[] = [
+/** The core ops, before any plugin adds its own. */
+const CORE_OPS: readonly AnyOp[] = [
   ...SCENE_OPS,
   ...SELECTION_OPS,
   ...RENDERER_OPS,
@@ -68,14 +68,65 @@ export const OPS: readonly AnyOp[] = [
   ...ANIM_OPS,
   ...EDIT_OPS,
   ...LOAD_FORMAT_OPS,
-].sort(byName)
+]
+
+/** The lists made from the catalogue, rebuilt only when a plugin adds ops. */
+interface Views {
+  all: readonly AnyOp[]
+  tool: readonly AnyOp[]
+  mcp: readonly AnyOp[]
+  console: readonly AnyOp[]
+  byName: ReadonlyMap<string, AnyOp>
+}
+
+function buildViews(ops: readonly AnyOp[]): Views {
+  const all = [...ops].sort(byName)
+  return {
+    all,
+    tool: all.filter((op) => op.expose.tool === 'core'),
+    mcp: all.filter(isMcpOp),
+    console: all.filter((op) => op.expose.console),
+    byName: new Map(all.map((op) => [op.name, op])),
+  }
+}
+
+let views: Views = buildViews(CORE_OPS)
+
+/**
+ * Add a plugin's ops to the catalogue.
+ *
+ * Called by the plugin's worker module when the worker registers services,
+ * before any caller runs, so every caller sees the same catalogue. The lists
+ * below are read through functions because a module that loads before the
+ * plugin's (the glob order of the worker services) would otherwise keep the
+ * core ops alone.
+ *
+ * @param pluginId - the plugin adding them, for the error on a name clash
+ * @param ops - its ops
+ * @throws when an op name is already in the catalogue
+ */
+export function registerPluginOps(pluginId: string, ops: readonly AnyOp[]): void {
+  for (const op of ops) {
+    if (views.byName.has(op.name)) {
+      throw new Error(`plugin ${pluginId}: op "${op.name}" is already in the catalogue`)
+    }
+  }
+  views = buildViews([...views.all, ...ops])
+}
+
+/** Every op, sorted by name. The same array until a plugin adds ops. */
+export function allOps(): readonly AnyOp[] {
+  return views.all
+}
 
 /** The ops always offered to a tool caller, in catalogue order. */
-export const TOOL_OPS: readonly AnyOp[] = OPS.filter((op) => op.expose.tool === 'core')
+export function toolOps(): readonly AnyOp[] {
+  return views.tool
+}
 
 /** The ops one toolset adds once it is switched on, in catalogue order. */
 export function toolsetOps(id: ToolsetId): readonly AnyOp[] {
-  return OPS.filter((op) => op.expose.tool === id)
+  return views.all.filter((op) => op.expose.tool === id)
 }
 
 /**
@@ -88,14 +139,18 @@ export function isMcpOp(op: AnyOp): boolean {
 }
 
 /** The ops `isMcpOp` offers, in catalogue order. */
-export const MCP_OPS: readonly AnyOp[] = OPS.filter(isMcpOp)
+export function mcpOps(): readonly AnyOp[] {
+  return views.mcp
+}
 
-/** The ops a console makes commands of, in catalogue order. */
-export const CONSOLE_COMMAND_OPS: readonly AnyOp[] = OPS.filter((op) => op.expose.console)
+/** The ops a console makes commands of, in catalogue order. The same array until a plugin adds ops. */
+export function consoleCommandOps(): readonly AnyOp[] {
+  return views.console
+}
 
 /** Lookup by name. */
 export function findOp(name: string): AnyOp | undefined {
-  return OPS.find((op) => op.name === name)
+  return views.byName.get(name)
 }
 
 // The action log merges old runs of the same edit by what each op says.

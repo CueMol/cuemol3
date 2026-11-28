@@ -23,6 +23,7 @@ export type ToolsetId =
   | 'selection'
   | 'render'
   | 'anim'
+  | 'md'
 
 export interface Toolset {
   id: ToolsetId
@@ -90,5 +91,11 @@ export const TOOLSETS: readonly Toolset[] = [
   {
     id: 'anim',
     description: 'Playing the scene\'s animation.',
+  },
+  {
+    id: 'md',
+    description:
+      'MD trajectories: opening a topology with its trajectory files, adding trajectory files ' +
+      'to a molecule or trajectory, and removing or reordering its blocks of frames.',
   },
 ]

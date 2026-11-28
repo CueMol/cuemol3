@@ -28,7 +28,8 @@ const DEFAULTS: Record<string, FormatOptions> = {
 
 vi.mock('@renderer/worker/server/services/helpers/pickReaderName', () => ({ OBJREADER_CATEGORY: 0, pickReaderName }))
 vi.mock('@renderer/worker/server/services/file/getCompatibleRendererNames', () => ({
-  getCompatibleRendererNames: () => ({ types: [], objType: '', readerName: pickReaderName() }),
+  // A named reader is used as given; only an unnamed one is sniffed.
+  getCompatibleRendererNames: (_ctx: unknown, a: { readerName?: string }) => ({ types: [], objType: '', readerName: a.readerName ?? pickReaderName() }),
 }))
 vi.mock('@renderer/worker/server/services/file/getOpenFilters', () => ({
   // .map is claimed by two readers, so load_file would sniff it.
