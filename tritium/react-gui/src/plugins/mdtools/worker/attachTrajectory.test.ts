@@ -10,6 +10,11 @@
  * coordinates gets no frame-0 block and the views fitted after the attach; a
  * failed read rolls all of it back; and the target list keeps only molecules
  * the files fit, with the reason for those that cannot be converted.
+ *
+ * The console / MCP arguments (add_traj_block): `replace` removes a
+ * Trajectory's blocks before the new ones in the same txn, and a load
+ * selection is applied to a converted molecule before its frame-0 block but
+ * refused for a Trajectory (its dropped atoms cannot come back).
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -29,6 +34,8 @@ vi.mock('@renderer/worker/server/services/sceneTree/sceneOps', () => ({
 vi.mock('@renderer/worker/server/services/scene/listSceneObjects', () => ({
   listSceneObjects: () => ({ objects: sceneObjects }),
 }))
+
+vi.mock('@renderer/worker/server/services/helpers/makeSel', () => ({ makeSel: () => ({ sel: true }) }))
 
 import { services as mdtoolsServices } from './mdtools.service'
 
@@ -75,6 +82,7 @@ function makeFixture(opts: { mols: ReturnType<typeof makeMol>[]; fileAtoms?: num
     set name(v: string) { calls.push(`traj.name=${v}`) },
     set ui_order(v: number) { calls.push(`traj.ui_order=${v}`) },
     append: vi.fn(() => calls.push('traj.append')),
+    applyLoadSel: () => calls.push('traj.applyLoadSel'),
   }
 
   const makeReader = (nick: string) => ({
@@ -206,5 +214,44 @@ describe('attachTrajectory', () => {
       [6, expect.stringMatching(/no original file/)],
       [7, ''],
     ])
+  })
+
+  it('replace on a trajectory removes every block, then appends, in one txn', () => {
+    const mol = {
+      ...makeMol({ uid: 7, className: 'Trajectory', natoms: 100 }),
+      nblock: 2,
+      nframe: 5,
+      removeBlock: (i: number) => calls.push(`removeBlock(${i})`),
+      append: () => calls.push('traj.append'),
+    }
+    const { ctx, calls } = makeFixture({ mols: [mol] })
+
+    const res = mdtoolsServices.attachTrajectory(ctx, { sceneId: 1, objId: 7, trajPaths: ['/p/a.xtc'], replace: true })
+
+    expect(res).toMatchObject({ ok: true, objId: 7 })
+    expect(calls).toEqual([
+      'startUndoTxn(Attach MD trajectory)',
+      'removeBlock(1)',
+      'removeBlock(0)',
+      'xtctraj.targTrajUID=7',
+      'xtctraj.setPath(/p/a.xtc)',
+      'xtctraj.read',
+      'traj.append',
+      'commitUndoTxn',
+    ])
+  })
+
+  it('applies a load selection to a converted molecule before its frame 0, and refuses it for a trajectory', () => {
+    const mol = makeMol({ uid: 5, className: 'MolCoord', natoms: 100, src: '/p/m.pdb' })
+    const { ctx, calls } = makeFixture({ mols: [mol] })
+    expect(mdtoolsServices.attachTrajectory(ctx, { sceneId: 1, objId: 5, trajPaths: ['/p/a.xtc'], loadSel: 'name CA' }).ok).toBe(true)
+    expect(calls.indexOf('traj.applyLoadSel')).toBeGreaterThan(calls.indexOf('scene.addObject(traj)'))
+    expect(calls.indexOf('traj.applyLoadSel')).toBeLessThan(calls.indexOf('structframe.read'))
+
+    const traj = makeMol({ uid: 7, className: 'Trajectory', natoms: 100 })
+    const f = makeFixture({ mols: [traj] })
+    expect(mdtoolsServices.attachTrajectory(f.ctx, { sceneId: 1, objId: 7, trajPaths: ['/p/a.xtc'], loadSel: 'name CA' }))
+      .toMatchObject({ ok: false, code: 'invalid-args' })
+    expect(f.calls).toEqual([])
   })
 })

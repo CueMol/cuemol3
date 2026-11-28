@@ -22,6 +22,11 @@ import type { RendererOptions } from '@renderer/dialogs/fopen-opt-dlgs/types'
 vi.mock('@renderer/worker/server/services/rend/setupRenderer', () => ({
     setupRenderer: vi.fn(),
 }))
+// The op record is pinned in recordTraj.test.ts.
+vi.mock('./recordTraj', async (orig) => ({
+    ...(await orig<typeof import('./recordTraj')>()),
+    recordLoadTrajectory: vi.fn(),
+}))
 
 import { services as mdtoolsServices } from './mdtools.service'
 import { setupRenderer } from '@renderer/worker/server/services/rend/setupRenderer'
