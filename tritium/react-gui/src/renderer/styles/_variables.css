@@ -412,6 +412,8 @@
   --mdtraj-lane-h: 32px;                   /* block-segment lane height */
   --mdtraj-gutter-h: 12px;                 /* seek gutter (holds playhead grip) */
   --mdtraj-block-text: #f4f6fa;            /* fixed light label tone on blocks */
+  --mdtraj-target-w: 200px;               /* Trajectory pane target select width */
+  --mdtraj-target-w-narrow: 112px;        /* ... in a narrow pane */
   --mdtraj-block-0: #3a63b0;
   --mdtraj-block-1: #2f7d8a;
   --mdtraj-block-2: #3f8a55;

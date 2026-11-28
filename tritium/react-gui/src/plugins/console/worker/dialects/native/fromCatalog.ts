@@ -453,7 +453,10 @@ function completionOf(p: Param<unknown>, rel: RelatedParams, opens = false): Arg
     case 'propPath':
       return { source: 'propPath', description: 'property', list: true }
     case 'path':
-      return opens || p.kind === 'paths' ? { source: 'files', description: 'file', files: 'openable', list: true } : { source: 'files', description: 'file' }
+      // A file list (trajectory files) takes files File > Open does not
+      // list, so every file is offered rather than the openable ones first.
+      if (p.kind === 'paths') return { source: 'files', description: 'file', list: true }
+      return opens ? { source: 'files', description: 'file', files: 'openable', list: true } : { source: 'files', description: 'file' }
     default:
       // Free text (a name, a chain, a property) has nothing to offer, and
       // listing files for it would only mislead.

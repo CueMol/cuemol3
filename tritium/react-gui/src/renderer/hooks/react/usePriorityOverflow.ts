@@ -1,5 +1,5 @@
 /**
- * @file features/animation/anim/usePriorityOverflow.ts
+ * @file hooks/react/usePriorityOverflow.ts
  * @description Priority+ overflow for a single-line toolbar: decides which
  * optional groups no longer fit and should move into a trailing "more" menu.
  *
