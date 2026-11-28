@@ -9,8 +9,12 @@
  *
  * The C++ side (src/modules/mdtools) is always loaded, so these services keep
  * working whether or not the plugin is enabled -- only the UI that reaches
- * them disappears.
+ * them disappears. The same holds for the ops registered here: the console,
+ * MCP clients and the AI agent reach trajectories either way.
  */
+
+import { registerPluginOps } from '@renderer/worker/server/catalog';
+import { TRAJ_OPS } from './trajOps';
 
 import { attachTrajectory, listAttachTargets } from './attachTrajectory';
 import { getTrajectoryRendererInfo } from './getTrajectoryRendererInfo';
@@ -22,6 +26,8 @@ import {
     removeTrajectoryBlock,
     setTrajectoryFrame,
 } from './trajectory';
+
+registerPluginOps('mdtools', TRAJ_OPS);
 
 export const services = {
     loadTrajectory,

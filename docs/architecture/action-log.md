@@ -183,6 +183,7 @@ helper)。
 | selection の原子のラベル (`navi/atomLabels.ts`、PyMOL の `label` / `hide labels, sel`) | `set_atom_labels` (selection・書式・renderer 名。外すときは書式が null) |
 | render settings (`renderSettings/`) | `set_render_settings` (`"key=value; ..."`) |
 | Sequence panel の残基の選択 (`plugins/sequence/worker/seqPanelOps.ts`) | `set_mol_selection` (選んだ後の selection の文字列) |
+| MD trajectory (`plugins/mdtools/worker/recordTraj.ts`) | `load_trajectory` / `add_traj_block` / `remove_traj_block` / `move_traj_block` (行き先は `by`)。[md-trajectory-console-ops.md](md-trajectory-console-ops.md) §5 |
 
 表に無い service の txn は、label だけを持つ行になる。`list_actions` ではこの行に
 `# no op recorded for this edit` と出し、qax には `<note>` として書く。dev build (`__DEV_UI__`) では、
@@ -203,9 +204,8 @@ console に出す (記録の漏れを見つけるため)。
   `rotate_view` など): op (`set_view`、`focus_selection`、`orient_view`、`set_frame`) は `replay` で記録する
   が、scene が変わらなければ txn は rollback するので行が残らない。scene を変える入力と同じ行にあるときだけ、
   その step に並ぶ。
-- 対応する op が無いもの: MD trajectory (mdtools plugin の service で、plugin から op を足す仕組みが無い)。
-  renderer の右クリックの Create Style (`createStyleFromRenderer`。undo の txn も開かないので History にも残らない)。
-  計画は [261013-action-record-coverage-plan.md](../plans/261013-action-record-coverage-plan.md)。
+- 対応する op が無いもの: renderer の右クリックの Create Style (`createStyleFromRenderer`。undo の txn も
+  開かないので History にも残らない)。[backlog](../plans/261011-op-console-backlog-plan.md) §2。
 - **scene を変えない操作は記録しない** (意図して): style set / camera を元のファイルへ上書きする Save は、
   scene の中が何も変わらず undo の行ができない。再生でファイルを黙って上書きしないためでもある。
   別のファイルへの Save as は、set や camera の元のファイルが変わる (undo に載る) ので記録する。

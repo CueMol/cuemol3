@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { AGENT_TOOLS, ALL_AGENT_TOOLS, activeToolNames, buildAiSdkTools, findTool, toolsetsEnabledIn } from './index'
+import { agentTools, allAgentTools, activeToolNames, buildAiSdkTools, findTool, toolsetsEnabledIn } from './index'
 import type { TurnContext } from './types'
 import type { StrictObjectSchema } from './types'
 import { SYSTEM_PROMPT } from '../prompt/systemPrompt'
@@ -75,7 +75,7 @@ function schemasOf(node: unknown): StrictObjectSchema[] {
 
 describe('the tool catalogue', () => {
   it('names each tool once, in a stable order', () => {
-    const names = AGENT_TOOLS.map((t) => t.name)
+    const names = agentTools().map((t) => t.name)
     expect(names).toEqual([...new Set(names)])
     expect(names).toEqual([...names].sort())
     expect(names.length).toBeLessThanOrEqual(MAX_TOOLS)
@@ -83,7 +83,7 @@ describe('the tool catalogue', () => {
 
   it('declares every schema in the form strict mode requires', () => {
     // Toolset tools too: once switched on they go out under the same flag.
-    for (const tool of ALL_AGENT_TOOLS) {
+    for (const tool of allAgentTools()) {
       for (const schema of schemasOf(tool.parameters)) {
         expect(schema.additionalProperties, tool.name).toBe(false)
         expect([...schema.required].sort(), tool.name).toEqual(
@@ -108,15 +108,15 @@ describe('the tool catalogue', () => {
       }
       if (n.items) walk(n.items, `${where}[]`)
     }
-    for (const tool of ALL_AGENT_TOOLS) walk(tool.parameters, tool.name)
+    for (const tool of allAgentTools()) walk(tool.parameters, tool.name)
   })
 
   it('hands the whole catalogue to the model, strict or not', () => {
     // The adapter is where a tool could silently go missing between the
     // catalogue and what the provider is offered.
     for (const strict of [true, false]) {
-      const built = buildAiSdkTools(AGENT_TOOLS, {} as never, {} as never, strict)
-      expect(Object.keys(built).sort()).toEqual(AGENT_TOOLS.map((t) => t.name).sort())
+      const built = buildAiSdkTools(agentTools(), {} as never, {} as never, strict)
+      expect(Object.keys(built).sort()).toEqual(agentTools().map((t) => t.name).sort())
       for (const [name, tool] of Object.entries(built)) {
         // All or nothing: one provider refuses a catalogue this size when
         // any of it is strict, so the flag cannot vary tool by tool.
@@ -128,14 +128,14 @@ describe('the tool catalogue', () => {
 
 describe('toolsets', () => {
   it('offers a toolset only once it is switched on, and keeps it on across turns', async () => {
-    const off = activeToolNames(ALL_AGENT_TOOLS, new Set())
+    const off = activeToolNames(allAgentTools(), new Set())
     expect(off).toContain('enable_toolsets')
     expect(off).not.toContain('measure_geometry')
 
     const turn = { toolsets: new Set<string>() } as unknown as TurnContext
     const res = await findTool('enable_toolsets')!.run({} as never, { toolsets: ['analysis'] }, turn)
     expect(res.ok).toBe(true)
-    expect(activeToolNames(ALL_AGENT_TOOLS, turn.toolsets)).toContain('measure_geometry')
+    expect(activeToolNames(allAgentTools(), turn.toolsets)).toContain('measure_geometry')
 
     // The next turn reads the switch back from the conversation.
     const history = [

@@ -17,7 +17,7 @@
  */
 
 /** The `.qif` scalar types, plus the one structured kind ops need. */
-export type ParamKind = 'boolean' | 'integer' | 'real' | 'string' | 'enum' | 'vec3' | 'quat' | 'atoms' | 'nodes'
+export type ParamKind = 'boolean' | 'integer' | 'real' | 'string' | 'enum' | 'vec3' | 'quat' | 'atoms' | 'nodes' | 'paths'
 
 /**
  * What a value means beyond its type.
@@ -223,6 +223,15 @@ export function propValue(description: string): Param<string> {
  */
 export function path(description: string, readerName?: string): Param<string> {
   return param('string', description, readerName === undefined ? { semantic: 'path' } : { semantic: 'path', readerName })
+}
+
+/**
+ * Several file paths, in order, for an op that reads them together rather
+ * than once each (the blocks of one MD trajectory). A console reads every
+ * word of the argument into this one list, patterns expanded.
+ */
+export function paths(description: string): Param<string[]> {
+  return param('paths', description, { semantic: 'path' })
 }
 
 /** A point or direction (`object<Vector>`): x, y, z. */

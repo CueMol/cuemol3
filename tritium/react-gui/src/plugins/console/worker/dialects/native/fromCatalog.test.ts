@@ -34,7 +34,7 @@ import { defineOp } from '@renderer/worker/server/catalog/op'
 import { atoms, boolean, enumOf, nodeId, nodeIds, objectId, optional, path as path_, quat, selection, string, vec3 } from '@renderer/worker/server/catalog/params'
 import { formatCommand, quoteArg } from '@renderer/worker/server/catalog/cmlFormat'
 import { catalogCommands } from './fromCatalog'
-import { CONSOLE_COMMAND_OPS } from '@renderer/worker/server/catalog'
+import { consoleCommandOps } from '@renderer/worker/server/catalog'
 import { NATIVE_BUILTINS } from './builtins'
 
 // Temp dirs a test makes, removed after it.
@@ -310,7 +310,7 @@ describe('the native command set', () => {
     // An alias that repeats an op name (or a builtin) would shadow it silently:
     // lookup takes the first match.
     const names = [
-      ...catalogCommands(CONSOLE_COMMAND_OPS).map((c) => c.command.name),
+      ...catalogCommands(consoleCommandOps()).map((c) => c.command.name),
       ...NATIVE_BUILTINS.map((c) => c.name),
     ]
     expect(names.filter((n, i) => names.indexOf(n) !== i)).toEqual([])
@@ -320,7 +320,7 @@ describe('the native command set', () => {
     // A format's load op reads with its own reader, so Tab must not sniff the
     // file (a CCP4 map once sniffed as NAMD coordinates); load_file does.
     const sourceOf = (name: string) => {
-      const cmd = catalogCommands(CONSOLE_COMMAND_OPS).find((c) => c.command.name === name)!.command
+      const cmd = catalogCommands(consoleCommandOps()).find((c) => c.command.name === name)!.command
       return cmd.completions?.[cmd.params.findIndex((p) => p.name === 'rendererType')]?.source
     }
     expect(sourceOf('load_ccp4')).toBe('fileRendererTypes:path:ccp4map')

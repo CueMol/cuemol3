@@ -46,6 +46,9 @@ export function opToQax(
       })
     } else if (isRefParam(p) && typeof v === 'number') {
       out.push({ name: argName, ...(refs[argName] !== undefined ? { path: refs[argName] } : {}), uid: v })
+    } else if (p.kind === 'paths' && Array.isArray(v)) {
+      // One <arg> per file, gathered back in order (as a node list is).
+      for (const f of v as string[]) out.push({ name: argName, text: f })
     } else if (p.kind === 'atoms' && Array.isArray(v)) {
       out.push({ name: argName, atoms: (v as AtomSpec[]).map((a) => ({ chain: a.chain, resid: a.resid, name: a.atomName })) })
     } else if (numberListSize(p.kind) !== null && Array.isArray(v)) {
@@ -83,6 +86,8 @@ export function qaxToInput(
       else input[a.name] = id
     } else if (a.atoms) {
       input[a.name] = a.atoms.map((t) => ({ chain: t.chain, resid: t.resid, atomName: t.name }))
+    } else if (p.kind === 'paths') {
+      input[a.name] = [...((input[a.name] as string[] | undefined) ?? []), a.text ?? '']
     } else if (numberListSize(p.kind) !== null) {
       input[a.name] = (a.text ?? '').split(/\s+/).filter((w) => w !== '').map(Number)
     } else {

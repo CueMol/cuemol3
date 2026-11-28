@@ -22,6 +22,7 @@
 import type { WorkerContext } from '@renderer/worker/server/types/WorkerContext';
 import { withUndoTxn } from '@renderer/worker/server/services/withUndoTxn';
 import { appendTrajFile, fileExt, TRAJ_READER_BY_EXT } from './trajBlocks';
+import { recordAddTrajBlock, recordMoveTrajBlock, recordRemoveTrajBlock } from './recordTraj';
 
 const log = console;
 
@@ -232,6 +233,14 @@ export function appendTrajectoryBlock(
 
     try {
         return withUndoTxn(scene, 'Add trajectory block', () => {
+            recordAddTrajBlock(ctx, args.sceneId, {
+                objId: args.objId,
+                paths: [args.path],
+                reader: null,
+                nevery,
+                loadSel: null,
+                replace: false,
+            });
             appendTrajFile(ctx, traj, args.path, nevery);
             return { ok: true, nframe: safeNum(() => traj.nframe, 0) };
         });
@@ -253,6 +262,7 @@ export function removeTrajectoryBlock(
     if (!traj) return { ok: false, error: 'trajectory not found' };
     try {
         return withUndoTxn(scene, 'Remove trajectory block', () => {
+            recordRemoveTrajBlock(ctx, args.sceneId, args.objId, args.index);
             traj.removeBlock(args.index);
             return { ok: true, nframe: safeNum(() => traj.nframe, 0) };
         });
@@ -274,6 +284,7 @@ export function moveTrajectoryBlock(
     if (!traj) return { ok: false, error: 'trajectory not found' };
     try {
         return withUndoTxn(scene, 'Reorder trajectory block', () => {
+            recordMoveTrajBlock(ctx, args.sceneId, args.objId, args.from, args.to);
             traj.moveBlock(args.from, args.to);
             return { ok: true, nframe: safeNum(() => traj.nframe, 0) };
         });

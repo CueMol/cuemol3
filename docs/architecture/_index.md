@@ -188,6 +188,11 @@ architecture, it belongs here.
   scriptable API のみで組み立てる `loadTrajectory` service、renderer cancel = 全 transaction
   キャンセルに合わせた 2 段 deferred-load フロー、`DIALOG_PICK_PATH` の複数選択拡張、
   `OpenMdTrajDialog` の構成とスコープ (topology は gro / prmtop / psf、再生 UI 別タスク)。migration ではない。
+- [MD trajectory の op (console・MCP・AI agent)](md-trajectory-console-ops.md) (日本語) --
+  plugin から op catalog に op を足す `registerPluginOps` と、一覧を関数で読む理由。mdtools の
+  `load_trajectory` / `add_traj_block` (`reader`・`nevery`・`loadSel`・`replace`) / `list_traj_blocks` /
+  `remove_traj_block` / `move_traj_block`、param 種別 `paths`、PyMOL の `load_traj` と `load` からの振り分け、
+  GUI の操作の記録。
 - [MD trajectory: 落としたファイルを既存の分子に付ける (tritium / libcuemol2)](md-trajectory-attach-on-drop.md) (日本語) --
   trajectory を drop すると付け先の分子を選ぶダイアログ (`contributes.fileOpeners`)。原子数がヘッダで合う分子だけを
   候補にし、普通の分子は `Trajectory` に変換して元の座標を `structframe` block で frame 0 に残す。行列・編集・元の

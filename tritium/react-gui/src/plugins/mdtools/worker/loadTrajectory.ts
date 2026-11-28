@@ -31,7 +31,8 @@ import { setupRenderer } from '@renderer/worker/server/services/rend/setupRender
 import { undoTxnResult } from '@renderer/worker/server/services/withUndoTxn';
 import { OBJREADER_CATEGORY } from '@renderer/worker/server/services/helpers/pickReaderName';
 import { fail, ok, type Result } from '@renderer/worker/shared/result';
-import { appendTrajFile, fileExt, unsupportedTrajFormat } from './trajBlocks';
+import { appendTrajFile, applyLoadSel, fileExt, unsupportedTrajFormat } from './trajBlocks';
+import { recordLoadTrajectory } from './recordTraj';
 import { TOPOLOGY_READER_BY_EXT } from '../trajFormats';
 import { baseName, reportTask } from '@renderer/worker/server/services/helpers/taskReport';
 
@@ -65,6 +66,10 @@ export interface LoadTrajectoryArgs {
     trajPaths: string[];
     /** Load every Nth frame (applied to every trajectory reader). Default 1. */
     nevery?: number;
+    /** The block reader for every trajectory file; by default each file's extension picks one. */
+    reader?: string | null;
+    /** Keep only the atoms this selection picks (applied before the first block). */
+    loadSel?: string | null;
     /** Initial renderer options (from the renderer dialog). */
     renderer: RendererOptions;
 }
@@ -84,7 +89,7 @@ export function loadTrajectory(
         log.warn('[worker] loadTrajectory: no trajectory files given');
         return fail('no trajectory files given', 'invalid-args');
     }
-    const unsupported = unsupportedTrajFormat(args.trajPaths);
+    const unsupported = unsupportedTrajFormat(args.trajPaths, args.reader);
     if (unsupported) return fail(unsupported, 'unsupported');
     // The topology reader by extension; a prmtop / PSF is read without
     // coordinates, so frame 0 is the first coordinate block.
@@ -123,6 +128,7 @@ export function loadTrajectory(
         topoReader.attach(traj);
         topoReader.read();
         topoReader.detach();
+        if (args.loadSel) applyLoadSel(ctx, args.sceneId, traj, args.loadSel);
 
         traj.name = args.renderer.objectName || fileStem(args.topologyPath);
         (scene as unknown as SceneHandle).addObject(traj);
@@ -130,7 +136,17 @@ export function loadTrajectory(
         // 3. Trajectory files -> TrajBlocks appended in order.
         args.trajPaths.forEach((trajPath, i) => {
             reportTask(ctx, { detail: baseName(trajPath), step: 2 + i, total });
-            appendTrajFile(ctx, traj, trajPath, nevery);
+            appendTrajFile(ctx, traj, trajPath, nevery, args.reader);
+        });
+
+        // Before the renderer exists, so its default name is still free.
+        recordLoadTrajectory(ctx, args.sceneId, {
+            topology: args.topologyPath,
+            paths: args.trajPaths,
+            reader: args.reader ?? null,
+            nevery,
+            loadSel: args.loadSel ?? null,
+            renderer: args.renderer,
         });
 
         // 4. Initial renderer (Trajectory is MolCoord-derived; reused as-is).

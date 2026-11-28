@@ -21,6 +21,7 @@ import { SAVE_COMMANDS } from './saveCommands'
 import { COLOR_COMMANDS } from './colorCommands'
 import { FIT_COMMANDS } from './fitCommands'
 import { MOVIE_COMMANDS } from './movieCommands'
+import { TRAJ_COMMANDS } from './trajCommands'
 import { MOTION_COMMANDS } from './motionCommands'
 import { LABEL_COMMANDS } from './labelCommands'
 import { usageLine } from '@plugins/console/worker/dialect-api'
@@ -89,6 +90,7 @@ export const PYM_COMMANDS: readonly PymCommand[] = [
   ...COLOR_COMMANDS,
   ...FIT_COMMANDS,
   ...MOVIE_COMMANDS,
+  ...TRAJ_COMMANDS,
   ...MOTION_COMMANDS,
   ...LABEL_COMMANDS,
   help,

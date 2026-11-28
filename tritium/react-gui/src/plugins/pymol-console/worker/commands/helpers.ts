@@ -16,6 +16,7 @@ import type { WorkerContext } from '@renderer/worker/server/types/WorkerContext'
 import { listSceneObjects } from '@renderer/worker/server/services/scene/listSceneObjects'
 import type { SceneObjectEntry } from '@renderer/worker/server/services/scene/listSceneObjects'
 import type { SceneTreeNode } from '@renderer/worker/shared/sceneTreeTypes'
+import { isMoleculeClass } from '@renderer/worker/shared/objectClasses'
 import { selectionNames, translateSelection } from '../sel/translate'
 import { runOp as runConsoleOp } from '@plugins/console/worker/dialect-api'
 import type { CmdContext, OpRun } from '@plugins/console/worker/dialect-api'
@@ -66,8 +67,8 @@ export function resolveOneObject(
  *
  * A selection only means anything against a molecule, and the class name is
  * the only thing `listSceneObjects` reports that separates one from a map or
- * a surface. `endsWith('Mol')` catches the subclasses; `MolCoord` itself is
- * spelled out because it does not end that way.
+ * a surface (`isMoleculeClass`: MolCoord, its `*Mol` subclasses and an MD
+ * Trajectory, which `load_traj` makes of a molecule).
  */
 export function molecules(
   ctx: WorkerContext,
@@ -75,7 +76,7 @@ export function molecules(
   pattern: string = ALL,
 ): SceneObjectEntry[] {
   return resolveObjects(ctx, sceneId, pattern).filter(
-    (o) => o.className === 'MolCoord' || o.className.endsWith('Mol'),
+    (o) => isMoleculeClass(o.className),
   )
 }
 

@@ -19,6 +19,7 @@
 import type { WorkerContext } from '@renderer/worker/server/types/WorkerContext'
 import { listSceneObjects } from '@renderer/worker/server/services/scene/listSceneObjects'
 import type { SceneObjectEntry } from '@renderer/worker/server/services/scene/listSceneObjects'
+import { isMoleculeClass } from '@renderer/worker/shared/objectClasses'
 
 /** One object with its model number. */
 export interface NumberedObject extends SceneObjectEntry {
@@ -57,9 +58,9 @@ export function numberedObjects(ctx: WorkerContext, sceneId: number): NumberedOb
   return out.sort((a, b) => a.model - b.model)
 }
 
-/** Whether an object holds atoms (a MolCoord or one of its subclasses). */
+/** Whether an object holds atoms (a MolCoord or one of its subclasses, an MD Trajectory included). */
 export function isMolecule(o: SceneObjectEntry): boolean {
-  return o.className === 'MolCoord' || o.className.endsWith('Mol')
+  return isMoleculeClass(o.className)
 }
 
 /** Forget the tables (tests). */

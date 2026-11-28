@@ -60,6 +60,9 @@ function paramSchema(p: Param<unknown>): Record<string, unknown> {
   if (p.kind === 'nodes') {
     return { type: p.optional ? ['array', 'null'] : 'array', description: p.description, items: { type: 'integer' } }
   }
+  if (p.kind === 'paths') {
+    return { type: p.optional ? ['array', 'null'] : 'array', description: p.description, items: { type: 'string' } }
+  }
   if (p.kind === 'vec3' || p.kind === 'quat') {
     // Three (or four) numbers; the count is checked when read, for the same strict-mode
     // reason as `atoms`. Nullable when optional, like any other argument.
@@ -115,6 +118,12 @@ function readJsonArg(name: string, p: Param<unknown>, value: unknown): { value: 
     return typeof list === 'string' ? list : { value: list }
   }
   if (p.kind === 'string') return { value: String(value) }
+  if (p.kind === 'paths') {
+    // A caller without strict mode may send one path as a plain string.
+    const list = Array.isArray(value) ? value.map(String) : [String(value)]
+    const bad = checkArg(name, p, list)
+    return bad ? bad : { value: list }
+  }
   // A caller without strict mode may send a number or a boolean as a string.
   const parsed =
     p.kind === 'boolean' ? (typeof value === 'string' ? parseBoolText(value) : value)

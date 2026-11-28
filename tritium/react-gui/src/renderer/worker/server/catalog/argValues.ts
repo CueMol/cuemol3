@@ -50,6 +50,10 @@ export function checkArg(name: string, p: Param<unknown>, value: unknown): strin
       return Array.isArray(value) && value.length === 4 && value.every((x) => typeof x === 'number' && Number.isFinite(x))
         ? null
         : `${name} must be four numbers, a x y z.`
+    case 'paths':
+      return Array.isArray(value) && value.length > 0 && value.every((x) => typeof x === 'string' && x !== '')
+        ? null
+        : `${name} must be a list of one or more file paths.`
     case 'nodes':
       return Array.isArray(value) && value.every((x) => Number.isInteger(x) && x >= 0)
         ? null
