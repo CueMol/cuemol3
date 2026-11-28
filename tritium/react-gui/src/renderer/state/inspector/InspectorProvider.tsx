@@ -24,6 +24,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { GenericPropEntry, PropTargetType, PropWriteOpts } from '@renderer/worker/shared/genericProps'
+import type { MolStructRef } from '@renderer/worker/shared/molStructInfo'
 import { isMolSelectionType } from '@renderer/worker/shared/genericProps'
 import { pushHistory } from '@renderer/h3-kit/MolSelList'
 import { useCueMol } from '@renderer/hooks/cuemol/useCueMol'
@@ -57,6 +58,9 @@ function recordSelWrite(valueType: string, value: unknown): void {
  *   the action log's step id.
  * - `camera` -- a named camera opened from the Camera pane; cameras have no
  *   uid, so it is keyed by name, and `CameraInspector` fetches and edits it.
+ * - `molStruct` -- one chain, residue or atom of a molecule (Mol Struct pane
+ *   > Properties), shown read-only by `MolStructInspector`; parts of a
+ *   molecule have no uid, so it is keyed by the molecule and the part's name.
  */
 export type InspectorTarget =
   | { kind: 'node'; sceneId: number; nodeId: number; nodeType: PropTargetType }
@@ -69,6 +73,7 @@ export type InspectorTarget =
       /** Scroll to this section once shown (Edit vis flags). */
       focus?: 'visibility'
     }
+  | { kind: 'molStruct'; sceneId: number; molId: number; part: MolStructRef }
 
 /** A property-bridge target (a scene-tree node or the View). */
 export type NodeTarget = Extract<InspectorTarget, { kind: 'node' }>
@@ -139,6 +144,15 @@ export interface InspectorActions {
   clearCamera: (sceneId: number) => void
   /** CameraInspector reports the header it fetched. */
   setCameraHeader: (name: string, type: string) => void
+  /** Show one chain / residue / atom of a molecule (Mol Struct pane > Properties). */
+  showMolStruct: (sceneId: number, molId: number, part: MolStructRef) => void
+  /**
+   * Drop a molStruct target for one scene (the molecule or the part went
+   * away). Scene-scoped and kind-guarded like `clearCamera`.
+   */
+  clearMolStruct: (sceneId: number) => void
+  /** MolStructInspector reports the header it fetched. */
+  setMolStructHeader: (name: string, type: string) => void
   /** Close the panel, forget the target and the per-scene memory. */
   close: () => void
   /** Set the open flag alone (a snap-collapse of the pane); the target is kept. */
@@ -151,6 +165,13 @@ export interface InspectorActions {
   setMany: (writes: PropWrite[]) => Promise<void>
   /** Restore several properties in one undo step. No-op when empty. */
   resetMany: (keys: string[]) => Promise<void>
+}
+
+/** Header category label for each part of a molecule. */
+const MOL_STRUCT_CATEGORY: Record<MolStructRef['kind'], string> = {
+  chain: 'Chain',
+  resid: 'Residue',
+  atom: 'Atom',
 }
 
 /** Header category label for each scene-tree node type. */
@@ -372,6 +393,13 @@ export function InspectorProvider({ children }: { children: React.ReactNode }): 
         setAnimHeader(null)
       },
       setCameraHeader: (name, type) => setAnimHeader({ name, type }),
+      showMolStruct: (sceneId, molId, part) => applyTarget({ kind: 'molStruct', sceneId, molId, part }),
+      clearMolStruct: (sceneId) => {
+        setTarget((t) => (t?.kind === 'molStruct' && t.sceneId === sceneId ? null : t))
+        const mem = targetsBySceneRef.current.get(sceneId)
+        if (mem?.kind === 'molStruct') targetsBySceneRef.current.delete(sceneId)
+      },
+      setMolStructHeader: (name, type) => setAnimHeader({ name, type }),
       close: () => {
         setOpen(false)
         setTarget(null)
@@ -467,7 +495,8 @@ export function InspectorProvider({ children }: { children: React.ReactNode }): 
 
   const state = useMemo<InspectorState>(() => {
     const selfFetched =
-      target?.kind === 'animElement' || target?.kind === 'actionStep' || target?.kind === 'camera'
+      target?.kind === 'animElement' || target?.kind === 'actionStep' || target?.kind === 'camera' ||
+      target?.kind === 'molStruct'
     return {
       open,
       target,
@@ -479,6 +508,8 @@ export function InspectorProvider({ children }: { children: React.ReactNode }): 
             ? 'Action'
             : target.kind === 'camera'
               ? 'Camera'
+            : target.kind === 'molStruct'
+              ? MOL_STRUCT_CATEGORY[target.part.kind]
             : (NODE_CATEGORY_LABELS[target.nodeType] ?? 'Node'),
       header: selfFetched ? (animHeader ?? EMPTY_HEADER) : nodeHeader,
       entries,

@@ -105,7 +105,11 @@ export interface ArgCompletion {
    * remain unbound, else nothing.
    */
   suffix?: '' | ' ' | ', '
-  /** A value the user keeps typing into (a selection, a path): nothing follows it. */
+  /**
+   * A value the user keeps typing into (a selection), where a space goes on
+   * with it: a completed word gets `, ` only at its top level (not inside a
+   * bracket or a quote) while parameters remain, else nothing.
+   */
   open?: boolean
   /**
    * For `files`: `openable` lists the files a load opens (by the readers'
@@ -160,6 +164,12 @@ export interface ConsoleCommand {
    * Such a call must then be the only command on the line, like `undo`.
    */
   outsideTxn?: (args: Record<string, string>) => boolean
+  /**
+   * An `outsideTxn` command that may also end a script (or a line of several
+   * commands): it is held until the transaction has committed, then run.
+   * Not inside a qax file, whose replay never reaches that point.
+   */
+  deferAtEnd?: boolean
   /**
    * `undo` / `redo`: the runtime runs a lone one outside the submission's
    * transaction, since it moves the undo stack; `run` is reached only when

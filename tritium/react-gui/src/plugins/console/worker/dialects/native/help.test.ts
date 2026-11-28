@@ -13,7 +13,7 @@ import { describe, it, expect, vi } from 'vitest'
 vi.mock('@cuemol/core/src/wrappers/wrapper-loader', () => ({ wrapper_map: {} }))
 vi.mock('@cuemol/core/src/BaseWrapper', () => ({ BaseWrapper: class {} }))
 
-import { CONSOLE_COMMAND_OPS } from '@renderer/worker/server/catalog'
+import { CONSOLE_COMMAND_OPS, toolDescription } from '@renderer/worker/server/catalog'
 import type { Param } from '@renderer/worker/server/catalog/params'
 import { makeWorkerCtx } from '@renderer/worker/testing'
 import type { CmdContext } from '../../runtime/types'
@@ -53,5 +53,14 @@ describe('native help', () => {
     const row = text.split('\n').find((l) => l.startsWith(`| \`${name}\``))!
     expect(row).toContain(`\`${param.values![0]}\``)
     expect(row).toContain(param.description.split('\n')[0].replace(/\|/g, '\\|'))
+  })
+
+  it("leaves out a model-only note (it names a tool the console lacks), and lists an alias under its own subject", () => {
+    const rotate = CONSOLE_COMMAND_OPS.find((o) => o.name === 'rotate_view')!
+    expect(toolDescription(rotate)).toContain('capture_view')
+    expect(help('rotate_view')).not.toContain('capture_view')
+    // set_bgcolor runs set_prop (properties) but is looked for with the view.
+    expect(help('viewing')).toContain('`set_bgcolor`')
+    expect(help('properties')).not.toContain('`set_bgcolor`')
   })
 })

@@ -9,6 +9,9 @@
  */
 import type { Result } from '@renderer/worker/shared/result';
 import type { RendColoringId } from '@shared/types/sceneCtxMenu';
+import type { PaintTheme } from '@renderer/worker/server/services/helpers/defPaintColoring';
+
+export type { PaintTheme };
 
 /**
  * Discriminator for the Coloring panel's selector: both top-level objects
@@ -33,6 +36,8 @@ export interface PaintColoringStyleEntry {
 export interface GetPaintColoringStylesResult {
     ok: boolean;
     entries: PaintColoringStyleEntry[];
+    /** Palette themes whose colours the menu offers (`paint-theme-<colour>`). */
+    themes: PaintTheme[];
 }
 
 export interface SetRendererColoringArgs {
@@ -52,6 +57,12 @@ export interface PaintRendererSelectionArgs {
     rendId: number;
     /** CueMol color value string, e.g. "#FFF", "hsb(0, 1.0, 1.0)". */
     colorValue: string;
+    /**
+     * The atoms to paint, as a selection expression. Given (the add_paint
+     * op), it is compiled and the molecule's current selection is left
+     * alone; omitted (the Paint menu), the current selection is painted.
+     */
+    selStr?: string;
 }
 
 export interface PaintRendererSelectionResult {
@@ -73,6 +84,12 @@ export interface PaintObjectSelectionArgs {
     objId: number;
     /** CueMol color value string, e.g. "#FFF", "hsb(0, 1.0, 1.0)". */
     colorValue: string;
+    /**
+     * The atoms to paint, as a selection expression. Given (the add_paint
+     * op), it is compiled and the molecule's current selection is left
+     * alone; omitted (the Paint menu), the current selection is painted.
+     */
+    selStr?: string;
 }
 
 export interface PaintObjectSelectionResult {

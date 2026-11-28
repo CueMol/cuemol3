@@ -24,6 +24,8 @@ import type {
   GetMolChainsResult,
   GetMolResiduesArgs,
   GetMolResiduesResult,
+  GetMolStructInfoArgs,
+  GetMolStructInfoResult,
 } from '@renderer/worker/server/services/select/getMolStructure'
 import type { GetSelDefsArgs, GetSelDefsResult } from '@renderer/worker/server/services/select/getSelDefs'
 import type {
@@ -56,6 +58,7 @@ export interface SelectCalls {
   getMolChains:               { args: GetMolChainsArgs; result: GetMolChainsResult }
   getMolResidues:             { args: GetMolResiduesArgs; result: GetMolResiduesResult }
   getMolAtoms:                { args: GetMolAtomsArgs; result: GetMolAtomsResult }
+  getMolStructInfo:           { args: GetMolStructInfoArgs; result: GetMolStructInfoResult }
   applyMolSelString:          { args: ApplyMolSelStringArgs; result: ApplyMolSelStringResult }
   selectAndFocusMol:          { args: SelectAndFocusMolArgs; result: SelectAndFocusMolResult }
   focusMolSelection:          { args: FocusMolSelectionArgs; result: FocusMolSelectionResult }
@@ -73,6 +76,7 @@ export const SELECT_KEYS = [
   'getMolChains',
   'getMolResidues',
   'getMolAtoms',
+  'getMolStructInfo',
   'applyMolSelString',
   'selectAndFocusMol',
   'focusMolSelection',

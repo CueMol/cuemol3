@@ -52,6 +52,12 @@ export interface CompletionContext {
   cwd: string
   /** The language whose commands and candidate sources are offered. */
   dialect: ConsoleDialect
+  /**
+   * The caret's line after the caret ('' at the end of the line). Text there
+   * that continues the argument (a word, not a comma) keeps a list or a
+   * selection from being closed with `, `.
+   */
+  rest?: string
 }
 
 export function complain(messages: ConsoleEntry[], text: string): void {

@@ -118,6 +118,15 @@ describe("anim.service getAnimElementDetail", () => {
     expect(res.detail.siblings).toEqual([{ name: "Cam0", usable: true }]);
   });
 
+  it("reads the target and values of the types without an inspector section (RealPropAnim)", () => {
+    // list_anim_props reads these back after set_anim_prop writes them.
+    const objs = [makeObj({ uid: 30, name: "Fade", className: "RealPropAnim", props: { rend: "1crn/simple1", startValue: 0.2, endValue: 0.8 } })];
+    const { ctx } = makeCtx({ objs });
+    const res = services.getAnimElementDetail(ctx, { sceneId: 1, uid: 30 });
+    if (!res.ok) throw new Error(res.error);
+    expect(res.detail.typeProps).toEqual({ rend: "1crn/simple1", startValue: 0.2, endValue: 0.8 });
+  });
+
   it("returns gone:true when the uid is not in the manager", () => {
     const objs = [makeObj({ uid: 10, name: "A", className: "NoopAnimObj" })];
     const { ctx } = makeCtx({ objs });

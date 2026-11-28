@@ -31,8 +31,8 @@ vi.mock('@renderer/worker/server/services/select/validateSelection', () => ({
 }))
 
 import { defineOp } from '@renderer/worker/server/catalog/op'
-import { atoms, boolean, enumOf, nodeId, nodeIds, objectId, optional, path as path_, selection } from '@renderer/worker/server/catalog/params'
-import { formatCommand } from '@renderer/worker/server/catalog/cmlFormat'
+import { atoms, boolean, enumOf, nodeId, nodeIds, objectId, optional, path as path_, quat, selection, string, vec3 } from '@renderer/worker/server/catalog/params'
+import { formatCommand, quoteArg } from '@renderer/worker/server/catalog/cmlFormat'
 import { catalogCommands } from './fromCatalog'
 import { CONSOLE_COMMAND_OPS } from '@renderer/worker/server/catalog'
 import { NATIVE_BUILTINS } from './builtins'
@@ -269,6 +269,39 @@ describe('an atoms argument', () => {
     const read = take.mock.calls[0][1] as { atoms: unknown }
     expect(read.atoms).toEqual([{ chain: 'A', resid: '20', atomName: 'CA' }, { chain: 'B', resid: '12A', atomName: 'N' }])
     expect(formatCommand('measure_geometry', atomOp.params, read)).toBe('measure_geometry atoms=A.20.CA B.12A.N')
+  })
+})
+
+describe('the JSON spellings a parameter description uses', () => {
+  const take = vi.fn((_ctx: unknown, _args: unknown) => ({ ok: true as const }))
+  const viewOp = defineOp({
+    name: 'set_view',
+    description: 'View.',
+    params: {
+      zoom: optional(string('zoom')),
+      objId: optional(objectId('object')),
+      center: optional(vec3('centre')),
+      rotation: optional(quat('rotation')),
+    },
+    mutates: false,
+    group: 'viewing',
+    expose: { tool: false, console: true },
+    run: take,
+  })
+  const cmd = catalogCommands([viewOp])[0].command
+  const runWith = (bound: Record<string, string>) =>
+    cmd.run({} as WorkerContext, { zoom: '', objId: '', center: '', rotation: '', ...bound }, cc)
+
+  it('reads a bare null as left out and [x, y, z] as a number list', async () => {
+    expect(await runWith({ zoom: 'null', objId: 'null', center: '[1.5, -2, 3]', rotation: '1 0 0 0' })).toEqual({ ok: true })
+    expect(take.mock.calls.at(-1)![1]).toEqual({ zoom: null, objId: null, center: [1.5, -2, 3], rotation: [1, 0, 0, 0] })
+  })
+
+  it('keeps a quoted "null" as the name, and quotes it when writing a command back', async () => {
+    expect(await runWith({ zoom: '"null"' })).toEqual({ ok: true })
+    expect((take.mock.calls.at(-1)![1] as { zoom: unknown }).zoom).toBe('null')
+    // Bare, a copied command would read it back as left out.
+    expect(quoteArg('null')).toBe('"null"')
   })
 })
 

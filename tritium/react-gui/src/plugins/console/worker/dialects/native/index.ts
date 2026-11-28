@@ -68,6 +68,9 @@ const NATIVE_SYNTAX = `# Writing commands
   patterns with \`*\` and \`?\`: \`hide 1crn 2abc\`, \`set */cartoon*.width, 2\`, \`load *.pdb\`.
   The command runs for each; one that fails is reported as a warning and the rest still run.
   Write a space in a name as \`my\\ mol\` (a star as \`\\*\`) or quote it; Tab expands a pattern in place.
+- **Leaving one out**: an optional argument may be skipped with a bare \`null\`
+  (\`set_view 25, null, null, 0 0 0\`); write \`"null"\` for something named null.
+- **Number lists** (a centre, a rotation) are written \`x y z\` or \`[x, y, z]\`.
 - **Properties** follow their node after a dot: \`set 1crn/cartoon1.width, 2\``
 
 function commandsOf(group: OpGroup): readonly ConsoleCommand[] {

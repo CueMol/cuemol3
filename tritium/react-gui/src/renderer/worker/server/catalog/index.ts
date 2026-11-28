@@ -35,7 +35,7 @@ import { STYLE_OPS } from './ops/styleOps'
 import type { ToolsetId } from './toolsets'
 
 export type { AnyOp, Op, OpContext, OpImage, OpOutcome, OpAlias, OpTable } from './op'
-export { defineOp } from './op'
+export { defineOp, toolDescription } from './op'
 export { invokeOp, runExclusive, runInTxn, TXN_BUSY_MESSAGE, txnBusy, txnLabel } from './opRuntime'
 export { MAX_ARRAY_ITEMS, MAX_OUTPUT_CHARS, serializeToolOutput } from './toolOutput'
 export { paramsSchema, readToolArgs, toolSchema } from './toolSchema'

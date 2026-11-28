@@ -74,10 +74,21 @@ async function streamWithProgress(
 }
 
 /** How a PubChem compound opens: the reader's defaults, a ball-and-stick renderer, the view centred on it. */
-function compoundOpenOptions(name: string, readerName: string): FileOpenOptions {
+async function compoundOpenOptions(
+  cm: AsyncCueMol,
+  name: string,
+  readerName: string,
+  sceneId: number,
+): Promise<FileOpenOptions> {
+  // Named scene-wide like any other new renderer (ballstick1, ballstick2, ...).
+  const { name: rendererName } = await cm.invokeService('proposeUniqName', {
+    kind: 'sceneRenderer',
+    prefix: 'ballstick',
+    sceneId,
+  })
   return {
     format: buildDefaultFormatOptions(formatKindForReader(readerName)),
-    renderer: { ...getDefaultRendererOptions(name, 'ballstick'), objectName: name, centerView: true },
+    renderer: { ...getDefaultRendererOptions(name, 'ballstick'), objectName: name, rendererName, centerView: true },
   }
 }
 
@@ -138,7 +149,7 @@ export function useGetPdbCommand(): void {
           // A PubChem compound or a CCD ligand is one small molecule: drawn as
           // ball-and-stick and centred on, without asking how.
           const options = source === 'pubchem' || source === 'ccd'
-            ? compoundOpenOptions(name, readerName)
+            ? await compoundOpenOptions(cm, name, readerName, info.scene_uid)
             : await showFileOpenOptionDialog({
                 filePath: virtualFilename,
                 sceneId: info.scene_uid,

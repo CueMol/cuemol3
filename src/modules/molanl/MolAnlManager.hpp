@@ -39,6 +39,14 @@ namespace molanl {
     /// (bUseProp) or transform the coordinates by it.
     void applyXform(const MolCoordPtr &pmol_mov, const Matrix4D &xfmat, bool bUseProp);
 
+    /// Statistics of the last superposeXXX1() call as JSON ("" until one
+    /// succeeds; cleared when the next one starts).
+    LString m_lastSupJSON;
+
+    /// Rotation angle (degree) of a superpose transform, or -1 when it cannot
+    /// be determined
+    static double rotationDegree(const Matrix4D &xfmat);
+
   public:
     MolAnlManager();
 
@@ -88,6 +96,11 @@ namespace molanl {
     /// LSQ superpose
     void superposeLSQ1(MolCoordPtr pmol_ref, SelectionPtr psel_ref,
                        MolCoordPtr pmol_mov, SelectionPtr psel_mov, bool bUseProp=false);
+
+    /// Statistics of the last superposeUSalign1/SSM1/LSQ1 call as JSON:
+    /// {"algo","rmsd","nalgn","rotation", ...algorithm specific keys}.
+    /// Empty when none has succeeded since the last call started.
+    LString getLastSuperposeJSON() const { return m_lastSupJSON; }
 
 
     double calcRMSDScr(MolCoordPtr pmol_ref, SelectionPtr psel_ref,

@@ -26,6 +26,11 @@ import type { ArgMode, ParsedArg } from './parseArgs'
 export interface ParamSpec {
   name: string
   default?: string
+  /**
+   * Filled in from another argument (a node's kind, from its name), so
+   * nobody types it: Tab does not count it as an argument still to come.
+   */
+  implied?: boolean
 }
 
 /** Asking for usage rather than running: a lone `?`. */

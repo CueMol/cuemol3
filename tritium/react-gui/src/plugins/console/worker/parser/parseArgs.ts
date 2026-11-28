@@ -83,6 +83,26 @@ export interface ScannedLine {
   current: PartialArg | null
 }
 
+/**
+ * Whether the end of `text` is inside a bracket or a quote: brackets outside
+ * quotes that are not closed, or a quote that is not. A comma written there
+ * would not end the argument.
+ */
+export function opensGroup(text: string): boolean {
+  let depth = 0
+  let quote: string | null = null
+  for (const ch of text) {
+    if (quote !== null) {
+      if (ch === quote) quote = null
+      continue
+    }
+    if (ch === '"' || ch === "'") quote = ch
+    else if (ch === '(' || ch === '[') depth += 1
+    else if (ch === ')' || ch === ']') depth -= 1
+  }
+  return quote !== null || depth > 0
+}
+
 /** Whether `text` opens more brackets than it closes. */
 function opensBracket(text: string): boolean {
   let depth = 0

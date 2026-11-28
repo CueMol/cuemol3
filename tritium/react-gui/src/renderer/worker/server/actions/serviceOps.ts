@@ -20,7 +20,8 @@
 import type { WorkerContext } from '@renderer/worker/server/types/WorkerContext'
 import type { SceneNodeEntry } from '@renderer/worker/server/catalog/refs'
 import { recordedPath, recordedPaths, recordedPropPath, sceneNodes } from '@renderer/worker/server/catalog/refs'
-import type { FileOpenOptions, FormatOptions, MapCenterPolicy } from '@renderer/worker/shared/fileOpenTypes'
+import type { FileOpenOptions, FormatOptions, MapCenterPolicy, RendererOptions } from '@renderer/worker/shared/fileOpenTypes'
+import { defaultRendererName, type RendNameScope } from '@renderer/worker/server/services/rend/defaultRendererName'
 import { insideOp, noteEntry, txnOpen } from './actionLog'
 
 /** The node kinds the property ops address (a group is a renderer to them). */
@@ -253,6 +254,24 @@ export function formatLoad(format: FormatOptions): [string, Record<string, unkno
 }
 
 /**
+ * The renderer name a load records: null when it is the name the op would
+ * give anyway (so a replay renumbers it the same way), else the name the user
+ * chose -- for a preset group too, whose children are named after it. Call
+ * before the renderer exists, or it takes its own name and the default moves
+ * on to the next number.
+ */
+export function recordedRendererName(
+  ctx: WorkerContext,
+  sceneId: number,
+  r: Pick<RendererOptions, 'rendererName' | 'rendererType' | 'presetName'>,
+): string | null {
+  if (!r.rendererName) return null
+  const scene = ctx.sceMgr.getScene(sceneId) as unknown as RendNameScope | null
+  if (scene && r.rendererName === defaultRendererName(scene, r)) return null
+  return r.rendererName
+}
+
+/**
  * A file opened from the File Open dialog: the format's own load op with
  * the options the dialog read it with, and the renderer it is first drawn with.
  *
@@ -275,7 +294,7 @@ export function recordLoadFile(
     rendererType: r.presetName ? null : r.rendererType || null,
     selection: r.selectionEnabled ? r.selection : null,
     name: r.objectName || null,
-    rendererName: r.presetName || !r.rendererName ? null : r.rendererName,
+    rendererName: recordedRendererName(ctx, sceneId, r),
     preset: r.presetName ? r.presetName : null,
     // The ops' defaults: the view centres on it, and a map follows its kind.
     centerView: r.centerView ? null : false,

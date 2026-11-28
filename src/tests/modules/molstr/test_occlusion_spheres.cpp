@@ -1,6 +1,6 @@
 // -*-Mode: C++;-*-
 //
-// MolRenderer::collectOcclusionSpheres keeps the atoms its selection matches
+// MolRenderer::collectOccluderBounds keeps the atoms its selection matches
 // between Fast GI probe bakes (evaluating the selection is the costly part).
 // The kept atoms must follow selection and topology changes, and the spheres
 // must follow moved atoms, or the probe grid misses part of what is drawn.
@@ -84,8 +84,10 @@ protected:
 
     std::vector<Vector4D> spheres()
     {
+        // The MolRenderer implementation (the simple renderer itself draws
+        // lines only and reports no occluder).
         std::vector<Vector4D> out;
-        m_pRend->collectOcclusionSpheres(out);
+        m_pRend->molstr::MolRenderer::collectOccluderBounds(out);
         return out;
     }
 
@@ -124,3 +126,4 @@ TEST_F(OcclusionSpheresTest, FollowsMovedAtomsSelectionAndTopology)
     EXPECT_EQ(sph.size(), 2u);
     EXPECT_TRUE(hasCenter(sph, Vector4D(20.0, 2.0, 0.0)));
 }
+

@@ -51,6 +51,7 @@ function makeCtx(opts: {
 
     const mockScene = {
         view_uids: '',
+        getRendByName: vi.fn(() => null),
         clearAllData: vi.fn(() => calls.push('clearAllData')),
         getView: vi.fn(),
         setName: vi.fn(),

@@ -169,6 +169,7 @@ add_executable(test_molstr
   modules/molstr/test_coordtexsupport.cpp
   modules/molstr/test_namelabel.cpp
   modules/molstr/test_bfac_coloring.cpp
+  modules/molstr/test_nucl_sidech_mainch.cpp
 )
 target_include_directories(test_molstr PRIVATE
   ${CMAKE_SOURCE_DIR}/src
@@ -243,6 +244,7 @@ add_executable(test_surface
   modules/surface/test_reader_validation.cpp
   modules/surface/test_elepot_symop_fixes.cpp
   modules/surface/test_surf_atom_color.cpp
+  modules/surface/test_molsurf_occluder_bounds.cpp
 )
 target_include_directories(test_surface PRIVATE
   ${CMAKE_SOURCE_DIR}/src
@@ -337,6 +339,7 @@ add_executable(test_importers
   modules/importers/test_pickle_instream.cpp
   modules/importers/test_sdfmolwriter.cpp
   modules/importers/test_mmcif_struct_conn.cpp
+  modules/importers/test_scene_load_errors.cpp
 )
 target_include_directories(test_importers PRIVATE
   ${CMAKE_SOURCE_DIR}/src
@@ -346,6 +349,7 @@ target_include_directories(test_importers PRIVATE
 )
 target_compile_definitions(test_importers PRIVATE
   CUEMOL2_SYSCONFIG_PATH="${CMAKE_SOURCE_DIR}/data/sysconfig.xml"
+  CUEMOL2_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/test_data"
 )
 target_link_libraries(test_importers PRIVATE importers surface symm xtal mdtools molvis molstr qsys gfx qlib Boost::filesystem GTest::gtest)
 if (BUILD_OPENGL_SYSDEP)

@@ -6,7 +6,9 @@
  *   - play / stop / seek / setLoop route to animPlay / animStop / animGoTime /
  *     animSetLoop with the active scene/view ids;
  *   - with no active view, `canControl` is false and the actions are no-ops;
- *   - `mgr` exposes `baseMgr` until a transport op supersedes it;
+ *   - `mgr` exposes `baseMgr` until a transport op supersedes it, and a
+ *     refetched `baseMgr` supersedes the op's reply in turn (an edited
+ *     length must not stay hidden behind an earlier seek);
  *   - playback progress arrives as worker pushes for this scene, and the
  *     renderer never asks for it -- the poll this replaced was the one
  *     remaining place the UI questioned the worker on a timer.
@@ -98,6 +100,21 @@ describe("useAnimTransport", () => {
     h.result.setLoop(true);
     await flushPromises();
     expect(h.result.mgr.loop).toBe(true);
+    h.unmount();
+  });
+
+  it("lets a refetched baseMgr supersede an earlier op's reply", async () => {
+    const cm = makeCm(mgrState({ playState: "pause", elapsedMs: 1200, lengthMs: 5000 }));
+    let base = mgrState({ lengthMs: 5000 });
+    const h = makeRenderHook(() => useAnimTransport({ cm: cm as never, sceneId: 3, viewId: 7, baseMgr: base }));
+    h.result.seek(1200);
+    await flushPromises();
+    expect(h.result.mgr.elapsedMs).toBe(1200);
+
+    // An element's duration was edited: the timeline refetch reads the new length.
+    base = mgrState({ playState: "pause", elapsedMs: 1200, lengthMs: 7000 });
+    h.rerender();
+    expect(h.result.mgr.lengthMs).toBe(7000);
     h.unmount();
   });
 });

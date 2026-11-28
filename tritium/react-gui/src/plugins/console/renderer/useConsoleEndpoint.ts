@@ -87,6 +87,7 @@ export function useConsoleEndpoint(): void {
           sceneId: activeSceneId ?? 0,
           viewId: activeMolViewId ?? 0,
           line: p.line,
+          rest: p.rest,
           cwd: p.cwd,
         })
         if (!res.ok) return { error: res.error }

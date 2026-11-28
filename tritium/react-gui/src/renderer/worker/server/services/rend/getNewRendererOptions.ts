@@ -12,6 +12,7 @@ import type { Renderer } from '@cuemol/core/src/wrappers/Renderer';
 import type { WorkerContext } from '@renderer/worker/server/types/WorkerContext';
 import type { PresetTypeEntry } from '@renderer/worker/shared/fileOpenTypes';
 import { getSceneOrNull } from '@renderer/worker/server/services/helpers/sceneResolver';
+import { unusedSceneRendererName } from '@renderer/worker/server/services/rend/defaultRendererName';
 import { fetchStyleEntries } from '@renderer/worker/server/services/helpers/styleEntries';
 import { isSelectableRendererType } from '@renderer/worker/server/services/helpers/rendererFilter';
 import { isMolObjectClass } from '@renderer/worker/shared/objectClasses';
@@ -70,11 +71,7 @@ export function unusedRendererName(
     scene: { getRendByName(name: string): unknown },
     type: string,
 ): string {
-    for (let i = 1; i < 10000; i++) {
-        const candidate = `${type}${i}`;
-        if (!scene.getRendByName(candidate)) return candidate;
-    }
-    return `${type}${Date.now()}`;
+    return unusedSceneRendererName(scene, type);
 }
 
 /**

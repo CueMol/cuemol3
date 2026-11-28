@@ -4,6 +4,9 @@
  * worker and its answer is shown, and the arrow key brings the last line
  * back.
  *
+ * Ctrl-R searches that history (the steps themselves are console-kit's
+ * historySearch.test.ts; here, that the panel drives them and runs the match).
+ *
  * The history is the half worth pinning. It is pure state that no type
  * checks, it is how people actually use a console, and losing it fails
  * quietly -- the key just does nothing.
@@ -124,6 +127,36 @@ describe('ConsolePanel', () => {
     key('Enter')
     expect(promptOf(tree.container).value).toBe('bg_color ')
     expect(runner).not.toHaveBeenCalled()
+    tree.unmount()
+  })
+
+  it('searches the history on Ctrl-R, runs the match on Enter, and Esc puts back what was typed', async () => {
+    for (const line of ['view', 'get bgcolor', 'list_cameras']) historyOf(NATIVE_META).pushHistory(line)
+    const runner = vi.fn()
+    const tree = mountTree(<ConsolePanel cm={null} />)
+    act(() => consoleSession.setRunner(runner))
+    const key = (k: string, init: KeyboardEventInit = {}) =>
+      act(() => {
+        promptOf(tree.container).dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true, ...init }))
+      })
+    const status = () => tree.container.querySelector('.console-line-search')?.textContent
+
+    act(() => type(promptOf(tree.container), 'draft'))
+    key('r', { ctrlKey: true })
+    key('b')
+    key('g')
+    expect(promptOf(tree.container).value).toBe('get bgcolor')
+    expect(status()).toBe('bck-i-search: bg')
+    key('Escape')
+    expect(promptOf(tree.container).value).toBe('draft')
+    expect(status()).toBeUndefined()
+
+    key('r', { ctrlKey: true })
+    key('v')
+    key('Enter')
+    await act(async () => flushPromises())
+    expect(runner).toHaveBeenCalledWith('view', 'native')
+    expect(status()).toBeUndefined()
     tree.unmount()
   })
 

@@ -418,3 +418,15 @@ bool Renderer::hasCenter() const
 {
   return true;
 }
+
+void Renderer::appendBoxCorners(const qlib::Vector4D &vmin, const qlib::Vector4D &vmax,
+                                const qlib::Matrix4D &xf, std::vector<qlib::Vector4D> &out)
+{
+  for (int i = 0; i < 8; ++i) {
+    qlib::Vector4D v((i & 1) ? vmax.x() : vmin.x(), (i & 2) ? vmax.y() : vmin.y(),
+                     (i & 4) ? vmax.z() : vmin.z());
+    xf.xform3D(v);
+    v.w() = 0.0;
+    out.push_back(v);
+  }
+}

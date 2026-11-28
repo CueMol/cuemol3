@@ -25,7 +25,11 @@ namespace qsys {
     int m_prevPt_x, m_prevPt_y;
     int m_startPt_x, m_startPt_y;
 
+    /// time of the previous single click (0: none, or consumed by a double click)
     qlib::time_value m_prevClickTime;
+    /// button and position of the previous single click
+    int m_nPrevClickBtn;
+    int m_prevClick_x, m_prevClick_y;
 
     /// mouse dragging start flag
     int m_nState;
@@ -46,6 +50,8 @@ namespace qsys {
     static const int VELO_GAP_TIME = 50;
     /// double click interval (nanoseconds)
     static const int DBLCLICK_TIME = 500*1000*1000;
+    /// largest distance (pixels, each axis) between the two clicks of a double click
+    static const int DBLCLICK_DIST = 4;
 
     InDevEvent m_lastEvent;
 

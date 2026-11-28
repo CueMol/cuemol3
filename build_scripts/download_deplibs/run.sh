@@ -14,12 +14,17 @@ TMPDIR=$BASEDIR/tmp
 mkdir -p $TMPDIR
 cd $TMPDIR
 
-# Retrieve deplibs binary
-DEPLIBS_TGZ=deplibs_${RUNNER_OS}_${RUNNER_ARCH}.tar.bz2
+# Retrieve deplibs binary. DEPLIBS_FLAVOR=manylinux selects the Linux bundle
+# built on glibc 2.28 (manylinux_2_28), used by the portable cuetty tarball.
+if [ -n "${DEPLIBS_FLAVOR:-}" ]; then
+    DEPLIBS_TGZ=deplibs_${RUNNER_OS}-${DEPLIBS_FLAVOR}_${RUNNER_ARCH}.tar.bz2
+else
+    DEPLIBS_TGZ=deplibs_${RUNNER_OS}_${RUNNER_ARCH}.tar.bz2
+fi
 URL=https://github.com/CueMol/build_scripts/releases/download/$DEPLIBS_VERSION/$DEPLIBS_TGZ
 
 # wget --progress=dot:mega -c \
-curl -sS -L -O $URL
+curl -fsS -L -O $URL
      
 # xattr -cr $DEPLIBS_TGZ
 

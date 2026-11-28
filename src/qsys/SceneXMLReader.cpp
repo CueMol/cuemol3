@@ -114,6 +114,9 @@ void SceneXMLReader::read()
   // show start msg
   LOG_DPRINTLN("SceneXML> Start loading: %s ...", localfile.c_str());
 
+  m_loadErrors.clear();
+  m_pendingChunks.clear();
+
   //
   // Setup streams
   //
@@ -148,6 +151,16 @@ void SceneXMLReader::read()
 
   // perform chunk loading
   procDataChunks(ois, pNode);
+
+  // A chunk still pending was never found in the file. A truncated file
+  // reaches EOF while looking for the next chunk, which ends the chunk loop
+  // the normal way, so this is the only place such a file shows up.
+  for (const LString &id : m_pendingChunks) {
+    LString msg = LString::format("data chunk %s is missing from the file", id.c_str());
+    LOG_DPRINTLN("SceneXML> %s", msg.c_str());
+    m_loadErrors.push_back(msg);
+  }
+  m_pendingChunks.clear();
 
   ois.close();
   m_pClient->setUpdateFlag();
@@ -193,8 +206,9 @@ void SceneXMLReader::procDataChunks(qlib::LDom2InStream &ois, LDom2Node *pNode)
 {
   for (;;) {
     qlib::InStream *pin = NULL;
+    LString chunkid;
     try {
-      LString chunkid = ois.getNextDataChunkID();
+      chunkid = ois.getNextDataChunkID();
       if (chunkid.isEmpty())
         return;
       MB_DPRINTLN("SceneXMLReader> load datachunk: %s", chunkid.c_str());
@@ -211,15 +225,22 @@ void SceneXMLReader::procDataChunks(qlib::LDom2InStream &ois, LDom2Node *pNode)
       pCnt->readFromStream(*pin);
       ois.closeChunkStream(pin);
       pin = NULL;
+      m_pendingChunks.erase(chunkid);
     }
     catch (qlib::LException &e) {
       pNode->appendErrMsg("SceneXML> Load object error (ignored).");
       pNode->appendErrMsg("SceneXML> Reason: %s", e.getMsg().c_str());
+      m_loadErrors.push_back(LString::format("data chunk %s: %s", chunkid.c_str(),
+                                             e.getMsg().c_str()));
+      m_pendingChunks.erase(chunkid);
       skipFailedChunk(ois, pin);
     }
     catch (...) {
       pNode->appendErrMsg("SceneXML> Load object error (ignored).");
       pNode->appendErrMsg("SceneXML> Reason: unknown");
+      m_loadErrors.push_back(
+          LString::format("data chunk %s: unknown error", chunkid.c_str()));
+      m_pendingChunks.erase(chunkid);
       skipFailedChunk(ois, pin);
     }
   }
@@ -271,6 +292,7 @@ void SceneXMLReader::procDataSrcLoad(qlib::LDom2InStream &ois, LDom2Node *pNode)
                 src.c_str(), srctype.c_str());
     // addChunkMap(src, pCnt, srctype);
     ois.addChunkMap(src, pCnt);
+    m_pendingChunks.insert(src);
     return;
   }
   

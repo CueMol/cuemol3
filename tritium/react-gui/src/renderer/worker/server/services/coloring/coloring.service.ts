@@ -69,6 +69,7 @@ export type {
     ColoringTargetKind,
     GetPaintColoringStylesArgs,
     PaintColoringStyleEntry,
+    PaintTheme,
     GetPaintColoringStylesResult,
     SetRendererColoringArgs,
     SetRendererColoringResult,

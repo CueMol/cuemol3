@@ -37,6 +37,10 @@ layout(location = 2) out vec4 o_Material;
 
 void main(void)
 {
+    // Drawn without a normal: casts no AO, so not part of the occluder-only
+    // pass (the probe bake, fog_inc.glsl isOccluderPass).
+    if (isOccluderPass()) discard;
+
     if (stippleLen > 0.0) {
         float stipos = mod(v_length, stippleLen);
         if (stipos < stippleLen * 0.5) {

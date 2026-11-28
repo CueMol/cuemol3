@@ -47,6 +47,11 @@ interface RendererOptionsPaneProps {
    */
   molID?: number;
   /**
+   * Label of the view switch. File open centres on the loaded molecule (the
+   * default label); New Renderer centres on the renderer it adds.
+   */
+  centerViewLabel?: string;
+  /**
    * Routes renderer-name keystrokes through the parent so it can track
    * whether the value is still the auto-generated default (UXP
    * mRendNameDefault). When omitted, falls back to setting the field
@@ -55,7 +60,7 @@ interface RendererOptionsPaneProps {
   onRendererNameUserEdit?: (newValue: string) => void;
 }
 
-export const RendererOptionsPane: React.FC<RendererOptionsPaneProps> = ({ options, onChange, rendererTypes, presetTypes, sceneId, isMolFormat, isMapObject, molID, onRendererNameUserEdit }) => {
+export const RendererOptionsPane: React.FC<RendererOptionsPaneProps> = ({ options, onChange, rendererTypes, presetTypes, sceneId, isMolFormat, isMapObject, molID, centerViewLabel = 'Center view on molecule after loading', onRendererNameUserEdit }) => {
   const set = <K extends keyof RendererOptions>(key: K) =>
     (value: RendererOptions[K]) => onChange({ ...options, [key]: value });
 
@@ -155,7 +160,7 @@ export const RendererOptionsPane: React.FC<RendererOptionsPaneProps> = ({ option
           </SelectField>
         </Field>
       ) : (
-        <Field label="Center view on molecule after loading" inline>
+        <Field label={centerViewLabel} inline>
           <SwitchField checked={options.centerView} onChange={set('centerView')} />
         </Field>
       )}

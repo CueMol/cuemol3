@@ -237,6 +237,11 @@ boundary で切り取った region を budget 由来の stride で** 表示し�
   renderer が無いか箱が空なら、データの箱に合わせる (`DensityMap::fitView` / `getFitBoxJSON`)。EM map の箱は粒子の
   数倍あるので、箱に合わせると粒子が小さく写る。File > Open (`fitViewsToMap`)、EMDB / URL の取得
   (`streamLoad.ts`)、scene tree の Focus (`sceneTree/sceneOps.ts`) が使う。
+- **取得した地図の view** (`streamLoadDensityMap`、Get PDB と `fetch_map` / `fetch_emdb` / `fetch_map_url`):
+  地図に fit するのは cryo-EM の地図だけ。結晶学の地図 (2Fo-Fc / Fo-Fc) は File > Open の `setMapCenter` と
+  同じく、各 renderer の `center` を取得先の view の中心にする (`setMapRenderersCenterToView`)。Get PDB は座標を
+  先に読んで分子に視点を合わせるので、地図は分子のまわりに描かれる。以前は結晶学の地図にも fit しており、視点が
+  単位胞の中央に移って分子から離れた所に contour が描かれた。
 - **データの箱**: `DensityMap::fitView` / `getFitBoxJSON` は、単位胞 (分数座標 0-1) ではなくデータの 8 つの角
   (格子 index (0,0,0) から (nCols, nRows, nSecs)) を `convToOrth` で変換した箱を使う。EMDB の map は開始 index が
   -n/2 のことが多く、単位胞に合わせると粒子から半箱ずれた点を向いた。`getLevelFitBoxJSON` は 8 bit の格子を byte の

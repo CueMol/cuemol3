@@ -1,7 +1,8 @@
 /**
  * Pin streamLoadDensityMap service: reader configuration per
  * (readerName, mapType), normal/cancel/HTTP-error paths, and
- * post-load setup (preset contour count + fitView).
+ * post-load setup (preset contours; the view fits a cryo-EM map, a
+ * crystallographic map is drawn around the view centre).
  *
  * UXP reference:
  *  - reader props: netpdbopen.js openMapImpl L334-360 (compress, clmn_F/PHI, gridsize)
@@ -67,7 +68,7 @@ function makeEnv(opts?: { readerName?: string; obj?: FakeObj | null }): MockEnv 
         ? { __obj: true, fitView: vi.fn() }
         : (opts.obj as FakeObj)
     const scene = { uid: 7, addObject: vi.fn() }
-    const view = { __view: true } as const
+    const view: { __view: true } = { __view: true }
 
     const createHandler = vi.fn(() => reader)
     const loadObjectAsync = vi.fn(() => 99)
@@ -210,6 +211,8 @@ describe('streamLoadDensityMap — reader configuration', () => {
         expect(env.reader.clmn_F).toBeUndefined()
         expect(kindAtSetup).toBe('em')
         expect(setupDensityMapRenderers).toHaveBeenCalledWith(env.ctx, env.scene, env.obj, 'em', 0.116)
+        // A cryo-EM map is the whole subject: the view goes to it.
+        expect(env.obj.fitView).toHaveBeenCalledWith(env.view, false)
 
         // The Get PDB dialog's download replays as the op, at the level it
         // was drawn at; defaults (name, mirror) are left out.
@@ -254,8 +257,19 @@ describe('streamLoadDensityMap — post-load behavior', () => {
         else delete (globalThis as unknown as { fetch?: typeof fetch }).fetch
     })
 
-    it('success: addObject + setupDensityMapRenderers + fitView; returns ok=true', async () => {
-        const env = makeEnv()
+    it('success (2fofc): addObject + setupDensityMapRenderers, drawn around the view centre without moving the view; returns ok=true', async () => {
+        // A crystallographic map comes to the model on screen: its contours
+        // are centred on the view, and the view is not fitted to the unit cell.
+        const contour = { center: undefined as unknown }
+        const obj = {
+            __obj: true,
+            fitView: vi.fn(),
+            getRendCount: () => 1,
+            getRendererByIndex: () => contour,
+        } as unknown as FakeObj
+        const env = makeEnv({ obj })
+        const viewCenter = { x: 1, y: 2, z: 3 }
+        ;(env.view as unknown as { getViewCenter: () => unknown }).getViewCenter = () => viewCenter
         globalThis.fetch = fetchYieldingChunks([
             new Uint8Array([1, 2, 3, 4]),
             new Uint8Array([5, 6, 7]),
@@ -286,7 +300,8 @@ describe('streamLoadDensityMap — post-load behavior', () => {
         expect(setupDensityMapRenderers).toHaveBeenCalledTimes(1)
         expect(setupDensityMapRenderers).toHaveBeenCalledWith(env.ctx, env.scene, env.obj, '2fofc', null)
 
-        expect(env.obj.fitView).toHaveBeenCalledWith(env.view, false)
+        expect(env.obj.fitView).not.toHaveBeenCalled()
+        expect(contour.center).toBe(viewCenter)
         expect(result).toEqual(expect.objectContaining({ ok: true }))
     })
 

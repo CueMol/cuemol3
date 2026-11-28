@@ -106,6 +106,7 @@ void MolAnlManager::superposeLSQ1(MolCoordPtr pmol_ref, SelectionPtr psel_ref,
                                   MolCoordPtr pmol_mov, SelectionPtr psel_mov, bool bUseProp/*=false*/)
 {
   qsys::AutoStyleCtxt asc(pmol_ref->getSceneID());
+  m_lastSupJSON = LString();
 
   double rmsd;
   int nfit;
@@ -122,6 +123,10 @@ void MolAnlManager::superposeLSQ1(MolCoordPtr pmol_ref, SelectionPtr psel_ref,
   LOG_DPRINTLN(" RMSD: %f angstrom", rmsd);
   LOG_DPRINTLN(" Nfit: %d atoms", nfit);
   LOG_DPRINTLN("======");
+
+  m_lastSupJSON = LString::format(
+      "{\"algo\":\"LSQ\",\"rmsd\":%.6f,\"nalgn\":%d,\"rotation\":%.6f}",
+      rmsd, nfit, rotationDegree(xfmat));
 }
 
 bool MolAnlManager::lsqFit(MolCoordPtr pRefMol, SelectionPtr pRefSel,

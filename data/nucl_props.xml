@@ -14,7 +14,7 @@
         <ring value="C1' C2' C3' C4' O4'"/>
       </rings>
       <sidech value="C1' N9 C4 N3 C2 N1 C6 N6 H61 H62 C5 N7 C8"/>
-      <mainch value="P O1P O2P O5' C5' C4' O4' C1' C2' O2' H2' C3' O3'"/>
+      <mainch value="P O1P O2P OP1 OP2 OP3 O5' C5' C4' O4' C1' C2' O2' H2' C3' O3'"/>
       <prop name="basetype" value="pur"/>
     </resid>
 
@@ -29,7 +29,7 @@
         <ring value="C1' C2' C3' C4' O4'"/>
       </rings>
       <sidech value="C1' N1 C6 C2 O2 N3 C4 N4 H41 H42 C5"/>
-      <mainch value="P O1P O2P O5' C5' C4' O4' C1' C2' O2' C3' O3'"/>
+      <mainch value="P O1P O2P OP1 OP2 OP3 O5' C5' C4' O4' C1' C2' O2' C3' O3'"/>
       <prop name="basetype" value="pyr"/>
     </resid>
 
@@ -45,7 +45,7 @@
         <ring value="C1' C2' C3' C4' O4'"/>
       </rings>
       <sidech value="C1' N9  C4  N3  C2  N2  H21 H22 N1  H1  C6  O6  C5  N7  C8"/>
-      <mainch value="P O1P O2P O5' C5' C4' O4' C1' C2' O2' H2' C3' O3'"/>
+      <mainch value="P O1P O2P OP1 OP2 OP3 O5' C5' C4' O4' C1' C2' O2' H2' C3' O3'"/>
       <prop name="basetype" value="pur"/>
     </resid>
 
@@ -58,8 +58,8 @@
         <ring value="N1 C2 N3 C4 C5 C6"/>
         <ring value="C1' C2' C3' C4' O4'"/>
       </rings>
-      <sidech value="C1' N1 C6 C2 O2 N3 H3 C4 O4 C5 C5A"/>
-      <mainch value="P O1P O2P O5' C5' C4' O4' C1' C2' O2' C3' O3'"/>
+      <sidech value="C1' N1 C6 C2 O2 N3 H3 C4 O4 C5 C5A C7 H71 H72 H73 C5M 1H5M 2H5M 3H5M H5M1 H5M2 H5M3"/>
+      <mainch value="P O1P O2P OP1 OP2 OP3 O5' C5' C4' O4' C1' C2' O2' C3' O3'"/>
       <prop name="basetype" value="pyr"/>
     </resid>
 
@@ -74,7 +74,7 @@
         <ring value="C1' C2' C3' C4' O4'"/>
       </rings>
       <sidech value="C1' N1 C6 C2 O2 N3 H3 C4 O4 C5"/>
-      <mainch value="P O1P O2P O5' C5' C4' O4' C1' C2' O2' C3' O3'"/>
+      <mainch value="P O1P O2P OP1 OP2 OP3 O5' C5' C4' O4' C1' C2' O2' C3' O3'"/>
       <prop name="basetype" value="pyr"/>
     </resid>
 
@@ -86,7 +86,7 @@
         <ring value="C1' C2' C3' C4' O4'"/>
       </rings>
       <sidech value="C1' N1 C6 C2 O2 N3 C4 O4 C5"/>
-      <mainch value="P O1P O2P O5' C5' C4' O4' C1' C2' O2' C3' O3'"/>
+      <mainch value="P O1P O2P OP1 OP2 OP3 O5' C5' C4' O4' C1' C2' O2' C3' O3'"/>
       <prop name="basetype" value="pyr"/>
     </resid>
 
@@ -97,7 +97,7 @@
         <ring value="C1' C2' C3' C4' O4'"/>
       </rings>
       <sidech value="C1' N9 C4 N3 C2 N1 C6 N6 C5 N7 C8 CM1"/>
-      <mainch value="P O1P O2P O5' C5' C4' O4' C1' C2' O2' C3' O3'"/>
+      <mainch value="P O1P O2P OP1 OP2 OP3 O5' C5' C4' O4' C1' C2' O2' C3' O3'"/>
       <prop name="basetype" value="pur"/>
     </resid>
 
@@ -108,7 +108,7 @@
         <ring value="C1' C2' C3' C4' O4'"/>
       </rings>
       <sidech value="C1' N9  C4  N3  C2  N2  CM2 N1 C6  O6  C5  N7  C8"/>
-      <mainch value="P O1P O2P O5' C5' C4' O4' C1' C2' O2' C3' O3'"/>
+      <mainch value="P O1P O2P OP1 OP2 OP3 O5' C5' C4' O4' C1' C2' O2' C3' O3'"/>
       <prop name="basetype" value="pur"/>
     </resid>
 
@@ -118,7 +118,7 @@
         <ring value="C1' C2' C3' C4' O4'"/>
       </rings>
       <sidech value="C1' N1 C6 C2 O2 N3 C4 N4 C5 CM5"/>
-      <mainch value="P O1P O2P O5' C5' C4' O4' C1' C2' O2' C3' O3'"/>
+      <mainch value="P O1P O2P OP1 OP2 OP3 O5' C5' C4' O4' C1' C2' O2' C3' O3'"/>
       <prop name="basetype" value="pyr"/>
     </resid>
 
@@ -128,7 +128,7 @@
         <ring value="C1' C2' C3' C4' O4'"/>
       </rings>
       <sidech value="C1' N1 C6 C2 O2 N3 H3 C4 O4 C5 C5M"/>
-      <mainch value="P O1P O2P O5' C5' C4' O4' C1' C2' O2' C3' O3'"/>
+      <mainch value="P O1P O2P OP1 OP2 OP3 O5' C5' C4' O4' C1' C2' O2' C3' O3'"/>
       <prop name="basetype" value="pyr"/>
     </resid>
 
@@ -139,7 +139,7 @@
         <ring value="C1' C2' C3' C4' O4'"/>
       </rings>
       <sidech value="C1' N9  C4  N3  C2  N2 N1  C6  O6  C5  N7  CM7 C8"/>
-      <mainch value="P O1P O2P O5' C5' C4' O4' C1' C2' O2' C3' O3'"/>
+      <mainch value="P O1P O2P OP1 OP2 OP3 O5' C5' C4' O4' C1' C2' O2' C3' O3'"/>
       <prop name="basetype" value="pur"/>
     </resid>
 
@@ -150,7 +150,7 @@
         <ring value="C1' C2' C3' C4' O4'"/>
       </rings>
       <sidech value="C1' N9  C4  N3  C2  N2 CM1 CM2 N1 C6  O6  C5  N7  C8"/>
-      <mainch value="P O1P O2P O5' C5' C4' O4' C1' C2' O2' C3' O3'"/>
+      <mainch value="P O1P O2P OP1 OP2 OP3 O5' C5' C4' O4' C1' C2' O2' C3' O3'"/>
       <prop name="basetype" value="pur"/>
     </resid>
 
@@ -160,7 +160,7 @@
         <ring value="C1' C2' C3' C4' O4'"/>
       </rings>
       <sidech value="C1' N1 C6 C2 O2 N3 C4 N4 C5"/>
-      <mainch value="P O1P O2P O5' C5' C4' O4' C1' C2' O2' CM2 C3' O3'"/>
+      <mainch value="P O1P O2P OP1 OP2 OP3 O5' C5' C4' O4' C1' C2' O2' CM2 C3' O3'"/>
       <prop name="basetype" value="pyr"/>
     </resid>
 
@@ -171,7 +171,7 @@
         <ring value="C1' C2' C3' C4' O4'"/>
       </rings>
       <sidech value="C1' N9  C4  N3  C2  N2 N1 C6  O6  C5  N7  C8"/>
-      <mainch value="P O1P O2P O5' C5' C4' O4' C1' C2' O2' CM2 C3' O3'"/>
+      <mainch value="P O1P O2P OP1 OP2 OP3 O5' C5' C4' O4' C1' C2' O2' CM2 C3' O3'"/>
       <prop name="basetype" value="pur"/>
     </resid>
 
@@ -181,7 +181,7 @@
         <ring value="C1' C2' C3' C4' O4'"/>
       </rings>
       <sidech value="C1' N1 C6 C2 O2 N3 C4 O4 C5"/>
-      <mainch value="P O1P O2P O5' C5' C4' O4' C1' C2' O2' C3' O3'"/>
+      <mainch value="P O1P O2P OP1 OP2 OP3 O5' C5' C4' O4' C1' C2' O2' C3' O3'"/>
       <prop name="basetype" value="pyr"/>
     </resid>
 
@@ -193,7 +193,7 @@
         <ring value="N1 C12 C11 N2 C2"/>
       </rings>
       <sidech value="C1' N9  C4  N3 C3 C2  N2 N1 C6  O6  C5  N7  C8 C10 C11 C12 C13 C14 C15 C16 O17 O18 C19 N20 C21 O22 O23 C24"/>
-      <mainch value="P O1P O2P O5' C5' C4' O4' C1' C2' O2' C3' O3'"/>
+      <mainch value="P O1P O2P OP1 OP2 OP3 O5' C5' C4' O4' C1' C2' O2' C3' O3'"/>
       <prop name="basetype" value="pur"/>
     </resid>
 

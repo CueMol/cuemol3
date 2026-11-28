@@ -1,5 +1,6 @@
 // Runs in Web Worker thread. Wrappers are sync (no await on C++ wrappers).
 import type { WorkerContext } from '@renderer/worker/server/types/WorkerContext';
+import { unusedSceneRendererName, type RendNameScope } from '@renderer/worker/server/services/rend/defaultRendererName';
 
 export type ProposeUniqNameArgs =
     | { kind: 'scene';         prefix: string }
@@ -70,11 +71,9 @@ export function proposeUniqName(ctx: WorkerContext, args: ProposeUniqNameArgs): 
             if (!scene) {
                 return { name: prefix + '1' };
             }
-            // Scene-wide rendgroup naming: matches UXP `onNewRendGrp`'s
-            // `scene.getRendByName` lookup so group names don't collide
-            // with sibling renderers on other objects.
-            tryFunc = (name) => (scene as any).getRendByName(name);
-            break;
+            // Scene-wide naming (UXP `onNewRendGrp`'s `scene.getRendByName`
+            // lookup), the one rule every renderer-creating path shares.
+            return { name: unusedSceneRendererName(scene as unknown as RendNameScope, prefix) };
         }
         case 'camera': {
             // UXP `createCamera` walks `camera_0`, `camera_1`, ... against

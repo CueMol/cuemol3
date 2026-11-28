@@ -13,6 +13,9 @@
  *   - inside the undo txn: createDefaultObj -> attach -> read -> detach ->
  *     name -> scene.addObject -> setupRenderer.
  *   - read() throwing rolls back the undo txn (no commit).
+ *   - an op's load (`requireRenderer`) names a preset or type the object
+ *     cannot have: refused before scene.addObject, so an outer transaction
+ *     (an agent turn) has nothing to keep.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { WorkerContext } from '@renderer/worker/server/types/WorkerContext'
@@ -26,6 +29,10 @@ vi.mock('@renderer/worker/server/services/helpers/pickReaderName', () => ({
 }))
 vi.mock('@renderer/worker/server/services/helpers/applyReaderOptions', () => ({
     applyReaderOptions: vi.fn(),
+}))
+vi.mock('@renderer/worker/server/services/rend/getNewRendererOptions', async (importOriginal) => ({
+    ...(await importOriginal<object>()),
+    collectRendPresetTypes: vi.fn(() => [{ name: 'Default1RendPreset', desc: '' }]),
 }))
 
 import { services } from '@renderer/worker/server/services/file/file.service'
@@ -66,6 +73,8 @@ function makeFixture(opts: { readThrows?: boolean; obj?: Record<string, unknown>
         commitUndoTxn: vi.fn(() => calls.push('commit')),
         rollbackUndoTxn: vi.fn(() => calls.push('rollback')),
         addObject: vi.fn(() => calls.push('addObject')),
+        // The recorded renderer name is compared with the scene's default.
+        getRendByName: vi.fn(() => null),
     }
 
     const createHandler = vi.fn(() => reader)
@@ -234,5 +243,37 @@ describe('loadObject.service — reader-based path', () => {
         expect(calls).not.toContain('commit')
         expect(calls).not.toContain('addObject')
         expect(setupRenderer).not.toHaveBeenCalled()
+    })
+})
+
+describe('loadObject.service - a load that must create its renderer (an op)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        ;(pickReaderName as ReturnType<typeof vi.fn>).mockReturnValue('pdb')
+    })
+
+    // What the read object says it can have: `*group` is internal and never offered.
+    const molObj = { getClassName: () => 'MolCoord', searchCompatibleRendererNames: () => 'simple, cartoon, *group' }
+    const load = (f: ReturnType<typeof makeFixture>, renderer: Record<string, unknown>) =>
+        loadObject(f.ctx, {
+            filePath: '/data/1ema.cif',
+            sceneId: 1,
+            options: { format: unknownFormat, renderer: { ...baseRendererOpts, ...renderer } } as any,
+            contentFirst: false,
+        })
+
+    it('refuses a preset or type the object cannot have before adding it, listing what it can', () => {
+        const f = makeFixture({ obj: molObj })
+        const preset = load(f, { presetName: 'nosuch', requireRenderer: true })
+        expect(preset).toMatchObject({ ok: false, error: 'This object has no renderer preset "nosuch". Available: Default1RendPreset.' })
+
+        const group = load(f, { rendererType: '*group', requireRenderer: true })
+        expect(group).toMatchObject({ ok: false, error: 'This object cannot be drawn as "*group". Available: simple, cartoon.' })
+        expect(f.scene.addObject).not.toHaveBeenCalled()
+        expect(setupRenderer).not.toHaveBeenCalled()
+
+        // The dialogs do not ask for it: the object is loaded as before.
+        expect(load(f, { rendererType: '*group' })).toEqual({ ok: true })
+        expect(f.scene.addObject).toHaveBeenCalledTimes(1)
     })
 })

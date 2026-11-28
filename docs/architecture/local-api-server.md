@@ -67,6 +67,12 @@ listen 中は `~/.cuemol/local-api.json` (mode 0600。場所は `CUEMOL_LOCAL_AP
 `{ port, token, pid, endpoints }` を書く。同じユーザの command line client が、port も token も
 貼り付けずに接続するためのもの。close と app 終了で消す。
 
+消すのは、ファイルの `pid` が自分の process のときだけ (読めない・形式が違うときも消さない)。
+listen していない状態への遷移 (close、終了、port が使用中で listen に失敗) で消すので、インストール版を
+起動したまま開発版を起動すると、開発版は既定の port の listen に失敗して、インストール版のファイルを
+消していた。別の port で listen に成功した開発版は、ファイルを上書きし、終了時に消す (インストール版の情報は
+戻らない)。これは開発環境だけで起きるので扱わない。docs-verify は `CUEMOL_LOCAL_API_INFO` で別のファイルを使う。
+
 ## 3. MCP endpoint
 
 - Streamable HTTP の **stateless** (`sessionIdGenerator: undefined`、`enableJsonResponse: true`)。

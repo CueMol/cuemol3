@@ -13,6 +13,7 @@
 // #include <qlib/Vector4D.hpp>
 
 #include <qsys/DispListRenderer.hpp>
+#include <qlib/Box3D.hpp>
 #include <gfx/SolidColor.hpp>
 #include <qsys/MultiGradient.hpp>
 
@@ -152,6 +153,10 @@ namespace surface {
     /// target surface object
     MolSurfObj *m_pSurf;
 
+    /// Box of the faces the last render() drew (object-transformed vertex
+    /// coordinates), for collectOccluderBounds; empty when no face was drawn.
+    qlib::Box3D m_drawnBox;
+
   public:
 
     ///////////////////////////////////////////
@@ -187,6 +192,10 @@ namespace surface {
     void postRender(DisplayContext *pdc) override;
 
     void render(DisplayContext *pdl) override;
+
+    /// The box of the drawn faces (Fast GI probe bake bounds), in fill mode
+    /// only: a wireframe or dot surface is unlit and occludes nothing.
+    void collectOccluderBounds(std::vector<qlib::Vector4D> &out) const override;
 
     // virtual void targetChanged(MbObjEvent &ev);
 

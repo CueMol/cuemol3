@@ -35,18 +35,18 @@ enumdef surfalgor {
   meshms = surface::DirectSurfRenderer::DS_MESHMS;
 }
 property enum surfalgor => redirect(getSurfAlgor, setSurfAlgor);
-default surfalgor = "distfield";
+default surfalgor = "meshms";
 ```
 
 | 値 | 実装 | 対応 surftype | 備考 |
 |---|---|---|---|
 | `edtsurf` | `edtsurf::ProteinSurface` (vendored) | vdw / sas / ses | 統合前の `dsurface` |
-| `distfield` | `DistFieldSurfBuilder` | vdw / sas / ses | 統合前の `dsurf2`。**既定** |
-| `meshms` | libMeshMS (`<meshms/meshms.hpp>`) | **ses のみ** | `makeSurf` と同じ解析的 SES |
+| `distfield` | `DistFieldSurfBuilder` | vdw / sas / ses | 統合前の `dsurf2` |
+| `meshms` | libMeshMS (`<meshms/meshms.hpp>`) | **ses のみ** | `makeSurf` と同じ解析的 SES。**既定** |
 
 未実装のまま残っていた `msms` 値は削除した。旧シーンに `surfalgor="msms"` があっても
 enum 変換が失敗し `LScrObjBase::readFrom2` が catch してログを出すだけなので、
-既定値 (`distfield`) で読み込まれる。互換コードは不要。
+既定値 (`meshms`) で読み込まれる。互換コードは不要。
 
 ### meshms のフォールバック
 
@@ -146,9 +146,10 @@ meshms も 32 で頂点予算が発火している。detail 6 はどのガード
   distfield と meshms がほぼ同じ頂点数 (1.40M / 1.43M — 校正が効いている) で
   **distfield が 2.1 倍速い**。逆に 1CRN の detail 32 では箱が小さく格子だけが細かく
   なるので、頂点あたりで **meshms が 4 倍速い**。
-- **既定を distfield にしているのはこのため**。実際の使い方 (タンパク質全体を既定
-  detail で表示) は前者の領域にある。高 detail で小さい対象を見るときは meshms に
-  切り替えるのが素直。
+- **既定は meshms**。タンパク質全体を既定 detail で表示する使い方では distfield より
+  遅いが、解析的な SES で面がきれいになるのを優先した。meshms が使えない形 (vdw /
+  sas) やビルドでは distfield に落ちる (上の「meshms のフォールバック」)。速さを優先する
+  大きな分子では distfield に切り替える。
 - **MeshMS には約 9 ms の下限がある** (1CRN の detail 2-6 が頭打ちになっている)。
   density 非依存の RS 計算で、レンダラは `RSCache` を持たない (`MolSurfObj` も同様)
   ので毎回払う。大分子ではこれが上表の時間のかなりの部分を占める。
@@ -384,10 +385,11 @@ pRF->registAlias("dsurf2", "dsurface", {{"surfalgor", "distfield"}});
 
 ## 既知の挙動変更
 
-- **旧 `dsurface` シーンは distfield で描かれる**。`surfalgor` は既定値だった
-  (= `edtsurf`) ためシーンファイルに書かれておらず (`LDOM2Stream` が default flag 付き
-  ノードを skip する)、新しい既定値 `distfield` で読まれる。メッシュの見た目と
-  `detail` の効き方が変わる。リリースノート記載事項。
+- **`surfalgor` を書いていないシーンは meshms で描かれる**。既定値は保存されない
+  (`LDOM2Stream` が default flag 付きノードを skip する) ので、統合前の `dsurface`
+  (当時の既定 `edtsurf`) も、既定が `distfield` だった間に保存したシーンも、現在の既定
+  `meshms` で読まれる。見た目はほぼ変わらず、面が滑らかになる代わりに計算が重くなる
+  ことがある。互換コードは入れていない。
 - 旧 `dsurf2` シーンは alias 経由で見た目を保ったまま読める。
 - **代替配座 (altconf) の B 以降は表面に入らなくなった** (上の「入力原子」)。
   altconf を含む構造では表面の形がわずかに変わる。

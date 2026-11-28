@@ -46,7 +46,7 @@ DEBUG_FLAG=${2:-}
 NCPU=8
 
 CMAKE_OPT=""
-if [ "${GITHUB_WORKSPACE+foo}" ]; then
+if [ "${GITHUB_WORKSPACE+foo}" ] && command -v sccache > /dev/null; then
     CMAKE_SCCACHE_OPT="-DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache"
 else
     CMAKE_SCCACHE_OPT=""
@@ -69,7 +69,7 @@ else
 fi
 
 # Python embed (posix only; Windows build disables Python bindings)
-if $IS_WINDOWS; then
+if $IS_WINDOWS || [ "${CUEMOL2_CLI_ONLY:-OFF}" = "ON" ]; then
     BUILD_PYTHON_BINDINGS=OFF
     ENABLE_PYTHON_EMBED=OFF
     PYTHON_OPT="-DBUILD_PYTHON_BINDINGS=OFF -DBUILD_PYTHON_MODULE=OFF"
@@ -92,6 +92,21 @@ fi
 
 BUILD_NODEJS_BINDINGS=ON
 ENABLE_TYPESCRIPT=ON
+BUILD_XPCJS_BINDINGS=ON
+BUILD_TESTS=ON
+REQUIRE_LIBLZMA=OFF
+
+# CUEMOL2_CLI_ONLY=ON: just libcuemol2 for cuetty (the portable Linux tarball,
+# built in a manylinux container): no Python (see above) / node.js / XPCOM
+# bindings, no tests. LibLZMA becomes required, since the GUI saves scenes as
+# QDF1 + xz by default and a build without it cannot read their embedded data.
+if [ "${CUEMOL2_CLI_ONLY:-OFF}" = "ON" ]; then
+    BUILD_NODEJS_BINDINGS=OFF
+    ENABLE_TYPESCRIPT=OFF
+    BUILD_XPCJS_BINDINGS=OFF
+    BUILD_TESTS=OFF
+    REQUIRE_LIBLZMA=ON
+fi
 
 # Windows-specific cmake flags: compiler (see win_cc.sh), Perl without spaces
 # in path, LibLZMA. cl.exe is still needed on PATH even with clang-cl: it is
@@ -134,7 +149,8 @@ cmake -G "$GENERATOR" \
       $PYTHON_OPT \
       -DBUILD_NODEJS_BINDINGS=$BUILD_NODEJS_BINDINGS \
       -DENABLE_TYPESCRIPT=$ENABLE_TYPESCRIPT \
-      -DBUILD_XPCJS_BINDINGS=ON \
+      -DBUILD_XPCJS_BINDINGS=$BUILD_XPCJS_BINDINGS \
+      -DREQUIRE_LIBLZMA=$REQUIRE_LIBLZMA \
       -DENABLE_TBB=${ENABLE_TBB:-ON} \
       -DENABLE_UMBREON=${ENABLE_UMBREON:-OFF} \
       -DENABLE_MESHMS=${ENABLE_MESHMS:-OFF} \
@@ -142,7 +158,8 @@ cmake -G "$GENERATOR" \
       -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
       -DCGAL_DISABLE_GMP=TRUE \
       -DCGAL_HEADER_ONLY=TRUE \
-      -DBUILD_TESTS=ON
+      -DBUILD_TESTS=$BUILD_TESTS \
+      -DCMAKE_INSTALL_LIBDIR=lib
 
 cmake --build $BUILD_DIR --parallel --config $BUILD_TYPE
 # ctest --test-dir $BUILD_DIR --output-on-failure

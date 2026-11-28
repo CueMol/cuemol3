@@ -59,7 +59,8 @@ function readConsoleRequest(
     return { dialect: b.dialect, text: b.text, cwd: b.cwd, ...lock }
   }
   if (typeof b.line !== 'string') return 'line must be a string.'
-  return { dialect: b.dialect, line: b.line, cwd: b.cwd }
+  if (b.rest !== undefined && typeof b.rest !== 'string') return 'rest must be a string.'
+  return { dialect: b.dialect, line: b.line, cwd: b.cwd, ...(b.rest !== undefined ? { rest: b.rest } : {}) }
 }
 
 /**

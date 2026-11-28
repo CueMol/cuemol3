@@ -9,6 +9,7 @@
 #include <gtest/gtest.h>
 #include <common.h>
 
+#include "qsys/AmbientProbeVolume.hpp"
 #include "qsys/Object.hpp"
 #include "qsys/ObjectEvent.hpp"
 #include "qsys/Renderer.hpp"
@@ -19,6 +20,9 @@
 
 #include <qlib/LQuat.hpp>
 #include <qlib/Vector4D.hpp>
+
+#include <algorithm>
+#include <cmath>
 
 namespace {
 
@@ -114,4 +118,28 @@ TEST_F(SceneOccluderGenTest, CameraAndSceneSettingsLeaveIt)
         pView->setViewCenter(qlib::Vector4D(1, 2, 3));
         m_pScene->setPropReal("aoBounce", 0.3);
     }));
+}
+
+// The probe atlas is (nx * nz) x ny texels: a large occluder (a map surface)
+// widens the spacing until both sides fit, and a small one keeps it.
+TEST(AmbientProbeVolumeTest, FitSpacingKeepsAtlasWithinLimit)
+{
+    const int pad = 2, maxAtlas = qsys::AmbientProbeVolume::kMaxAtlasSize;
+    auto atlasSide = [pad](const double ext[3], double h) {
+        int n[3];
+        for (int a = 0; a < 3; ++a) n[a] = int(std::ceil(ext[a] / h)) + 2 * pad;
+        return std::max(n[0] * n[2], n[1]);
+    };
+
+    const double small[3] = {40.0, 40.0, 40.0};
+    EXPECT_EQ(qsys::AmbientProbeVolume::fitSpacing(small, 3.0, pad, maxAtlas), 3.0);
+
+    // Wide in x/z (the width) and long in y (the height).
+    const double wide[3] = {500.0, 50.0, 500.0};
+    const double tall[3] = {10.0, 30000.0, 10.0};
+    for (const double *ext : {wide, tall}) {
+        const double h = qsys::AmbientProbeVolume::fitSpacing(ext, 3.0, pad, maxAtlas);
+        EXPECT_GT(h, 3.0);
+        EXPECT_LE(atlasSide(ext, h), maxAtlas);
+    }
 }

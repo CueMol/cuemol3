@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <memory>
 
 #include <qlib/LStream.hpp>
 #include <qsys/qsys.hpp>
@@ -39,19 +40,41 @@ namespace {
     LOG_DPRINTLN("Umbreon PNG: warning %s", msg);
   }
 
+  // A failed write or flush goes through png_error(), which longjmps back to
+  // writePngToStream and is thrown from there: a C++ exception must not unwind
+  // through libpng's C frames. Without this check a full disk or an exceeded
+  // quota left a truncated PNG behind a successful write().
   void umb_png_write_fn(png_structp png_ptr, png_bytep data, png_size_t length)
   {
     qlib::OutStream *pOut =
         reinterpret_cast<qlib::OutStream *>(png_get_io_ptr(png_ptr));
-    pOut->write((const char *) data, 0, length);
+    bool ok = false;
+    try {
+      ok = pOut->write((const char *) data, 0, int(length)) == int(length);
+    } catch (...) {
+      ok = false;
+    }
+    if (!ok) png_error(png_ptr, "short write");
   }
 
   void umb_png_flush_fn(png_structp png_ptr)
   {
     qlib::OutStream *pOut =
         reinterpret_cast<qlib::OutStream *>(png_get_io_ptr(png_ptr));
-    pOut->flush();
+    bool ok = true;
+    try {
+      pOut->flush();
+    } catch (...) {
+      ok = false;
+    }
+    if (!ok) png_error(png_ptr, "flush failed");
   }
+
+  /// Open the exporter's output, write the image as a PNG and close it. The
+  /// close is checked as well: the stdio buffer is written out there, so that
+  /// is where a full disk shows up for a small image.
+  void writePngFile(qsys::InOutHandler *pHandler, int width, int height,
+                    const unsigned char *pBytes, int ncomp, double dpi);
 
   /// Write an interleaved 8-bit image (top-left origin, ncomp = 3 or 4) to the
   /// output stream as a PNG. Mirrors PngSceneExporter's libpng setup but emits
@@ -112,6 +135,14 @@ namespace {
 
     png_write_end(pPNG, pInfo);
     png_destroy_write_struct(&pPNG, &pInfo);
+  }
+
+  void writePngFile(qsys::InOutHandler *pHandler, int width, int height,
+                    const unsigned char *pBytes, int ncomp, double dpi)
+  {
+    std::unique_ptr<qlib::OutStream> pOut(pHandler->createOutStream());
+    writePngToStream(pOut.get(), width, height, pBytes, ncomp, dpi);
+    pOut->close();
   }
 
   /// Parse a "#RRGGBB" hex string into display-encoded RGB floats in [0, 1].
@@ -531,10 +562,7 @@ void UmbreonSceneExporter::write()
     return;
   }
 
-  qlib::OutStream *pOut = createOutStream();
-  writePngToStream(pOut, ow, oh, &pix[0], ncomp, m_dResDPI);
-  pOut->close();
-  delete pOut;
+  writePngFile(this, ow, oh, &pix[0], ncomp, m_dResDPI);
 }
 
 //////////////////////////////////////////////////////////////
@@ -612,10 +640,7 @@ void UmbreonSceneExporter::endRender()
     return;
   }
 
-  qlib::OutStream *pOut = createOutStream();
-  writePngToStream(pOut, ow, oh, &pix[0], ncomp, m_dResDPI);
-  pOut->close();
-  delete pOut;
+  writePngFile(this, ow, oh, &pix[0], ncomp, m_dResDPI);
 }
 
 bool UmbreonSceneExporter::wasRenderCancelled() const

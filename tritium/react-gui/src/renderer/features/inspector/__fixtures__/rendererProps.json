@@ -5648,11 +5648,11 @@
   {
    "key": "surfalgor",
    "type": "enum",
-   "value": "distfield",
+   "value": "meshms",
    "readonly": false,
    "hasdefault": true,
    "isdefault": true,
-   "defaultValue": "distfield",
+   "defaultValue": "meshms",
    "enumdef": [
     "distfield",
     "edtsurf",

@@ -25,7 +25,7 @@ runtime_class DirectSurfRenderer extends DirectSurfRendererBase
     meshms = surface::DirectSurfRenderer::DS_MESHMS;
   }
   property enum surfalgor => redirect(getSurfAlgor, setSurfAlgor);
-  default surfalgor = "distfield";
+  default surfalgor = "meshms";
 
 };
 

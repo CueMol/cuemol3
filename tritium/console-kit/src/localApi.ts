@@ -107,8 +107,10 @@ export interface ConsoleRunResponse {
 /** `POST /console/complete`. */
 export interface ConsoleCompleteRequest {
   dialect: ConsoleDialectId
-  /** The line typed so far. */
+  /** The line typed so far (up to the cursor). */
   line: string
+  /** The line after the cursor; omitted reads as the end of the line. */
+  rest?: string
   cwd: string
 }
 

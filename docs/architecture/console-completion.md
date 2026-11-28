@@ -44,6 +44,29 @@ console panel (GUI) と `tritium_cli` (CLI) の Tab は同じ補完を使い、z
   ときにずれるため。native の宣言は op の param の意味型から作る (`dialects/native/fromCatalog.ts`)。
 - 候補は文字列か `CompletionItem { text, then }` (LSP の CompletionItem に倣う)。`then: 'continue'`
   は区切りを付けない (`name=`、`obj.`、ディレクトリ)。区切りは候補ごとに決まり、位置で固定しない。
+
+### 値の後の区切り
+
+値を書き込むとき、後に引数が残っていれば `, ` まで入れる。空白でも続けられる引数 (語の列と selection) でも
+`,` を優先する。空白なら同じ引数の続き (`hide 1crn 2abc`、`protein and chain A`)、`,` なら次の引数で、
+多いのは次の引数へ進むほうだから。同じ引数に語を足すときは、`,` を消して空白を打ち、もう一度 Tab を押す。
+
+| 引数 | 後に引数が残るとき | 残らないとき |
+|---|---|---|
+| ふつうの値 | `, ` | 何も付けない |
+| 語の列 (`list`: node・property path・load の path) | `, ` (候補の選択とパターンの展開の両方) | 空白 (次の語を足せる) |
+| selection (`open`) | `, `。ただし括弧や引用符の中 (`(prot`、`"protein or lig`) では何も付けない (`opensGroup`) | 何も付けない |
+
+- `suffix` を宣言した引数はそれに従う (PyMOL dialect のコマンドはすべて宣言している)。`then: 'continue'` の
+  候補と、複数の候補の共通 prefix まで伸ばすだけのときは区切りを付けない。
+- 「残る引数」に、他の引数から埋まる引数 (`ParamSpec.implied`: native の node の種類。名前から決まり、
+  打たない) は数えない。数えると `delete_node 1crn` の後に不要な `, ` が入る。
+- 行の途中で補完するとき: client は caret の右側の同じ行を `rest` として送る (`CompleteArgs.rest`。CLI は
+  `/console/complete` の `rest` を、main の `consoleEndpoint.ts` と renderer の `useConsoleEndpoint.ts` が
+  中継する)。`rest` が空白でも `,` でもない文字で始まる (同じ引数の続き。`zoom 1cr<Tab> 2abc, protein` の
+  ` 2abc`) なら、語の列は空白、selection は何も付けない。送らない古い client は行末として扱われる。
+- GUI は後の行も入力欄に持つが、`rest` に送るのも、書き戻しで区切りの重複を落とす判定 (`joinBeforeCaret`)
+  に使うのも同じ行の残りだけ。次の行の前の改行を、空白として扱わないため。
 - 名前付き引数 (`name=`) の候補は両 dialect で出す。候補が無いときにファイル名へ fall back するのは
   PyMOL dialect だけ (`commaSyntax` の `fileFallback`)。
 
@@ -78,7 +101,8 @@ PyMOL ではなく zsh に合わせる:
   - 空白で区切り、引用符 (`'...'` / `"..."`) と、空白・引用符・`*` `?` の前の `\` はその文字をそのまま
     名前にする。それ以外の `\` は残す (Windows の区切り)。書き戻すときは空白と `*` `?` を `\` で
     逃がし、`,` `;` 引用符を含む名前は引用符で囲む (`pathWord`)
-  - Tab は最後の単語を補完する。ファイルを選ぶと区切りは `, ` ではなく空白
+  - Tab は最後の単語を補完する。ファイルを選んだ後の区切りは上の「値の後の区切り」のとおり (後に引数が
+    残れば `, `、最後の引数なら空白)
   - 最後の単語にパターン (`*` / `?`) があれば、zsh 既定の `expand-or-complete` と同じく、その場で一致した
     全パスに展開する (`expandGlob`。ソート済み、`.` で始まる名前は segment が `.` で始まるときだけ、
     ディレクトリも含む)。一致が無ければ `no matches found: <pattern>`

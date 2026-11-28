@@ -4,9 +4,10 @@
 # usage: run_win.sh base_dir [host_arch]
 #   host_arch ... X64 (default)
 #
-# Windows publishes apbs / povray / ffmpeg as a single prebuilt bundle asset,
-# so this fetches one archive instead of the three separate downloads the posix
-# run.sh does. The extracted layout is the same
+# Windows publishes apbs / povray as a single prebuilt bundle asset, so this
+# fetches one archive instead of the separate downloads the posix run.sh does.
+# The bundle's ffmpeg is an old build, so it is replaced by the ffmpeg archive
+# from the third-party mirror. The resulting layout is the same
 # (BASEDIR/{apbs,povray,ffmpeg}), which is what collect-cuemol2-runtime.sh
 # stages into the installer via BUNDLE_APPS.
 
@@ -43,3 +44,14 @@ curl -sS -L -O \
 mkdir -p "$BASEDIR"
 cd "$BASEDIR"
 tar xjf "$TMPDIR/$PKG_TGZ"
+
+# Replace the bundle's ffmpeg with the mirrored build. Only ffmpeg.exe (plus the
+# license) is shipped; ffplay / ffprobe are not used.
+cd "$TMPDIR"
+curl -fsSL --retry 3 -O "$THIRDPARTY_MIRROR_URL/${FFMPEG_DIST_WINDOWS}.zip"
+rm -rf "$TMPDIR/$FFMPEG_DIST_WINDOWS"
+unzip -q -o "${FFMPEG_DIST_WINDOWS}.zip"
+rm -rf "$BASEDIR/ffmpeg"
+mkdir -p "$BASEDIR/ffmpeg/bin"
+cp "$FFMPEG_DIST_WINDOWS/bin/ffmpeg.exe" "$BASEDIR/ffmpeg/bin/"
+cp "$FFMPEG_DIST_WINDOWS/LICENSE" "$BASEDIR/ffmpeg/"

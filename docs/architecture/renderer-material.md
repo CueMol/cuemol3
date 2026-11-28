@@ -66,12 +66,15 @@ OpenGL 用の値と見た目 (鏡面の実効値 = specular × 0.4):
 
 CueMol2 の OpenGL 表示 (`OglDisplayContext::setMaterImpl`) と同じ読み方をする:
 
-- 環境光 = 0.2 (光のモデル全体の環境光) + material の ambient
+- 環境光 = 0.2 (光のモデル全体の環境光) + material の ambient。ただし環境光だけで照らす
+  material (拡散も鏡面も 0: `nolighting`・`shadow`) は material の ambient だけ (下記)
 - 拡散 = material の diffuse
 - 鏡面 = 0.4 (光の鏡面の強さ) × material の specular
 - 指数 = material の shininess
 
-Fast GI のときは、環境光と拡散だけを `default` が `Scene::kFastGILight*` (0.56 / 0.52) になる比率で換算する (環境光 ×1.4、拡散 ×0.65)。Fast GI では AO を環境光にだけ掛けるため、環境光を主にした光にしてある。鏡面と指数は換算しない。以前は鏡面も換算していたが (×1.56)、`diff_metal` が Fast GI でだけ鏡面 > 拡散になって金属らしく見えるなど、方式を変えると material の性格が変わったため、換算をやめた。環境光だけで照らす material (拡散も鏡面も 0、`nolighting`・`shadow`) は AO を掛けない (§6) ので、換算もしない。最後に 3 つの強さすべてに `lightBrightness` を掛ける。
+Fast GI のときは、環境光と拡散だけを `default` が `Scene::kFastGILight*` (0.56 / 0.52) になる比率で換算する (環境光 ×1.4、拡散 ×0.65)。Fast GI では AO を環境光にだけ掛けるため、環境光を主にした光にしてある。鏡面と指数は換算しない。以前は鏡面も換算していたが (×1.56)、`diff_metal` が Fast GI でだけ鏡面 > 拡散になって金属らしく見えるなど、方式を変えると material の性格が変わったため、換算をやめた。環境光だけで照らす material (拡散も鏡面も 0、`nolighting`・`shadow`) は AO を掛けない (§6) ので、換算もしない。最後に 3 つの強さすべてに `lightBrightness` を掛ける (Fast GI のときは、さらに `Scene::kFastGILightBrightness` = 1.32 を掛ける。[fastgi-ambient-occlusion.md](fastgi-ambient-occlusion.md) §3)。
+
+**環境光だけで照らす material** (`nolighting`・`shadow`) は、指定した色に ambient を掛けた色をそのまま出す (`nolighting` は指定色そのもの、`shadow` は 0.75 倍)。全体の環境光 0.2 も `lightBrightness` も Fast GI の倍率も掛けない。POV-Ray の書き出し (`finish {ambient 1.0 diffuse 0.0}`) と umbreon の表 (`nolighting` 1.00、`shadow` 0.75) と同じ値になる。以前は CueMol2 の OpenGL 表示と同じく 0.2 を足していて、`nolighting` が指定色の 1.2 倍、`shadow` が 0.95 倍になり、POV-Ray や umbreon の画像と色が違った (灰色が明るく出た) ので、不具合として直した。描き方は §6 の「法線なしの描画」。
 
 `Scene::display` は、material を持たない描画 (renderer の外) のために `""` の光を入れ、`displayRendImpl` が renderer ごとに入れ直す。検索は renderer ごとに毎フレーム走る (`StyleMgr` の検索、キャッシュはしていない)。
 
@@ -95,6 +98,9 @@ Fast GI のときは、環境光と拡散だけを `default` が `Scene::kFastGI
 | 出力 (0〜255) | そのまま | 219 | 233 | 249 | 254 | 255 |
 
 - 掛ける所は 1 画素につき 1 回: Fast GI は合成の最後 (scene の色は RGBA16F で 1 を超えたまま持つ)、AO なし・GTAO は `flight2` (それまで clamp していた所)。
+- **光を当てた色にだけ掛ける**。背景、fog の色、法線なしの描画 (§6: 線・label・edge line・環境光だけで照らす material・照明を切った三角形) には掛けず、指定した色を 0〜1 に切って出す。白い背景や白い線が (FF, FF, FF) で出ないと、画像を他のソフトウェアや紙の白に重ねたときに枠が見えるため。
+  - Fast GI の合成は、法線なしの画素 (scene の法線が (0,0,0)。背景もクリア値 0 で同じ) はそのまま出す。光を当てた画素は、fog の分 `(1 - fogVis) * fogColor` を外し、光の色 `(c - fog の分) / fogVis` にカーブを掛けてから fog を戻す。AO なし・GTAO の順序 (光 -> カーブ -> fog) と同じで、完全に fog に入った画素はちょうど背景色になる (`fogVis` が 0 に近い画素は fog の色を出す)。以前は合成で全画素にカーブを掛けていて、白い背景が (E9, E9, E9) になった。
+  - `flight2` は環境光だけで照らす material のときカーブの代わりに 0〜1 で切る (`isAmbientOnlyLight`)。
 - 白い分子表面 (Fast GI) では、255 に張り付いた画素が 14,633 から 0 になり、陰の側と中間の明るさはほぼ変わらなかった (下位 10% 点 131、中央値 203 → 200)。
 - 1 で頭打ちしない比較案 (1 に近づくだけで届かない曲線) は、最大 244 で白い面が灰色寄りに見えたので採らなかった。
 
@@ -103,8 +109,12 @@ Fast GI のときは、環境光と拡散だけを `default` が `Scene::kFastGI
 Fast GI の合成は scene の色を環境光・拡散・鏡面に分け直す (環境光の分に AO、拡散にプローブの影、鏡面に鏡面の遮蔽)。分け方は「拡散 / 環境光」の比と鏡面の粗さに依存し、material が renderer ごとに違うと Scene の 1 組の値では合わない。
 
 - AO があるとき (GTAO・Fast GI)、scene の描画先に RGBA8 の 3 枚目の添付 (`RT_MATERIAL_RGBA8`) を足す。ライティングするシェーダは描いている renderer の光を書く (`encodeMaterial`): r = 拡散 / 環境光、b = 環境光 (どちらも `x / (1 + x)` で 0〜1 に収める)、g = 指数 n を GGX の alpha に直した粗さ `sqrt(2 / (n + 2))`、a = 1 (環境光だけで照らす material は 0.75)。法線の `.w` は scene パスのブレンドで背景と混ざるので使えない。
-- 合成は a が 1 の画素ではこの値を使い、照明なしの描画 (a = 0) では Scene の値 (`u_lightAmbient` / `u_lightDiffuse`、指数 16 の粗さ 0.3333) を使う。照り返し (間接光) の albedo も、その画素の環境光の強さで割って求める。
-- **AO を掛けない material**: a が 0.75 の画素 (環境光だけで照らす material: `nolighting`・`shadow`) は、GTAO でも Fast GI でも AO を掛けない (Fast GI は照り返しも足さない)。これらは平らな色の表現 (地図の等高線は `nolighting`) で、AO を掛けると環境光だけの陰影が付いて立体に見えてしまうため。拡散と鏡面がどちらも 0 であることで決めるので、material に印を足す必要はない。
+- 合成は a が 1 の画素ではこの値を使い、material の無い画素 (a = 0) では Scene の値 (`u_lightAmbient` / `u_lightDiffuse`、指数 16 の粗さ 0.3333) を使う。照り返し (間接光) の albedo も、その画素の環境光の強さで割って求める。
+- **法線なしの描画**: 線・label・edge line・地図の網 (`linew_frag` / `pixdraw_frag` / `trigedge_frag` / `mapmesh_frag`)、環境光だけで照らす material (`nolighting`・`shadow`。三角形・球・円柱)、照明を切った三角形 (`trig_frag` の `enable_lighting == 0`: 表面のワイヤーフレームなど) は、法線に (0,0,0) を書く。AO 的には存在しないものとして扱う:
+  - 受けない: GTAO・Fast GI の合成は、法線なしの画素に AO もトーンカーブも掛けず、scene の色をそのまま出す。合成で scene の法線 (フル解像度) を読んで決めるので、半解像度の AO で細い線に周りの AO が補間されて付くこともない (`PostProcGpuPrim::drawComposite` は両方式で法線を結び付ける)。
+  - 落とさない: 画面の探索は、法線なしのサンプルを遮る物にも照り返しにも使わない (GTAO・Fast GI とも)。Fast GI の焼き込みでは描かない ([fastgi-ambient-occlusion.md](fastgi-ambient-occlusion.md) §5)。
+  - 判定に material の a を使わないのは、scene の描画が全出力に同じブレンド (`SRC_ALPHA, ONE_MINUS_SRC_ALPHA`) を使い、線や label が material に書く alpha 0 では照明した面の上で背後の値が残るため。法線は alpha 1 で書くので確実に残る。
+  - 平らな色の表現 (地図の等高線は `nolighting`) に AO を掛けると、環境光だけの陰影が付いて立体に見えてしまう。
 - WebGL (`FboStore` / `EcRenderTarget`) とデスクトップ GL (`OcRenderTarget`) の両方の描画先に対応している。
 
 ## 7. 既知の制限
@@ -112,4 +122,6 @@ Fast GI の合成は scene の色を環境光・拡散・鏡面に分け直す (
 - 環境の映り込みは固定の空のグラデーションで、周りの分子は映らない。`spec_metal` の赤い球は、umbreon (GI) より暗めに出る。
 - toon には、POV-Ray (`_shadow` を付けたとき) や umbreon が出す隣の原子の硬い落ち影がない (WebGL に影の計算がないため)。Fast GI のプローブの key light の影を閾値で硬くする案は、プローブの値が `N.L` で変わるため、光に向いた所 (白い点の位置) に黒い円が出て採らなかった。
 - material は renderer 単位。色ごとの material (`Color.material`、`ColorTable`) は WebGL の描画では効かない。
-- トーンカーブの肩 (0.7 より上) にかかる明るい色は、わずかに暗く出る。
+- トーンカーブの肩 (0.7 より上) にかかる明るい色は、わずかに暗く出る (光を当てた面だけ)。
+- 線・label・法線なしの面が上書きした画素の奥の面は、画面の AO の遮る物として見えなくなる。表示を切り替えたときの周りの面の差は、Fast GI で最大 8 段階 (線から 2 画素より外は 3 以下)、半解像度の GTAO で線が最大 12、`nolighting` の面が最大 37 (1CRN の cartoon の上の線と ball & stick で測定)。消すには、それらを AO の合成の後に照明した面の深度を引き継いで別に描く必要がある (scene の描画を 2 回に分けることになるので、見送っている)。
+- label の半透明な縁は、色が文字色と背後の面で混ざる一方で法線は (0,0,0) になるので、縁の画素は AO を受けない。

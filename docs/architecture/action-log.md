@@ -135,8 +135,7 @@ helper)。
   二重にならない。
 - PyMOL / ChimeraX のコマンドは op を呼ぶので、呼んだ op の分だけ native の op が並ぶ。
   たとえば `show sticks` は `create_renderer ... name=pym:sticks, selection=...` と `set_renderer_styles`
-  として、`color red, resn ALA` は renderer ごとの `add_paint` と、元の選択に戻す `set_mol_selection`
-  として記録される。PyMOL の入力文字列は、内部データにも qax にも持たない。行の `label` (`pym: ...`)
+  として、`color red, resn ALA` は renderer ごとの `add_paint` として記録される。PyMOL の入力文字列は、内部データにも qax にも持たない。行の `label` (`pym: ...`)
   に残るだけ。
 
 対応している service:
@@ -155,7 +154,7 @@ helper)。
 | `superposeMol` | `superpose`。transform (xformMat) として保つときは `keepAsProperty` |
 | `createRendererOnObject` | `create_renderer` (type・name・selection・`centerView`)。group 指定があれば、続けて `group` の `set_node_prop`。preset は `create_preset_renderer` (preset・group 名・`centerView`) |
 | `changeRendererType` | `set_renderer_type` |
-| `loadObject` (File > Open) | 形式ごとの load の op (`load_pdb` / `load_mmcif` / `load_mtz` / `load_ccp4` / `load_msms` / `load_psf` / `load_amber`、どれでもなければ `load_file`) に、dialog の形式のオプションと renderer の選択 (type・selection・`rendererName`・`preset`・`centerView`・`mapCenterPolicy`) を入れる。形式ごとの op は reader を自分で選ぶ。`load_file` には dialog が読んだ reader を `reader` として入れる (再生で拡張子から別の reader が選ばれないように) |
+| `loadObject` (File > Open) | 形式ごとの load の op (`load_pdb` / `load_mmcif` / `load_mtz` / `load_ccp4` / `load_msms` / `load_psf` / `load_amber`、どれでもなければ `load_file`) に、dialog の形式のオプションと renderer の選択 (type・selection・`rendererName`・`preset`・`centerView`・`mapCenterPolicy`) を入れる。形式ごとの op は reader を自分で選ぶ。`load_file` には dialog が読んだ reader を `reader` として入れる (再生で拡張子から別の reader が選ばれないように)。`rendererName` は既定名 ([Renderer の既定名](renderer-default-name.md)) なら null、利用者が付けた名前なら preset の group でも記録する (`recordedRendererName`。Get PDB の `fetch_pdb` / `fetch_entry` も同じ) |
 | `viewXform` (回転・平行移動) | 0 でない軸ごとの `rotate_view`、`pan_view` |
 | map の property (`map/props.ts`) | renderer への `set_node_prop`。Re-centre は `recenter_map` (中心は再生したときの view の中心) |
 | 背景色 (`scene/sceneBgColor.ts`、メニューの背景色) | scene の `set_node_prop bgcolor` (色名のまま)。Color proofing は切り替えた後の `use_colproof` (と既定の `icc_filename`) の `set_node_prop` |
@@ -164,7 +163,7 @@ helper)。
 | `applyRendererStyleList` (Edit Style ダイアログ) | `set_renderer_styles` (style の並び全体を `,` 区切りで) |
 | coloring scheme の property (`coloring/applyColoring.ts` の `setColoringProp`。Color pane の CPK / Rainbow / B-factor の欄) | `set_coloring_prop` (対象の renderer か object、property 名、値)。style から借りた着色なら、先にその node 専用の着色に切り替えてから書く (GUI と同じ) |
 | 着色 (`coloring/applyColoring.ts`、`colorTargets.ts`、`multiGrad.ts`) | `set_renderer_coloring` / `set_elepot_coloring` / `set_default_color`。coloring の target・elepot の property・multigrad の color map は `set_node_prop`。着色と paint の op は対象を `nodeId` + `nodeType` (`renderer` / `object`) で取るので、Color pane で object を対象にした変更も記録する (style と elepot は renderer のみ)。CPK の dark / light gray は CPK と `set_coloring_prop col_C` の 2 つ。既定の paint 表と multigrad への切り替えは `set_renderer_coloring` の mode `paint-type-paint` / `paint-type-multigrad`、multigrad の node の編集は `set_multigrad_nodes` (`"値 色; 値 色"`)。style は Paint の style と CPK の style (`DefaultCPKColoring` ほか。`list_coloring_styles` が両方を出す) |
-| paint の表 (`coloring/paintCrud.ts`、`paintClipboard.ts`) | `set_paint` / `remove_paint` (複数行は 1 行ずつ) / `move_paint` / `clear_paint`。行の挿入と貼り付けは行ごとの `add_paint_at` (挿入位置 `at`。`add_paint` と違い molecule の selection を変えない)。番号は 1 始まり |
+| paint の表 (`coloring/paintCrud.ts`、`paintClipboard.ts`) | `set_paint` / `remove_paint` (複数行は 1 行ずつ) / `move_paint` / `clear_paint`。行の挿入と貼り付けは行ごとの `add_paint_at` (挿入位置 `at`)。番号は 1 始まり |
 | 分子の編集 (`molops/`) | `rename_chain`、`renumber_residues`、`delete_atoms`、`merge_molecules`、`set_secondary_structure`、`create_surface` / `recalc_surface` (`backend` 付き)、`cut_surface`、`set_symmetry`、`show_symmetry`、`show_unit_cell`、`create_symmetry_copy` (operator の番号は表示範囲で変わるので 4x4 の行列で記録)、`analyze_interactions` (dialog の設定をすべて: 最小距離、最大の数、label set、2 つ目の object / selection) |
 | morph (`morph/morphMol.ts`) | `add_morph_frame` / `remove_morph_frame` / `convert_to_morph` |
 | APBS (`apbs/run.ts`) | `calc_elepot`。pot file を読む txn で記録する。温度・誘電率・水素の扱いも引数に入れる |

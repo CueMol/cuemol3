@@ -4,7 +4,8 @@
  * state: framing a selection leaves the object's own selection alone (the
  * reason PyMOL's zoom uses it), and
  * showing a frame moves the frame without opening an undo transaction
- * (it is playback, not an edit).
+ * (it is playback, not an edit). And set_view reports the rotation in the
+ * order it takes it back.
  */
 
 import { describe, it, expect, vi } from 'vitest'
@@ -18,7 +19,7 @@ vi.mock('@renderer/worker/server/services/helpers/makeSel', () => ({ makeSel: ()
 
 import type { WorkerContext } from '@renderer/worker/server/types/WorkerContext'
 import type { OpContext } from '../op'
-import { focusSelection } from './viewOps'
+import { focusSelection, setView } from './viewOps'
 import { setFrame } from './moreOps'
 
 const oc = { sceneId: 1, viewId: 2, callId: 'c', markMutated: vi.fn() } as unknown as OpContext
@@ -57,5 +58,18 @@ describe('set_frame', () => {
     expect(setFrame.mutates).toBe(false)
     // Out of range is refused, not clamped: the caller decides that.
     expect((await setFrame.run({} as WorkerContext, { objId: 10, frame: 5 }, oc)).ok).toBe(false)
+  })
+})
+
+describe('set_view', () => {
+  it('reports the rotation as [a, x, y, z], the order rotation= takes back', async () => {
+    const view = { zoom: 30, slab: 40, distance: 200, center: { x: 1, y: 2, z: 3 }, rotation: { a: 0.70710678, x: 0, y: 0.70710678, z: 0 } }
+    const ctx = { sceMgr: { getView: () => view } } as unknown as WorkerContext
+    const none = { zoom: null, slab: null, distance: null, center: null, rotation: null, fitSlab: null, objId: null }
+
+    const res = await setView.run(ctx, none, oc)
+
+    expect(res).toMatchObject({ ok: true, data: { rotation: [0.7071, 0, 0.7071, 0] } })
+    expect(setView.format!((res as { data: unknown }).data)[0]).toContain('rotation [0.7071, 0, 0.7071, 0]')
   })
 })

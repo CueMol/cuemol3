@@ -26,6 +26,9 @@
  *   - the modal block: while a dialog is open, only the text-edit items
  *     (`TEXT_EDIT_MENU_IDS`) still fire, exactly the set main/menuBlock.ts
  *     spares on macOS;
+ *   - keys claimed where they are typed: an element (or an ancestor) with
+ *     `data-own-keys` keeps those keys (the console prompt's Ctrl-R), as a
+ *     terminal keeps Ctrl-R from the window's menu;
  *   - focus-independence: the text-edit shortcuts are dispatched even from a
  *     text field. `utils/editClipboard.ts` then runs the native edit through
  *     main, as it does for the macOS menu path; preventDefault keeps Blink
@@ -102,6 +105,23 @@ export function collectMenuKeyBindings(
 }
 
 /**
+ * Whether an element the key comes from (or one around it) claims it, as
+ * `data-own-keys="ctrl+r"` (space-separated): a key with its own meaning
+ * there, such as Ctrl-R as the console's history search, rather than the menu
+ * item it is elsewhere (Reload Scene). Written as modifiers then the key,
+ * lower case: `ctrl`, `alt`, `shift`, `meta`.
+ */
+export function keyClaimedByTarget(e: KeyboardEvent): boolean {
+  const target = e.target as Element | null
+  const owner = typeof target?.closest === 'function' ? target.closest('[data-own-keys]') : null
+  if (!owner) return false
+  const name = [e.ctrlKey && 'ctrl', e.altKey && 'alt', e.shiftKey && 'shift', e.metaKey && 'meta', e.key.toLowerCase()]
+    .filter(Boolean)
+    .join('+')
+  return (owner.getAttribute('data-own-keys') ?? '').split(/\s+/).includes(name)
+}
+
+/**
  * Install the Windows / Linux menu-shortcut dispatcher for the lifetime of
  * the component. No-op on macOS, where the native menu owns the keys.
  */
@@ -121,6 +141,8 @@ export function useMenuKeyBindings(): void {
     const handler = (e: KeyboardEvent) => {
       // A key that is part of an IME composition belongs to the IME.
       if (e.isComposing) return
+      // A key the focused element claims for itself (the console's Ctrl-R).
+      if (keyClaimedByTarget(e)) return
       const hit = bindings.find((b) => acceleratorMatchesKey(b.acc, e))
       if (!hit) return
       // A disabled menu item's accelerator is inert; let the key fall through.

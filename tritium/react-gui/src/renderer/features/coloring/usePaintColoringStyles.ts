@@ -6,20 +6,26 @@
  * UXP `coloring-panel.js` `onPaintColShowing` ->
  * `cuemolui.populateStyleMenus(scene_uid, menu, /Paint$/, true)` list.
  *
- * The stock set (`data/default_style.xml`) is Default / Woody / Red / Orange /
- * Yellow / Green / Cyan / Blue / Purple; user styles saved into the scene's
- * style set join the same list, which is why this refetches on SEM_STYLE
- * instead of being a static table.
+ * The stock presets (`data/default_style.xml`) are Red / Orange / Yellow /
+ * Green / Cyan / Blue / Purple; user styles saved into the scene's style set
+ * join the same list, which is why this refetches on SEM_STYLE instead of
+ * being a static table. The same fetch brings the palette themes (their
+ * colours resolve in the scene, so a redefined colour also refetches).
  */
 
 import { useRef } from 'react'
 import type { AsyncCueMol } from '@renderer/worker/client/AsyncCueMol'
-import type { PaintColoringStyleEntry } from '@renderer/worker/server/services/coloring/coloring.service'
+import type { PaintColoringStyleEntry, PaintTheme } from '@renderer/worker/server/services/coloring/coloring.service'
 import { SEM_STYLE, SEM_ANY } from '@renderer/event'
 import { useLiveFetch } from '@renderer/hooks/cuemol/useLiveFetch'
 import { EVENT_BURST_DEBOUNCE_MS } from '@renderer/utils/timing'
 
-const EMPTY: PaintColoringStyleEntry[] = []
+interface PaintMenuData {
+    styles: PaintColoringStyleEntry[]
+    themes: PaintTheme[]
+}
+
+const EMPTY: PaintMenuData = { styles: [], themes: [] }
 
 export interface UsePaintColoringStylesOptions {
     cm: AsyncCueMol | null
@@ -28,6 +34,8 @@ export interface UsePaintColoringStylesOptions {
 
 export interface UsePaintColoringStylesResult {
     styles: PaintColoringStyleEntry[]
+    /** Palette themes whose numbered colours the Paint submenu offers. */
+    themes: PaintTheme[]
     refetch: () => void
 }
 
@@ -45,7 +53,7 @@ export function usePaintColoringStyles({
     const sceneIdRef = useRef<number | undefined>(sceneId)
     sceneIdRef.current = sceneId
 
-    const { state: styles, refetch } = useLiveFetch<PaintColoringStyleEntry[]>({
+    const { state, refetch } = useLiveFetch<PaintMenuData>({
         cm,
         initial: EMPTY,
         fallback: EMPTY,
@@ -54,7 +62,7 @@ export function usePaintColoringStyles({
             if (!cm || sid === undefined) return null
             return cm
                 .invokeService('getPaintColoringStyles', { sceneId: sid })
-                .then((res) => res?.entries ?? EMPTY)
+                .then((res) => ({ styles: res?.entries ?? [], themes: res?.themes ?? [] }))
                 .catch((err: unknown) => {
                     console.warn('getPaintColoringStyles failed:', err)
                     return EMPTY
@@ -72,5 +80,5 @@ export function usePaintColoringStyles({
         ],
     })
 
-    return { styles, refetch }
+    return { styles: state.styles, themes: state.themes, refetch }
 }

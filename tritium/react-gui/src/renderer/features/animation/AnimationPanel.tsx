@@ -37,6 +37,7 @@ import { ButtonRow, FormButton } from "@renderer/h3-kit/form";
 import type { AsyncCueMol } from "@renderer/worker/client/AsyncCueMol";
 import type { AnimAddType, AnimElement } from "@renderer/types";
 import { useAnimTimeline } from "./useAnimTimeline";
+import { useLatestRef } from "@renderer/hooks/react/useLatestRef";
 import { useAnimTransport } from "./useAnimTransport";
 import { useAnimEdit } from "./useAnimEdit";
 import { useInspectorActions } from "@renderer/state/inspector";
@@ -161,6 +162,29 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
 
   const [pxPerMs, setPxPerMs] = useState(DEFAULT_PX_PER_MS);
   const [selectedUid, setSelectedUid] = useState<number | null>(null);
+  // The scene the selection belongs to: after a scene switch the timeline
+  // still lists the old scene for a moment, and its elements are not the
+  // selection "vanishing".
+  const selSceneRef = useRef<number | undefined>(undefined);
+  const selectedUidRef = useLatestRef(selectedUid);
+  const activeSceneIdRef = useLatestRef(activeSceneId);
+
+  // The right Inspector follows the strip selection only when the user
+  // selects (click, delete-to-neighbour, paste). A timeline refetch must not
+  // move it: the timeline is refetched on every scene / camera event, and
+  // re-showing the element there took the Inspector back from a scene the
+  // user had opened and was editing.
+  const { showAnimElement, clearAnimElement } = useInspectorActions();
+  const selectElement = useCallback(
+    (uid: number | null) => {
+      setSelectedUid(uid);
+      selSceneRef.current = activeSceneId;
+      if (activeSceneId === undefined) return;
+      if (uid === null) clearAnimElement(activeSceneId);
+      else showAnimElement(activeSceneId, uid);
+    },
+    [activeSceneId, showAnimElement, clearAnimElement],
+  );
   // Non-null only while scrubbing the ruler -- previews the playhead.
   const [scrubMs, setScrubMs] = useState<number | null>(null);
   // Non-null only while dragging a strip -- previews its span.
@@ -397,12 +421,12 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
     if (selectedIndex === null || selectedUid === null) return;
     const next = elements[selectedIndex + 1] ?? elements[selectedIndex - 1] ?? null;
     removeElement(selectedUid);
-    setSelectedUid(next?.uid ?? null);
-  }, [selectedIndex, selectedUid, elements, removeElement]);
+    selectElement(next?.uid ?? null);
+  }, [selectedIndex, selectedUid, elements, removeElement, selectElement]);
 
   // A pasted element is selected before the refetched timeline lists it (the
   // refetch follows the worker's event, debounced). Until it shows up, the
-  // effect below must not take it for a deleted element and drop it.
+  // vanished-selection effect below must not take it for a deleted element.
   const pendingUidRef = useRef<number | null>(null);
 
   // Edit > Cut / Copy / Paste while the panel is where the user is working.
@@ -421,16 +445,24 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
       });
     },
     paste: () => {
+      // The paste waits on the clipboard and the worker. If the user moved to
+      // another scene or selected another element meanwhile, the paste still
+      // lands where it started but is not selected: selecting it now would
+      // show the old scene's element in the new scene's Inspector.
+      const sceneAtStart = activeSceneId;
+      const selAtStart = selectedUid;
       void pasteElement(addInsertIndex).then((uid) => {
         if (uid === null) return;
+        if (activeSceneIdRef.current !== sceneAtStart || selectedUidRef.current !== selAtStart) return;
         pendingUidRef.current = uid;
-        setSelectedUid(uid);
+        selectElement(uid);
       });
     },
   });
 
-  // Reset the selection on scene switch so a stale uid from the previous scene
-  // is never emitted against the new scene's inspector.
+  // Reset the panel's selection on scene switch. The Inspector is left alone:
+  // it restores what the new scene was showing, and clearing it here would
+  // also drop that memory (A -> B -> A would lose A's element).
   useEffect(() => {
     setSelectedUid(null);
     setDragPreview(null);
@@ -459,27 +491,20 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
     });
   }, [elements]);
 
-  // Drive the right Inspector from the strip selection. When the selected
-  // element is gone (deleted via SEM_ANIM refetch), clear both the local
-  // selection and the inspector target.
-  const { showAnimElement, clearAnimElement } = useInspectorActions();
+  // A selected element that left the timeline (deleted here, by undo, or by a
+  // script) drops the selection and the Inspector page. Only this; a refetch
+  // never re-shows the element (see selectElement).
   useEffect(() => {
-    if (activeSceneId === undefined) return;
-    if (selectedUid === null) {
-      clearAnimElement(activeSceneId);
+    if (selectedUid === null || selSceneRef.current !== activeSceneId) return;
+    if (elements.some((e) => e.uid === selectedUid)) {
+      if (pendingUidRef.current === selectedUid) pendingUidRef.current = null;
       return;
     }
-    const el = elements.find((e) => e.uid === selectedUid);
-    if (el) {
-      if (pendingUidRef.current === el.uid) pendingUidRef.current = null;
-      showAnimElement(activeSceneId, el.uid);
-    } else if (pendingUidRef.current === selectedUid) {
-      // Just pasted; the timeline has not caught up yet.
-    } else {
-      setSelectedUid(null);
-      clearAnimElement(activeSceneId);
-    }
-  }, [selectedUid, activeSceneId, elements, showAnimElement, clearAnimElement]);
+    // Just pasted; the timeline has not caught up yet.
+    if (pendingUidRef.current === selectedUid) return;
+    setSelectedUid(null);
+    if (activeSceneId !== undefined) clearAnimElement(activeSceneId);
+  }, [selectedUid, activeSceneId, elements, clearAnimElement]);
 
   // --- Empty (no scene) state ---
 
@@ -535,7 +560,7 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
               <div
                 key={el.uid}
                 className={`anim-label-row${selectedUid === el.uid ? " is-selected" : ""}`}
-                onClick={() => setSelectedUid((u) => (u === el.uid ? null : el.uid))}
+                onClick={() => selectElement(el.uid)}
                 title={`${el.name} (${el.type})`}
               >
                 <AppIcon
@@ -611,7 +636,7 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
                 <div
                   key={el.uid}
                   className={`anim-lane${selectedUid === el.uid ? " is-selected" : ""}`}
-                  onClick={() => setSelectedUid(null)}
+                  onClick={() => selectElement(null)}
                 >
                   <AnimStrip
                     el={el}
@@ -623,7 +648,7 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
                     previewAbsEndMs={
                       dragPreview?.uid === el.uid ? dragPreview.absEndMs : undefined
                     }
-                    onSelect={setSelectedUid}
+                    onSelect={selectElement}
                     onEditMouseDown={handleStripEditDown}
                   />
                 </div>

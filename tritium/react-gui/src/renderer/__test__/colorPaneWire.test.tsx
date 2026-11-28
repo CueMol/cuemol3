@@ -104,6 +104,7 @@ import {
     mountTree,
     flushPromises,
     setupElectronAPI,
+    setupPopupMenu,
     teardownElectronAPI,
 } from '@renderer/__test__/helpers/testHarness'
 import { withPaneEnv } from '@renderer/__test__/helpers/paneEnv'
@@ -929,24 +930,18 @@ describe('ColorPane wire', () => {
             // The paint items are gated on the renderer exposing `coloring`.
             hasColoring: true,
         })
-        // Open the "Coloring" dropdown.
+        // Open the "Coloring" dropdown and pick from the (mocked native) menu.
+        setupPopupMenu(['CPK coloring'])
         const caret = container.querySelector(
             '.h3-form-dropdown-caret',
         ) as HTMLButtonElement
         await act(async () => { caret.click() })
         await flushPromises()
-        // Blueprint renders the Menu in a portal on document.body.
-        const items = Array.from(
-            document.querySelectorAll('.bp5-menu-item'),
-        ) as HTMLElement[]
-        const cpkItem = items.find((el) => el.textContent?.includes('CPK coloring'))
-        expect(cpkItem).toBeTruthy()
-        await act(async () => { cpkItem!.click() })
-        await flushPromises()
         expect(cm.invokeService).toHaveBeenCalledWith('setRendererColoring', {
             ...TARGET,
             coloringId: 'paint-type-cpk',
         })
+        teardownElectronAPI()
         unmount()
     })
 })

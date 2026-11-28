@@ -27,6 +27,7 @@ void ShaderObject::setupFog(DisplayContext *pdc)
     data.lightDiffuse = pdc->getLightDiffuse();
     data.lightSpecular = pdc->getLightSpecular();
     data.lightNoClamp = pdc->isLightNoClamp() ? 1.0f : 0.0f;
+    data.occluderPass = pdc->isOccluderPass() ? 1.0f : 0.0f;
     pdc->getLightDir(data.lightDir);
     pdc->getLightMaterialExtra(data.matExtra);
 

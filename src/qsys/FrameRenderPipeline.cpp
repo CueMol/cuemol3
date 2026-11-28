@@ -586,9 +586,11 @@ bool FrameRenderPipeline::render(gfx::DisplayContext *pdc, const ScenePtr &pScen
         aoc.bounceStrength =
             (aoc.aoMethod == Scene::AOM_FASTGI) ? float(std::max(0.0, pScene->getAOBounce()))
                                                  : 0.0f;
-        // The lit colour's intensities (Scene::display), so the composite can
-        // split it into its ambient, diffuse and specular parts.
-        const float bri = float(std::max(0.0, pScene->getLightBrightness()));
+        // The lit colour's intensities (Scene::getMaterialLight), so the
+        // composite can split it into its ambient, diffuse and specular parts.
+        const double fgBri =
+            (aoc.aoMethod == Scene::AOM_FASTGI) ? Scene::kFastGILightBrightness : 1.0;
+        const float bri = float(std::max(0.0, pScene->getLightBrightness()) * fgBri);
         aoc.lightAmbient = float(Scene::kFastGILightAmbient) * bri;
         aoc.lightDiffuse = float(Scene::kFastGILightDiffuse) * bri;
         for (int a = 0; a < 3; ++a) aoc.lightDir[a] = Scene::kLightDir[a];

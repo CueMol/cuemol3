@@ -1,6 +1,7 @@
 /**
  * @file main/menuSwatches.ts
- * @description Colour swatches for the Scene > Background menu items.
+ * @description Colour swatches for menu items (Scene > Background, the
+ * Paint coloring theme colours).
  *
  * Drawn here rather than shipped as files: they are two flat squares, and a
  * generated bitmap avoids an asset that has to be found at runtime from both
@@ -52,9 +53,18 @@ const SWATCH_FILLS: Record<string, Rgb> = {
   black: [0, 0, 0],
 }
 
-/** The swatch for a menu item's `swatch` field, or undefined if unknown. */
+/** `#rrggbb` as RGB, or undefined. */
+function parseHex(s: string): Rgb | undefined {
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(s)
+  return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : undefined
+}
+
+/**
+ * The swatch for a menu item's `swatch` field (a name above, or `#rrggbb`),
+ * or undefined if unknown.
+ */
 export function menuSwatch(name: string): NativeImage | undefined {
-  const fill = SWATCH_FILLS[name]
+  const fill = SWATCH_FILLS[name] ?? parseHex(name)
   if (!fill) return undefined
   let img = cache.get(name)
   if (!img) {

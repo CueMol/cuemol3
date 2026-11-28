@@ -123,6 +123,7 @@ export function NewRendererDialog({
                     molID={molID}
                     isMolFormat={isMol}
                     isMapObject={isScalarMapClass(objClassName)}
+                    centerViewLabel="Center view on the new renderer"
                     onRendererNameUserEdit={onRendererNameUserEdit}
                 />
         </DialogShell>

@@ -23,6 +23,7 @@ import type { AboutRuntimeInfo } from './types/aboutInfo'
 import type { NaviCtxAction, NaviCtxMenuPayload } from './types/naviCtxMenu'
 import type { TextEditAction, TextCtxShowPayload } from './types/textCtxMenu'
 import type { SceneCtxAction, SceneCtxMenuPayload } from './types/sceneCtxMenu'
+import type { MenuNode } from './menuNodes'
 import type { MenuState } from './types/menuState'
 import type { PluginMenuContributionsReq } from './types/pluginContrib'
 import type {
@@ -192,6 +193,7 @@ export interface InvokeChannels {
   [IPC.CLIPBOARD_CUEMOL_PEEK]:  { req: void; res: CuemolClipPeekRes }
   [IPC.NAVI_CTX_SHOW]:     { req: NaviCtxMenuPayload;    res: NaviCtxAction | null }
   [IPC.SCENE_CTX_SHOW]:    { req: SceneCtxMenuPayload;   res: SceneCtxAction | null }
+  [IPC.POPUP_MENU_SHOW]:   { req: PopupMenuRequest;      res: unknown }
   [IPC.TEXT_CTX_ACTION]:   { req: TextEditAction;         res: void }
   [IPC.CRASH_REPORT]:      { req: CrashReport;           res: void }
   [IPC.FORCE_QUIT]:        { req: void;                  res: void }
@@ -271,4 +273,15 @@ export interface ElectronAPI {
    * does not originate from the filesystem.
    */
   getPathForFile(file: File): string
+}
+
+/**
+ * A native popup of a shared menu tree at a window position (CSS px). The
+ * action values must survive structured clone (plain data); the reply is the
+ * picked node's action, or null when the menu was dismissed.
+ */
+export interface PopupMenuRequest {
+  nodes: MenuNode<unknown>[]
+  x: number
+  y: number
 }
