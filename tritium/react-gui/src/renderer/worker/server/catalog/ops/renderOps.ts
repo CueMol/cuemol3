@@ -38,8 +38,8 @@ export const renderImage = defineOp({
     'scene\'s own, as in the Rendering window.\n' +
     '- Takes from seconds to minutes depending on size.\n' +
     '- Give a plain file name, which is saved to the desktop, or an absolute path where the ' +
-    'caller allows one. The full path is reported back -- tell the user where it went.\n\n' +
-    'Use `capture_view` to look at the view quickly instead.',
+    'caller allows one. The full path is reported back -- tell the user where it went.',
+  toolNote: 'Use `capture_view` to look at the view quickly instead.',
   params: {
     fileName: path('PNG file to write. A bare name is saved to the desktop.'),
     width: optional(integer('Width in pixels. Null keeps the scene\'s render size.')),

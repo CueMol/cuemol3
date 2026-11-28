@@ -142,7 +142,7 @@ namespace {
 
 DirectSurfRenderer::DirectSurfRenderer()
 {
-  m_nSurfAlgor = DS_DISTFIELD;
+  m_nSurfAlgor = DS_MESHMS;
   m_bCheckShaderOK = false;
   m_bUseShader = false;
   m_bColorDirty = false;

@@ -118,8 +118,10 @@ export interface CompleteArgs {
   /** 0 when no scene is active; name candidates are then empty. */
   sceneId: number
   viewId: number
-  /** The line the caret is on, without its newline. */
+  /** The caret's line up to the caret. */
   line: string
+  /** The caret's line after the caret, without its newline; omitted reads as the end of the line. */
+  rest?: string
   /** As in `RunCommandArgs`. */
   cwd?: string
 }

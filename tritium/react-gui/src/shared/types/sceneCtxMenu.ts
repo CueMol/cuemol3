@@ -59,6 +59,11 @@ export type RendColoringId =
   | 'paint-type-bfac'
   | 'paint-type-rainbow'
   | 'paint-type-paint'
+  // A PaintColoring with a chosen main colour: CueMol2's / CueMol1's fixed
+  // colours, or a palette theme colour (`paint-theme-okabeito_3`).
+  | 'paint-type-paint-cuemol2'
+  | 'paint-type-paint-cuemol1'
+  | `paint-theme-${string}`
   // The three CPK ids differ only in the carbon colour (see
   // CPK_CARBON_COLORS in coloring/applyColoring.ts).
   | 'paint-type-cpk'
@@ -169,6 +174,8 @@ export interface SceneCtxMenuPayload {
    * sub-submenu entirely.
    */
   paintStyles?: { name: string; label: string }[]
+  /** Palette themes for the Paint sub-submenu (numbered colours with swatches). */
+  paintThemes?: { label: string; colors: { name: string; hex: string; label: string }[] }[]
   /**
    * Whether the Paint color-picker submenu should appear.
    * True iff the renderer's current coloring is `PaintColoring` and the

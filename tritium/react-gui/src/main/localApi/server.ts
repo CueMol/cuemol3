@@ -117,6 +117,21 @@ function readBody(req: http.IncomingMessage): Promise<unknown> {
   })
 }
 
+/**
+ * Whether the info file is this process's own. Another CueMol (an installed
+ * one beside a development build) may have written it; that one is still
+ * listening, so its file is left alone -- also when this one could not get
+ * the port. An unreadable file is not ours to remove either.
+ */
+function ownsInfoFile(file: string): boolean {
+  try {
+    const info = JSON.parse(fs.readFileSync(file, 'utf8')) as Partial<LocalApiInfoFile>
+    return info.pid === process.pid
+  } catch {
+    return false
+  }
+}
+
 /** Create the server; it does not listen until an endpoint is switched on. */
 export function createLocalApiServer(opts: LocalApiServerOptions): LocalApiServer {
   const enabled = new Set<LocalApiEndpoint>()
@@ -140,7 +155,7 @@ export function createLocalApiServer(opts: LocalApiServerOptions): LocalApiServe
     if (!opts.infoFile) return
     try {
       if (!listening) {
-        fs.rmSync(opts.infoFile, { force: true })
+        if (ownsInfoFile(opts.infoFile)) fs.rmSync(opts.infoFile, { force: true })
         return
       }
       const info: LocalApiInfoFile = { port, token: opts.token(), pid: process.pid, endpoints: [...enabled].sort() }

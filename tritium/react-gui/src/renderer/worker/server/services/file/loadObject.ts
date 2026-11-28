@@ -24,6 +24,7 @@ import type { ObjReader } from '@cuemol/core/src/wrappers/ObjReader';
 import type { Object as CObject } from '@cuemol/core/src/wrappers/Object';
 import type { FileOpenOptions } from '@renderer/worker/shared/fileOpenTypes';
 import { setupRenderer } from '../rend/setupRenderer';
+import { removeUnrendered, requiredRendererError } from '../rend/requiredRenderer';
 import { undoTxnResult } from '../withUndoTxn';
 import { recordLoadFile } from '@renderer/worker/server/actions/serviceOps';
 import { pickReaderName, OBJREADER_CATEGORY } from '@renderer/worker/server/services/helpers/pickReaderName';
@@ -126,6 +127,12 @@ export function loadObject(ctx: WorkerContext, args: LoadObjectArgs): LoadObject
         // The dialog's map kind override (DensityMap.map_type) goes on the
         // object, so it must be set before the renderer resolves its region.
         applyMapTypeChoice(obj, args.options.format);
+        // Before the scene changes: an outer transaction (an agent turn)
+        // would keep an object added here even if this one rolls back.
+        if (args.options.renderer.requireRenderer) {
+            const bad = requiredRendererError(ctx, scene.uid, obj, args.options.renderer);
+            if (bad) return fail(bad, 'invalid-args');
+        }
         (scene as unknown as { addObject: (o: CObject) => void }).addObject(obj);
 
         // A molecule without coordinates is one point at the origin: fitting
@@ -137,6 +144,7 @@ export function loadObject(ctx: WorkerContext, args: LoadObjectArgs): LoadObject
         // The map kind also picks the renderer's default style (and with it
         // the cryo-EM contour level), see setupRenderer.
         const rend = setupRenderer(ctx, obj, rendOpts, true);
+        if (!rend && rendOpts.requireRenderer) return removeUnrendered(scene, obj);
         if (rend) {
             // What the view does for a volume object (UXP's scalar-object
             // deck). Runs here rather than in setupRenderer because `auto`

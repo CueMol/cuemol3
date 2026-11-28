@@ -42,29 +42,34 @@ TEST(SceneMaterialLight, MaterialSetsTheLight)
     for (const char *name : {"", "default", "matte_plastic", "no_such_material"})
         expectLight(pScene->getMaterialLight(name), Scene::kLegacyLightAmbient,
                     Scene::kLegacyLightDiffuse, kSpec, kShin);
-    // nolighting (ambient 1, diffuse 0, specular 0): the global ambient 0.2 on
-    // top, as in CueMol2.
-    expectLight(pScene->getMaterialLight("nolighting"), 1.2, 0.0, 0.0, 0.0);
+    // nolighting (ambient 1, diffuse 0, specular 0) shows its colour as
+    // given, as POV-Ray and the ray tracer draw it: no global ambient on top,
+    // and the brightness knob does not change it.
+    expectLight(pScene->getMaterialLight("nolighting"), 1.0, 0.0, 0.0, 0.0);
+    pScene->setLightBrightness(1.5);
+    expectLight(pScene->getMaterialLight("nolighting"), 1.0, 0.0, 0.0, 0.0);
+    pScene->setLightBrightness(1.0);
 
     // Fast GI scales the ambient and diffuse of every material so that
-    // "default" gets its constants; the specular and exponent stay the
-    // material's, in every mode.
+    // "default" gets its constants, and makes all three lights brighter by
+    // kFastGILightBrightness; the exponent stays the material's.
     pScene->setAOEnabled(true);
     pScene->setAOMethod(Scene::AOM_FASTGI);
-    expectLight(pScene->getMaterialLight(""), Scene::kFastGILightAmbient,
-                Scene::kFastGILightDiffuse, kSpec, kShin);
+    const double kB = Scene::kFastGILightBrightness;
+    expectLight(pScene->getMaterialLight(""), Scene::kFastGILightAmbient * kB,
+                Scene::kFastGILightDiffuse * kB, kSpec * kB, kShin);
     // diff_metal: ambient 0.2, diffuse 0.5, specular 1.25, exponent 16, and
     // the metalness 0.6 from its <def> attribute (no toon bands, no rim).
     const Scene::MaterialLight metal = pScene->getMaterialLight("diff_metal");
-    expectLight(metal, 0.4 * Scene::kFastGILightAmbient / Scene::kLegacyLightAmbient,
-                0.5 * Scene::kFastGILightDiffuse / Scene::kLegacyLightDiffuse, 0.4 * 1.25,
-                16.0);
+    expectLight(metal, 0.4 * Scene::kFastGILightAmbient / Scene::kLegacyLightAmbient * kB,
+                0.5 * Scene::kFastGILightDiffuse / Scene::kLegacyLightDiffuse * kB,
+                0.4 * 1.25 * kB, 16.0);
     EXPECT_NEAR(metal.metallic, 0.6, 1e-5);
     EXPECT_EQ(metal.toon, 0.0f);
     EXPECT_EQ(metal.fresnel, 0.0f);
     // nolighting is lit by the ambient light alone and gets no AO, so Fast GI
-    // keeps its light as without AO.
-    expectLight(pScene->getMaterialLight("nolighting"), 1.2, 0.0, 0.0, 0.0);
+    // keeps its light as without AO (no brightness boost either).
+    expectLight(pScene->getMaterialLight("nolighting"), 1.0, 0.0, 0.0, 0.0);
     // A material without the attributes is not metallic.
     EXPECT_EQ(pScene->getMaterialLight("").metallic, 0.0f);
     // ceramic: the Fresnel rim strength 3 from its <def> attribute.
@@ -73,10 +78,17 @@ TEST(SceneMaterialLight, MaterialSetsTheLight)
     // toon1 (POV-Ray: ambient 0, diffuse 0.8): with AO it keeps its flat
     // tones under the light any material gets, not its POV-Ray finish.
     const Scene::MaterialLight toonAO = pScene->getMaterialLight("toon1");
-    expectLight(toonAO, 0.2 * Scene::kFastGILightAmbient / Scene::kLegacyLightAmbient,
-                0.8 * Scene::kFastGILightDiffuse / Scene::kLegacyLightDiffuse, 0.0, 0.0);
+    expectLight(toonAO, 0.2 * Scene::kFastGILightAmbient / Scene::kLegacyLightAmbient * kB,
+                0.8 * Scene::kFastGILightDiffuse / Scene::kLegacyLightDiffuse * kB, 0.0, 0.0);
     EXPECT_EQ(toonAO.toon, 1.0f);
     EXPECT_EQ(toonAO.toonPov, 0.0f);
+    // GTAO keeps the light of no AO: neither the Fast GI balance nor its
+    // brightness boost.
+    pScene->setAOMethod(Scene::AOM_GTAO);
+    expectLight(pScene->getMaterialLight(""), Scene::kLegacyLightAmbient,
+                Scene::kLegacyLightDiffuse, kSpec, kShin);
+    pScene->setAOMethod(Scene::AOM_FASTGI);
+
     // Without AO, as POV-Ray renders it: no global ambient, the diffuse
     // under kToonLightDiffuse.
     pScene->setAOEnabled(false);

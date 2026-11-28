@@ -30,10 +30,13 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, Menu, MenuItem, Popover } from '@blueprintjs/core'
+import { Button } from '@blueprintjs/core'
 import { PaneSectionHeader } from '@renderer/shell/PaneSectionHeader'
 import { Field, SelectField } from '@renderer/h3-kit/form'
 import type { RendColoringId } from '@shared/types/sceneCtxMenu'
+import { paintChoiceMenu } from '@shared/coloring/paintChoiceMenu'
+import type { MenuNode } from '@shared/menuNodes'
+import { usePopupMenu } from '@renderer/shell/menu/usePopupMenu'
 import type { ColoringTargetKind } from '@renderer/worker/server/services/coloring/coloring.service'
 import type { SceneObjectEntry } from '@renderer/worker/server/services/scene/listSceneObjects'
 import { ColorPickerProvider } from '@renderer/h3-kit/colorpicker'
@@ -222,34 +225,8 @@ export const ColorPane: React.FC<ColorPaneProps> = ({ collapsed, onToggleCollaps
         enabled: isMolFancActive,
     })
 
-    // "Paint coloring" submenu entries (UXP `onPaintColShowing`): "Default"
-    // builds a plain PaintColoring on the target itself, and a renderer -- which
-    // has a `style` property, unlike an object -- additionally gets the scene's
-    // `*Paint` style presets (Woody / Red / ...) applied as a style.
-    //
-    // "Default" has to be the coloring rather than a style for a renderer too:
-    // the one `*Paint` style that reads as "default" is `DefaultHSCPaint`, which
-    // is solid + `$molcol` and is already the default style of the ribbon /
-    // cartoon / tube renderers, so applying it left them exactly as they were.
-    const { styles: paintStyles } = usePaintColoringStyles({ cm, sceneId })
-    const paintSubmenuItems = useMemo((): {
-        key: string
-        label: string
-        coloringId: RendColoringId
-    }[] => {
-        const items = [
-            { key: 'default', label: 'Default', coloringId: 'paint-type-paint' as RendColoringId },
-        ]
-        if (target?.targetKind === 'object') return items
-        return [
-            ...items,
-            ...paintStyles.map((s) => ({
-                key: s.name,
-                label: s.label,
-                coloringId: `style-${s.name}` as RendColoringId,
-            })),
-        ]
-    }, [target?.targetKind, paintStyles])
+    // Contents of the "Paint coloring" submenu (see openModeMenu).
+    const { styles: paintStyles, themes: paintThemes } = usePaintColoringStyles({ cm, sceneId })
 
     // -- Mutation handlers --
     const requireTarget = useCallback(
@@ -442,6 +419,43 @@ export const ColorPane: React.FC<ColorPaneProps> = ({ collapsed, onToggleCollaps
     // Also disabled while the first coloring-state fetch is in flight, so
     // the dropdown never opens with capability flags still unknown.
     const dropdownDisabled = target === null || state === null
+
+    // The coloring-type dropdown, shown as the platform menu (usePopupMenu).
+    // UXP `setupColoringSelector` gates: the Paint/CPK/Bfac/Rainbow/Solid/
+    // Reset items require a `coloring` property ('coloring' in rend), the
+    // Multi-gradient item a `multi_grad` property, and Electrostatic
+    // potential additionally a surface renderer. Map renderers without
+    // `coloring` (contour / gpu_*) offer only Multi-gradient; isosurf has
+    // `coloring` (MOLFANC) and offers the full paint set. Molecule color is
+    // a style, so a renderer's only. "Paint coloring" is a submenu
+    // (`paintChoiceMenu`): CueMol2 default, CueMol1 (woody), the palette themes'
+    // named colours, and for a renderer the `*Paint` style presets.
+    const openPopupMenu = usePopupMenu()
+    const openModeMenu = async (anchor: Element): Promise<void> => {
+        const isObject = target?.targetKind === 'object'
+        const nodes: MenuNode<RendColoringId>[] = COLORING_MODE_ITEMS
+            .filter((it) =>
+                it.rendererOnly && isObject
+                    ? false
+                    : it.multigradOnly
+                      ? multiGradCapable
+                      : it.surfaceOnly
+                        ? hasColoring && isSurface
+                        : hasColoring)
+            .map((it): MenuNode<RendColoringId> =>
+                it.coloringId === PAINT_SUBMENU_ID
+                    ? {
+                          label: it.label,
+                          submenu: paintChoiceMenu(paintThemes, isObject ? [] : paintStyles, (id) => id),
+                      }
+                    : {
+                          label: it.enabled ? it.label : `${it.label} (coming soon)`,
+                          enabled: it.enabled && it.coloringId !== null,
+                          ...(it.coloringId ? { action: it.coloringId } : {}),
+                      })
+        const picked = await openPopupMenu(nodes, anchor)
+        if (picked) onSelectMode(picked)
+    }
     const modeLabel = state?.ok
         ? coloringModeLabel({
               className,
@@ -469,76 +483,15 @@ export const ColorPane: React.FC<ColorPaneProps> = ({ collapsed, onToggleCollaps
                             selectedKey={selectedKey}
                             onChange={setSelectedKey}
                         />
-                        <Popover
+                        <Button
+                            small
+                            className="h3-form-dropdown-caret"
+                            rightIcon={<span className="h3-form-caret" aria-hidden />}
+                            text={modeLabel}
+                            title="Coloring mode"
                             disabled={dropdownDisabled}
-                            placement="bottom-end"
-                            content={
-                                <Menu>
-                                    {COLORING_MODE_ITEMS
-                                        // UXP `setupColoringSelector` gates:
-                                        // the Paint/CPK/Bfac/Rainbow/Solid/
-                                        // Reset items require a `coloring`
-                                        // property ('coloring' in rend), the
-                                        // Multi-gradient item a `multi_grad`
-                                        // property, and Electrostatic
-                                        // potential additionally a surface
-                                        // renderer. Map renderers without
-                                        // `coloring` (contour / gpu_*) offer
-                                        // only Multi-gradient; isosurf has
-                                        // `coloring` (MOLFANC) and offers
-                                        // the full paint set. "Paint coloring"
-                                        // renders as a submenu of style
-                                        // presets rather than a leaf item.
-                                        .filter((it) =>
-                                            it.multigradOnly
-                                                ? multiGradCapable
-                                                : it.surfaceOnly
-                                                  ? hasColoring && isSurface
-                                                  : hasColoring)
-                                        .map((it, i) =>
-                                            it.coloringId === PAINT_SUBMENU_ID ? (
-                                                <MenuItem
-                                                    key={i}
-                                                    text={it.label}
-                                                    disabled={paintSubmenuItems.length === 0}
-                                                >
-                                                    {paintSubmenuItems.map((s) => (
-                                                        <MenuItem
-                                                            key={s.key}
-                                                            text={s.label}
-                                                            onClick={() => onSelectMode(s.coloringId)}
-                                                        />
-                                                    ))}
-                                                </MenuItem>
-                                            ) : (
-                                                <MenuItem
-                                                    key={i}
-                                                    text={
-                                                        it.enabled
-                                                            ? it.label
-                                                            : `${it.label} (coming soon)`
-                                                    }
-                                                    disabled={!it.enabled}
-                                                    onClick={() => {
-                                                        if (it.enabled && it.coloringId) {
-                                                            onSelectMode(it.coloringId)
-                                                        }
-                                                    }}
-                                                />
-                                            ),
-                                        )}
-                                </Menu>
-                            }
-                        >
-                            <Button
-                                small
-                                className="h3-form-dropdown-caret"
-                                rightIcon={<span className="h3-form-caret" aria-hidden />}
-                                text={modeLabel}
-                                title="Coloring mode"
-                                disabled={dropdownDisabled}
-                            />
-                        </Popover>
+                            onClick={(e) => { void openModeMenu(e.currentTarget) }}
+                        />
                     </div>
 
                     {/* Deck content -- panel.coloring.deck.*. The Paint list

@@ -248,24 +248,22 @@ describe('setRendererColoring — dynamic style-* (Phase 3c-2 path)', () => {
 describe('getPaintColoringStyles', () => {
     beforeEach(() => vi.clearAllMocks())
 
-    it('filters merged global + scene entries by /Paint$/', () => {
+    it('lists the merged /Paint$/ presets by hue, without molcol / Woody, user ones last', () => {
+        const stock = ['Blue', 'Cyan', 'Default', 'Green', 'Orange', 'Purple', 'Red', 'Woody', 'Yellow']
         const { ctx } = makeFixture({
             styleNamesJSON: {
                 0: JSON.stringify([
-                    { name: 'DefaultHSCPaint', desc: 'HSC paint' },
+                    ...stock.map((c) => ({ name: `${c}HSCPaint`, desc: c })),
                     { name: 'DefaultRibbon', desc: 'Ribbon' },
                 ]),
-                7: JSON.stringify([
-                    { name: 'UserCustomPaint', desc: '' },
-                    { name: 'SomeStyle', desc: 'should be dropped' },
-                ]),
+                7: JSON.stringify([{ name: 'UserCustomPaint', desc: '' }]),
             },
         })
         const res = services.getPaintColoringStyles(ctx, { sceneId: 7 })
         expect(res.ok).toBe(true)
         expect(res.entries.map((e) => e.name)).toEqual([
-            'DefaultHSCPaint',
-            'UserCustomPaint',
+            'RedHSCPaint', 'OrangeHSCPaint', 'YellowHSCPaint', 'GreenHSCPaint',
+            'CyanHSCPaint', 'BlueHSCPaint', 'PurpleHSCPaint', 'UserCustomPaint',
         ])
     })
 
@@ -299,7 +297,7 @@ describe('getPaintColoringStyles', () => {
             styleNamesJSON: { 0: 'not-json', 7: '[]' },
         })
         const res = services.getPaintColoringStyles(ctx, { sceneId: 7 })
-        expect(res).toEqual({ ok: true, entries: [] })
+        expect(res).toMatchObject({ ok: true, entries: [] })
     })
 })
 

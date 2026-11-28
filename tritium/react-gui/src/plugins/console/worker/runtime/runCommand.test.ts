@@ -88,6 +88,26 @@ const outside: PymCommand = {
   },
 }
 
+/**
+ * Stands for `save_scene`: outside the transaction, but a script may end with
+ * it. Records how many transactions had committed when it ran.
+ */
+const savedAfter: number[] = []
+let commits: () => number = () => 0
+const saveAtEnd: PymCommand = {
+  name: 'saveend',
+  params: [],
+  mode: 'strict',
+  mutates: false,
+  summary: 'stub',
+  outsideTxn: () => true,
+  deferAtEnd: true,
+  run: () => {
+    savedAfter.push(commits())
+    return { ok: true }
+  },
+}
+
 /** Stands for `cd sub`: moves the working directory one level down. */
 const chdir: PymCommand = {
   name: 'chdir',
@@ -112,7 +132,7 @@ const sceneCmd: PymCommand = {
     cc.requestScene({ op: 'new', name: '' }) ? { ok: true } : { ok: false, error: 'Error: not in a script' },
 }
 
-const STUBS = [mutating, readOnly, failing, unsupportedCmd, downloading, outside, chdir, sceneCmd]
+const STUBS = [mutating, readOnly, failing, unsupportedCmd, downloading, outside, saveAtEnd, chdir, sceneCmd]
 
 vi.mock('@renderer/worker/server/services/helpers/streamFetchToReader', () => ({
   cancelStream: vi.fn(() => true),
@@ -325,6 +345,38 @@ describe('runCommand', () => {
     expect(errors.map((e) => e.text).join()).toContain('must be the only command on the line')
     // What ran before it is kept, as with any other failure.
     expect(scene.undo.committed).toHaveLength(1)
+  })
+
+  it('runs a command a script ends with once its transaction has committed', async () => {
+    const { scene, ctx } = setup()
+    commits = () => scene.undo.committed.length
+    savedAfter.length = 0
+    const dir = makeTmpDir('pymc-')
+    const script = path.join(dir, 'fig.pml')
+    fs.writeFileSync(script, 'mutate\nsaveend\n')
+
+    const res = await runCommand(ctx, { dialect: 'pymol', sceneId: 1, viewId: 7, runId: 'd1', text: `@${script}` })
+    expect(res.ok && !res.aborted).toBe(true)
+    // It saw the script's one transaction committed.
+    expect(savedAfter).toEqual([1])
+  })
+
+  it('refuses a held command that is not last, and holds none inside a qax file', async () => {
+    const { scene, ctx } = setup()
+    commits = () => scene.undo.committed.length
+    savedAfter.length = 0
+    const notLast = await runCommand(ctx, { dialect: 'pymol', sceneId: 1, viewId: 7, runId: 'd2', text: 'saveend; mutate' })
+    const errors = notLast.ok ? notLast.entries.filter((e) => e.kind === 'error') : []
+    expect(errors.map((e) => e.text).join()).toContain('must come at the end of the script')
+    expect(scene.undo.committed).toHaveLength(0)
+
+    // A qax file alone on the line never reaches the point a held command runs at.
+    dialect.id = 'native'
+    const file = path.join(makeTmpDir('qax-'), 'a.qax')
+    fs.writeFileSync(file, '<cuemol-actions version="1"><action label="x"><cmd>mutate</cmd><cmd>saveend</cmd></action></cuemol-actions>')
+    const inQax = await runCommand(ctx, { dialect: 'native', sceneId: 1, viewId: 7, runId: 'd3', text: `@${file}` })
+    expect(inQax.ok && inQax.aborted).toBe(true)
+    expect(savedAfter).toEqual([])
   })
 
   it('replays a qax file alone on the line one undo step per action, under its recorded label', async () => {

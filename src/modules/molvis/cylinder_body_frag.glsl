@@ -103,6 +103,12 @@ void main()
     if (id == 0u) discard;
     o_Pick = uvec4(u_rend_idx, id, u_outer_name, 0u);
 #else
+    // The silhouette edge and a material lit by the ambient light alone are
+    // drawn without a normal: no AO, no tone curve, and no occluder in the
+    // occluder-only pass (the probe bake).
+    bool noNormal = bEdge || isAmbientOnlyLight();
+    if (noNormal && isOccluderPass()) discard;
+
     // color calculation
     vec4 color;
     vec4 onrm = vec4(0.0, 0.0, 0.0, 1.0);
@@ -120,7 +126,7 @@ void main()
 
         color = flight2(normal, ecpos, v_color);
         // Length encodes the ambient fraction (AO applies to the ambient only).
-        onrm = encodeNormalAmbient(normal, g_ambientFraction);
+        if (!noNormal) onrm = encodeNormalAmbient(normal, g_ambientFraction);
     }
 
     // fog calculation

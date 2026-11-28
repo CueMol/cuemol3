@@ -6,6 +6,8 @@
 
 #include "Command.hpp"
 
+#include <vector>
+
 namespace qsys {
 
 using qlib::LString;
@@ -55,6 +57,10 @@ public:
 
     /// resulting scene (new or same as targScene)
     ScenePtr m_pResScene;
+
+    /// Data the scene file refers to that could not be loaded; the scene is
+    /// loaded without it (SceneXMLReader::getLoadErrors)
+    std::vector<LString> m_loadErrors;
 
 };
 

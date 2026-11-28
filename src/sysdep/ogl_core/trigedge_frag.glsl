@@ -33,6 +33,10 @@ layout(location = 2) out vec4 o_Material;
 
 void main(void)
 {
+    // Drawn without a normal: casts no AO, so not part of the occluder-only
+    // pass (the probe bake, fog_inc.glsl isOccluderPass).
+    if (isOccluderPass()) discard;
+
     o_FragColor = fragFogColor(v_frontColor, frag_alpha, v_fogCoord);
 
     // Edge-line (inverted-hull) fragments are decorative outlines: write the

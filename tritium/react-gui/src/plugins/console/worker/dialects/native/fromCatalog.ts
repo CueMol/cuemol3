@@ -69,6 +69,13 @@ function unquote(raw: string): string {
   return t
 }
 
+/** The numbers of a list written `x y z` or `[x, y, z]`, as words. */
+function numberWords(text: string): string[] {
+  const t = text.trim()
+  const inner = t.startsWith('[') && t.endsWith(']') ? t.slice(1, -1).replace(/,/g, ' ') : t
+  return inner.split(/\s+/).filter((w) => w !== '')
+}
+
 /** `A.20.CA A.21.CA` -> two atoms. */
 function readAtoms(raw: string): AtomSpec[] | string {
   const out: AtomSpec[] = []
@@ -140,8 +147,9 @@ function readArg(
   const parsed =
     p.kind === 'boolean' ? parseBoolText(text)
     : p.kind === 'integer' || p.kind === 'real' ? parseNumberText(text)
-    // Written `x y z`: a comma would end the argument.
-    : numberListSize(p.kind) !== null ? text.split(/\s+/).filter((w) => w !== '').map(Number)
+    // Written `x y z`, or `[x, y, z]` as a JSON caller writes it (the
+    // parser takes a bracketed group whole, commas and all).
+    : numberListSize(p.kind) !== null ? numberWords(text).map(Number)
     : text
   const bad = checkArg(name, p, parsed)
   if (bad) return `${bad.slice(0, -1)}, not "${text}"`
@@ -477,12 +485,25 @@ function opCommand(op: AnyOp, alias?: OpAlias): ConsoleCommand {
   const specs: ParamSpec[] = names.map((n) => {
     const p = params[n]
     const optional = p.optional || derivable.has(n) || defaults[n] !== undefined
-    return optional ? { name: n, default: '' } : { name: n }
+    const spec: ParamSpec = optional ? { name: n, default: '' } : { name: n }
+    return derivable.has(n) ? { ...spec, implied: true } : spec
   })
+  const optionalNames = new Set(specs.filter((sp) => sp.default !== undefined).map((sp) => sp.name))
+  /**
+   * The bound strings with a bare `null` in an optional argument read as
+   * left out, as a JSON caller's null is (the parameter descriptions say
+   * "Null leaves it"). Done on the text as bound, before any reader drops
+   * the quotes, so a quoted `"null"` stays the name `null`.
+   */
+  const nullsLeftOut = (bound: Readonly<Record<string, string>>): Record<string, string> => {
+    const out: Record<string, string> = { ...bound }
+    for (const n of optionalNames) if (out[n]?.trim() === 'null') out[n] = ''
+    return out
+  }
 
   return {
     name: alias?.name ?? op.name,
-    group: op.group,
+    group: alias?.group ?? op.group,
     params: specs,
     mode: 'strict',
     mutates: op.mutates,
@@ -490,6 +511,7 @@ function opCommand(op: AnyOp, alias?: OpAlias): ConsoleCommand {
     // The file a load op opens lists what it can open first.
     completions: names.map((n) => completionOf(params[n], related(params), n === filesParam)),
     ...(op.outsideTxn ? { outsideTxn: (bound: Record<string, string>) => op.outsideTxn?.(loneFile(bound)) ?? false } : {}),
+    ...(op.deferAtEnd ? { deferAtEnd: true } : {}),
     async run(ctx, bound, cc): Promise<CmdOutcome> {
       /** One run of the op; the reason it failed, or null. */
       const runOnce = async (b: Readonly<Record<string, string>>, label?: string): Promise<string | null> => {
@@ -504,7 +526,7 @@ function opCommand(op: AnyOp, alias?: OpAlias): ConsoleCommand {
       }
       const tables: { label: string; table: OpTable }[] = []
 
-      const read = readTargets(ctx, cc, op, bound, filesParam, alias)
+      const read = readTargets(ctx, cc, op, nullsLeftOut(bound), filesParam, alias)
       if (typeof read === 'string') return { ok: false, error: `Error: ${read}` }
       const { line, fan } = read
       if (fan === null) {

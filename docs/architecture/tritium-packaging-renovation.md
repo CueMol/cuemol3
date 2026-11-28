@@ -193,7 +193,7 @@ staging し、`electron-builder.yml` の extraResources 2 エントリが `cuemo
 `bundle_apps` へマップ。ローカルは `Taskfile.yml` の `package_tritium:darwin` /
 `package_tritium:windows` が `BUNDLE_APPS` を渡す（Windows の extpkgs 取得は
 `download_extpkgs:windows` -> `download_extpkgs/run_win.sh`。macOS と違い 3 パッケージが
-1 つの bundle asset で配布されているため別スクリプトになっている）。CI は `build2.yml` の
+1 つの bundle asset で配布されているため別スクリプトになっている。bundle 内の ffmpeg は古いので、run_win.sh が展開後に `FFMPEG_DIST_WINDOWS` (gyan.dev essentials) の `ffmpeg.exe` で置き換える）。ffmpeg は macOS / Windows とも `CueMol/build_scripts` の `thirdparty-mirror` release から取得し、配布元 (osxexperts.net / gyan.dev) には CI から取りに行かない。版を上げるときは先に mirror の manifest へ追加してから `deplibs.env` の `FFMPEG_DIST_*` を変える。CI は `build2.yml` の
 macOS / Windows 両 job で `download_extpkgs` を
 tritium package の前へ移動し、package step に `BUNDLE_APPS=<workspace>/target` を export
 (同 download は後続の UXP build も兼ねる) して配布物に同梱する。extpkgs のコピーは package

@@ -56,22 +56,6 @@ gfx::RenderTarget *AmbientProbeVolume::getAtlas() const
 
 namespace {
 
-void collectSpheres(const ScenePtr &pScene, std::vector<qlib::Vector4D> &sph)
-{
-    for (auto oi = pScene->beginObj(); oi != pScene->endObj(); ++oi) {
-        ObjectPtr pObj = oi->second;
-        if (pObj.isnull() || !pObj->isVisible()) continue;
-        for (auto ri = pObj->beginRend(); ri != pObj->endRend(); ++ri) {
-            RendererPtr pRend = ri->second;
-            if (pRend.isnull() || !pRend->isVisible()) continue;
-            // A translucent renderer (a veil) occludes nothing: as in the ray
-            // tracer, it casts no shadow or AO on what it covers.
-            if (pRend->getDefaultAlpha() < 1.0 - Scene::kVeilAlphaEps) continue;
-            pRend->collectOcclusionSpheres(sph);
-        }
-    }
-}
-
 /// The probe direction set: must match probe_bake_frag.glsl (probeDir).
 void probeDir(int k, int nd, double d[3])
 {
@@ -84,6 +68,41 @@ void probeDir(int k, int nd, double d[3])
 }
 
 }  // namespace
+
+double AmbientProbeVolume::fitSpacing(const double extent[3], double spacing, int pad,
+                                      int maxAtlas)
+{
+    // Atlas layout (texel (x + z * nx, y)): see update().
+    double h = spacing;
+    for (int iter = 0; iter < 64; ++iter) {
+        int n[3];
+        for (int a = 0; a < 3; ++a) n[a] = int(std::ceil(extent[a] / h)) + 2 * pad;
+        if (std::max(n[0] * n[2], n[1]) <= maxAtlas) break;
+        h *= 1.1;
+    }
+    return h;
+}
+
+void AmbientProbeVolume::collectOccluderBounds(const ScenePtr &pScene,
+                                                std::vector<qlib::Vector4D> &sph)
+{
+    for (auto oi = pScene->beginObj(); oi != pScene->endObj(); ++oi) {
+        ObjectPtr pObj = oi->second;
+        if (pObj.isnull() || !pObj->isVisible()) continue;
+        for (auto ri = pObj->beginRend(); ri != pObj->endRend(); ++ri) {
+            RendererPtr pRend = ri->second;
+            if (pRend.isnull() || !pRend->isVisible()) continue;
+            // A translucent renderer (a veil) occludes nothing: as in the ray
+            // tracer, it casts no shadow or AO on what it covers.
+            if (pRend->getDefaultAlpha() < 1.0 - Scene::kVeilAlphaEps) continue;
+            // Nor does an unlit one: its surfaces are drawn without a normal
+            // and discarded in the bake (DisplayContext::setOccluderPass).
+            const Scene::MaterialLight ml = pScene->getMaterialLight(pRend->getDefaultMaterial());
+            if (ml.diffuse <= 0.0f && ml.specular <= 0.0f) continue;
+            pRend->collectOccluderBounds(sph);
+        }
+    }
+}
 
 bool AmbientProbeVolume::update(gfx::DisplayContext *pdc, const ScenePtr &pScene,
                                 double spacing, gfx::PostProcGpuPrim *pPostProc, int numDirs,
@@ -119,12 +138,12 @@ bool AmbientProbeVolume::update(gfx::DisplayContext *pdc, const ScenePtr &pScene
     m_bakedGen = gen;
     m_bakedSettings = settings;
 
-    // The occluder spheres give the grid bounds. Collecting them evaluates
+    // The occluder bounds give the grid bounds. Collecting them evaluates
     // every renderer's selection over its atoms (~60 ms for the 5 default
     // renderers of a 59k-atom structure), so it runs only here, once per bake.
     const auto t0 = std::chrono::steady_clock::now();
     std::vector<qlib::Vector4D> sph;
-    collectSpheres(pScene, sph);
+    collectOccluderBounds(pScene, sph);
     if (sph.empty()) {
         // Nothing to bake; stays so until the geometry changes.
         releaseTargets();
@@ -133,8 +152,8 @@ bool AmbientProbeVolume::update(gfx::DisplayContext *pdc, const ScenePtr &pScene
     const double collectMs =
         std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
 
-    // Grid placement: the bounds of the spheres plus 2 probes.
-    const double h = spacing;
+    // Grid placement: the bounds of the spheres plus 2 probes, the spacing
+    // widened when the atlas would exceed kMaxAtlasSize (a large map surface).
     const int PAD = 2;
     double lo[3] = {1e30, 1e30, 1e30}, hi[3] = {-1e30, -1e30, -1e30};
     for (const auto &v : sph) {
@@ -143,6 +162,8 @@ bool AmbientProbeVolume::update(gfx::DisplayContext *pdc, const ScenePtr &pScene
             hi[a] = std::max(hi[a], v.ai(a + 1) + v.w());
         }
     }
+    const double extent[3] = {hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]};
+    const double h = fitSpacing(extent, spacing, PAD, kMaxAtlasSize);
     gfx::ProbeBakeParams bp;
     double rad2 = 0.0;
     for (int a = 0; a < 3; ++a) {
@@ -224,11 +245,14 @@ bool AmbientProbeVolume::update(gfx::DisplayContext *pdc, const ScenePtr &pScene
         const int tx = k % bp.tilesPerRow, ty = k / bp.tilesPerRow;
         pdc->setViewport(qlib::Vector4D(tx * bp.tileSize, ty * bp.tileSize, bp.tileSize,
                                         bp.tileSize));
-        // Without the translucent renderers (veils), as the occluder spheres.
+        // Without the translucent renderers (veils), as the occluder spheres,
+        // and without the primitives that have no normal (occluder pass).
         Scene::DrawFilter df;
         df.kind = Scene::DrawFilter::DF_BACKGROUND;
         Scene::AutoDrawFilter adf(pScene.get(), df);
+        pdc->setOccluderPass(true);
         pScene->display(pdc);
+        pdc->setOccluderPass(false);
     }
     m_pDepthAtlas->unbind();
     pdc->setProjMat(savedProj);
@@ -258,7 +282,7 @@ bool AmbientProbeVolume::update(gfx::DisplayContext *pdc, const ScenePtr &pScene
     LOG_DPRINTLN("AO probes (GPU, %s): %d spheres (collected in %.0f ms), %dx%dx%d probes of "
                  "%.1f A, baked in %.0f ms (CPU side, GPU not awaited)",
                  settleSec > 0.0 ? "live" : "export", int(sph.size()), collectMs, m_dim[0],
-                 m_dim[1], m_dim[2], spacing, ms);
+                 m_dim[1], m_dim[2], h, ms);
     return true;
 }
 

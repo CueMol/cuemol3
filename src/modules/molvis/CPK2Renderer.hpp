@@ -85,7 +85,7 @@ namespace molvis {
 
     void objectChanged(qsys::ObjectEvent &ev) override;
 
-    void collectOcclusionSpheres(std::vector<qlib::Vector4D> &out) const override;
+    void collectOccluderBounds(std::vector<qlib::Vector4D> &out) const override;
 
     //////////////////////////////////////////////////////
 

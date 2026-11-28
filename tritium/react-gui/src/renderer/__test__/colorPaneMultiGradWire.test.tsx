@@ -63,7 +63,13 @@ vi.mock('@renderer/features/coloring/PaintSelCell', () => ({
 
 import { ColorPane } from '@renderer/features/coloring/ColorPane'
 import { ContextMenuProvider } from '@renderer/shell/menu/ContextMenuProvider'
-import { mountTree, flushPromises } from '@renderer/__test__/helpers/testHarness'
+import {
+    mountTree,
+    flushPromises,
+    menuLabels,
+    setupPopupMenu,
+    teardownElectronAPI,
+} from '@renderer/__test__/helpers/testHarness'
 import { withPaneEnv } from '@renderer/__test__/helpers/paneEnv'
 
 // jsdom has no ResizeObserver; the histogram strip observes its parent.
@@ -190,6 +196,7 @@ describe('ColorPane multigrad wire', () => {
     })
 
     it('map renderer dropdown offers only Multi-gradient and fires the switch', async () => {
+        const sent = setupPopupMenu(['Multi-gradient coloring'])
         const { cm, container, unmount } = await mountWith({
             ...MAP_REND_MULTIGRAD,
             colormode: 'solid',
@@ -199,20 +206,14 @@ describe('ColorPane multigrad wire', () => {
         ) as HTMLButtonElement
         await act(async () => { trigger.click() })
         await flushPromises()
-        const items = Array.from(
-            document.querySelectorAll('.bp5-menu-item'),
-        )
-        expect(items.map((i) => i.textContent)).toEqual([
-            'Multi-gradient coloring',
-        ])
-        await act(async () => { (items[0] as HTMLElement).click() })
-        await flushPromises()
+        expect(menuLabels(sent[0])).toEqual(['Multi-gradient coloring'])
         expect(cm.invokeService).toHaveBeenCalledWith('setRendererColoring', {
             sceneId: SCENE_ID,
             rendId: REND_ID,
             targetKind: 'renderer',
             coloringId: 'paint-type-multigrad',
         })
+        teardownElectronAPI()
         unmount()
     })
 

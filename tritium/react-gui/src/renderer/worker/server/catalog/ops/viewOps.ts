@@ -24,8 +24,8 @@ export const rotateView = defineOp({
   name: 'rotate_view',
   description:
     'Turn the view about a screen axis: x runs left to right, y bottom to top, z out of the ' +
-    'screen toward the viewer. Use it to show the structure from another side; capture_view ' +
-    'tells you which way it went.',
+    'screen toward the viewer. Use it to show the structure from another side.',
+  toolNote: 'capture_view tells you which way it went.',
   params: {
     axis: enumOf(['x', 'y', 'z'], 'Screen axis to turn about.'),
     angle: real('Angle in degrees; negative turns the other way.'),
@@ -104,10 +104,25 @@ function fittedSlab(ctx: WorkerContext, sceneId: number, viewId: number, objId: 
   return 2 * far * (1 + SLAB_MARGIN)
 }
 
+/** The view's rotation as `[a, x, y, z]` (what `set_view rotation=` takes), or null when unreadable. */
+function viewRotation(ctx: WorkerContext, viewId: number): number[] | null {
+  try {
+    const view = ctx.sceMgr.getView(viewId) as unknown as { rotation: { a: number; x: number; y: number; z: number } } | null
+    if (!view) return null
+    const q = view.rotation
+    const r = (v: number) => Math.round(v * 10000) / 10000
+    return [r(q.a), r(q.x), r(q.y), r(q.z)]
+  } catch {
+    return null
+  }
+}
+
 /** The view's camera as an op reports it. */
 function viewState(ctx: WorkerContext, viewId: number): OpOutcome {
   const x = getViewXform(ctx, { viewId })
   if (!x.ok) return { ok: false, error: VIEW_UNREADABLE }
+  const rotation = viewRotation(ctx, viewId)
+  if (!rotation) return { ok: false, error: VIEW_UNREADABLE }
   const r = (v: number) => Math.round(v * 100) / 100
   return {
     ok: true,
@@ -116,6 +131,7 @@ function viewState(ctx: WorkerContext, viewId: number): OpOutcome {
       slab: r(x.slab),
       distance: r(x.distance),
       center: [r(x.centerX), r(x.centerY), r(x.centerZ)],
+      rotation,
     },
   }
 }
@@ -136,7 +152,7 @@ export const setView = defineOp({
     slab: optional(real('New slab depth in angstroms. Null leaves it.')),
     distance: optional(real('New eye-to-centre distance in angstroms. Null leaves it.')),
     center: optional(vec3('New centre [x, y, z] in angstroms. Null leaves it.')),
-    rotation: optional(quat('New camera rotation as a quaternion [a, x, y, z] (a the scalar part; [1, 0, 0, 0] faces the default way). Null leaves it.')),
+    rotation: optional(quat('New camera rotation as a quaternion [a, x, y, z] (a the scalar part; [1, 0, 0, 0] faces the default way), the order the reply reports it in. A camera file (.qcm) writes its rotation as x, y, z, w instead. Null leaves it.')),
     fitSlab: optional(boolean('True fits the slab to the MolCoord objects. Do not also give slab.')),
     objId: optional(objectId('With fitSlab: fit to this object only. Null fits every MolCoord object.')),
   },
@@ -148,13 +164,13 @@ export const setView = defineOp({
   expose: { tool: 'core', console: true },
   group: 'viewing',
   aliases: [
-    { name: 'view', summary: 'Print the camera: zoom, slab, distance, centre.' },
+    { name: 'view', summary: 'Print the camera: zoom, slab, distance, centre, rotation.' },
     { name: 'slab', order: ['slab'], summary: 'Set the slab depth: slab 30' },
     { name: 'fit_slab', fixed: { fitSlab: true }, order: ['objId'], summary: 'Fit the slab to the MolCoord objects, keeping centre and zoom.' },
   ],
   format(data) {
-    const d = data as { zoom: number; slab: number; distance: number; center: number[] }
-    return [`zoom ${d.zoom}  slab ${d.slab}  distance ${d.distance}  center (${d.center.join(', ')})`]
+    const d = data as { zoom: number; slab: number; distance: number; center: number[]; rotation: number[] }
+    return [`zoom ${d.zoom}  slab ${d.slab}  distance ${d.distance}  center (${d.center.join(', ')})  rotation [${d.rotation.join(', ')}]`]
   },
   run(ctx, args, oc) {
     if (args.fitSlab && args.slab !== null) {

@@ -22,7 +22,11 @@ import { withUndoTxn } from '@renderer/worker/server/services/withUndoTxn';
 import { getSceneOrNull } from '@renderer/worker/server/services/helpers/sceneResolver';
 import { remove as styleRemove, push as stylePush } from '@renderer/worker/server/services/helpers/styleutil';
 import { makeColor } from '@renderer/worker/server/services/helpers/makeColor';
-import { createDefPaintColoring } from '@renderer/worker/server/services/helpers/defPaintColoring';
+import {
+    createDefPaintColoring,
+    PAINT_CHOICE_CUEMOL1,
+    PAINT_CHOICE_CUEMOL2,
+} from '@renderer/worker/server/services/helpers/defPaintColoring';
 import {
     resolveColoringTarget,
     readColormodeValues,
@@ -199,6 +203,38 @@ function seedEmptyGradient(rend: Renderer): void {
     mg.setNodesJSON(JSON.stringify(nodes));
 }
 
+/** Prefix of a coloring id that paints with one palette theme colour. */
+const PAINT_THEME_PREFIX = 'paint-theme-';
+
+/** The `createDefPaintColoring` choice a Paint coloring id asks for (undefined: automatic). */
+function paintChoiceOf(id: string): string | undefined {
+    if (id === 'paint-type-paint-cuemol2') return PAINT_CHOICE_CUEMOL2;
+    if (id === 'paint-type-paint-cuemol1') return PAINT_CHOICE_CUEMOL1;
+    if (id.startsWith(PAINT_THEME_PREFIX)) return id.substring(PAINT_THEME_PREFIX.length);
+    return undefined;
+}
+
+/**
+ * Give the target a fresh PaintColoring built for the molecule it draws (the
+ * target is the object itself, or a renderer drawing it), in one undo txn.
+ */
+function applyPaintChoice(
+    ctx: WorkerContext,
+    scene: Scene,
+    rend: Renderer,
+    args: SetRendererColoringArgs,
+    choice: string | undefined,
+): void {
+    withUndoTxn(scene, 'Change coloring', () => {
+        const molUid = args.targetKind === 'object' ? args.rendId : rend.getClientObjID();
+        const coloring = createDefPaintColoring(ctx, scene.uid, molUid, choice);
+        if (!coloring) return;
+        recordColoringChoice(ctx, scene.uid, args);
+        forceMoleculeColormode(scene, rend);
+        (rend as unknown as MolRenderer).coloring = coloring;
+    });
+}
+
 /** The coloring ids set_renderer_coloring takes as its mode. */
 const OP_COLORING_MODES: ReadonlySet<string> = new Set([
     'paint-type-cpk',
@@ -218,6 +254,11 @@ const OP_COLORING_MODES: ReadonlySet<string> = new Set([
 function recordColoringChoice(ctx: WorkerContext, sceneId: number, args: SetRendererColoringArgs): void {
     const id: string = args.coloringId;
     const target = coloringOpTarget(args);
+    const paintColor = paintChoiceOf(id);
+    if (paintColor !== undefined) {
+        recordOp(ctx, sceneId, 'set_renderer_coloring', { ...target, mode: 'paint-type-paint', styleName: null, paintColor }, ['nodeId']);
+        return;
+    }
     if (OP_COLORING_MODES.has(id)) {
         recordOp(ctx, sceneId, 'set_renderer_coloring', { ...target, mode: id, styleName: null }, ['nodeId']);
         return;
@@ -268,6 +309,13 @@ export function setRendererColoring(
         return { ok: true };
     }
 
+    if (args.coloringId.startsWith(PAINT_THEME_PREFIX)) {
+        const color = args.coloringId.substring(PAINT_THEME_PREFIX.length);
+        if (!color) return { ok: false };
+        applyPaintChoice(ctx, scene, rend, args, color);
+        return { ok: true };
+    }
+
     switch (args.coloringId) {
         case 'paint-type-bfac':
             withUndoTxn(scene, 'Change coloring', () => {
@@ -282,19 +330,12 @@ export function setRendererColoring(
             });
             return { ok: true };
         case 'paint-type-paint':
-            // UXP `createDefPaintColoring`: the Default entry seeds the four
-            // secondary-structure rows rather than handing back an empty
-            // table, which read as "the menu did nothing".
-            withUndoTxn(scene, 'Change coloring', () => {
-                // The molecule's own palette colour: the target is the object
-                // itself, or a renderer drawing it.
-                const molUid = args.targetKind === 'object' ? args.rendId : rend.getClientObjID();
-                const coloring = createDefPaintColoring(ctx, scene.uid, molUid);
-                if (!coloring) return;
-                recordColoringChoice(ctx, scene.uid, args);
-                forceMoleculeColormode(scene, rend);
-                (rend as unknown as MolRenderer).coloring = coloring;
-            });
+        case 'paint-type-paint-cuemol2':
+        case 'paint-type-paint-cuemol1':
+            // UXP `createDefPaintColoring`: seed the secondary-structure rows
+            // rather than hand back an empty table, which read as "the menu
+            // did nothing".
+            applyPaintChoice(ctx, scene, rend, args, paintChoiceOf(args.coloringId));
             return { ok: true };
         case 'paint-type-cpk':
         case 'paint-type-cpk-darkgray':

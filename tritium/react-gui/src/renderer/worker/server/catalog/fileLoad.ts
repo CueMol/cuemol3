@@ -18,6 +18,8 @@ import { getCompatibleRendererNames } from '@renderer/worker/server/services/fil
 import { getOpenFilters } from '@renderer/worker/server/services/file/getOpenFilters'
 import { buildHeadlessFileOpenOptions } from '@renderer/worker/server/services/file/headlessOpen'
 import { loadObject } from '@renderer/worker/server/services/file/loadObject'
+import { defaultRendererName, type RendNameScope } from '@renderer/worker/server/services/rend/defaultRendererName'
+import { getSceneOrNull } from '@renderer/worker/server/services/helpers/sceneResolver'
 import { OBJREADER_CATEGORY } from '@renderer/worker/server/services/helpers/pickReaderName'
 import type { WorkerContext } from '@renderer/worker/server/types/WorkerContext'
 import type { FormatOptions, MapCenterPolicy, RendererOptions } from '@renderer/worker/shared/fileOpenTypes'
@@ -114,12 +116,25 @@ export const LOAD_RENDERER_PARAMS = {
   ),
 }
 
-/** Write the renderer arguments a load op was given over the dialog's defaults. */
-export function applyRendererArgs(renderer: RendererOptions, args: Partial<LoadArgs>): void {
-  if (args.rendererName != null) renderer.rendererName = args.rendererName
+/**
+ * Write the renderer arguments a load op was given over the dialog's defaults.
+ * An unnamed renderer is then named the way the GUI names it (scene-wide
+ * unique, after the preset or type finally chosen), so the op and the dialog
+ * give the same name. An op's load must create that renderer
+ * (`requireRenderer`): a preset or type the object cannot have fails the
+ * load rather than leaving a molecule nobody can see.
+ */
+export function applyRendererArgs(
+  renderer: RendererOptions,
+  args: Partial<LoadArgs>,
+  scene: RendNameScope | null,
+): void {
+  renderer.requireRenderer = true
   if (args.preset != null) renderer.presetName = args.preset
   if (args.centerView != null) renderer.centerView = args.centerView
   if (args.mapCenterPolicy != null) renderer.mapCenterPolicy = args.mapCenterPolicy
+  if (args.rendererName != null) renderer.rendererName = args.rendererName
+  else if (scene) renderer.rendererName = defaultRendererName(scene, renderer)
 }
 
 /**
@@ -142,7 +157,7 @@ export function loadObjectFile(
     selection: args.selection,
     filePath: target.filePath,
   })
-  applyRendererArgs(options.renderer, args)
+  applyRendererArgs(options.renderer, args, getSceneOrNull(ctx, oc.sceneId) as unknown as RendNameScope | null)
   if (adjust) {
     const format = adjust(options.format)
     if ('error' in format) return { ok: false, error: format.error }

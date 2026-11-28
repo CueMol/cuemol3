@@ -36,11 +36,24 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import * as readline from 'node:readline'
 import { fileURLToPath } from 'node:url'
-import { displayWidth, layoutSections, menuText, moveMenu, sectionRows } from '@cuemol/console-kit'
+import {
+  backspaceSearch,
+  displayWidth,
+  layoutSections,
+  menuText,
+  moveMenu,
+  repeatSearch,
+  searchLine,
+  searchPrompt,
+  sectionRows,
+  startSearch,
+  typeSearch,
+} from '@cuemol/console-kit'
 import type {
   CandidateKind,
   CompletionMenu,
   GridSection,
+  HistorySearch,
   MenuMove,
   ConsoleCompleteResponse,
   ConsoleDialectId,
@@ -137,11 +150,13 @@ function visibleLength(text: string): number {
 /** A candidate's colour, after ls: directories, programs, links. */
 const KIND_STYLE: Partial<Record<CandidateKind, string>> = { dir: STYLE.dir, exec: STYLE.green, link: STYLE.cyan }
 
-/** A readline Interface with the internals Tab's menu takes over. */
+/** A readline Interface with the internals Tab's menu and Ctrl-R take over. */
 type MenuInterface = readline.Interface & {
   _ttyWrite(s: string | undefined, key: readline.Key | undefined): void
   line: string
   cursor: number
+  /** The lines entered, newest first. */
+  history: string[]
 }
 
 /**
@@ -155,8 +170,17 @@ type MenuInterface = readline.Interface & {
  * line, so the prompt never moves; a list taller than the screen shows the
  * rows around the selection. Keys reach readline through `_ttyWrite`, which
  * this wraps to see them first.
+ *
+ * Ctrl-R searches the history here too (@cuemol/console-kit historySearch.ts,
+ * as the panel does), with its `bck-i-search:` line in the same place under
+ * the prompt. Both live in this one wrapper: two wrappers each seeing keys
+ * first would fight over Tab, the lines under the prompt and the keys this
+ * writes itself. Ctrl-R closes a list; Tab in a search ends it and
+ * completes; Ctrl-C in a search only ends it (on an empty prompt it would
+ * otherwise quit). After a search Up does not go on from the match: Node's
+ * readline starts its own prefix search on Up, which skips the older lines.
  */
-function installCompletion(rl: MenuInterface, complete: (line: string) => Promise<ConsoleCompleteResponse>): void {
+function installCompletion(rl: MenuInterface, complete: (line: string, rest: string) => Promise<ConsoleCompleteResponse>): void {
   const out = process.stdout
   const ttyWrite = rl._ttyWrite.bind(rl)
   /** Lines drawn under the prompt. */
@@ -165,6 +189,9 @@ function installCompletion(rl: MenuInterface, complete: (line: string) => Promis
   let menu: { view: CompletionMenu; rest: string; sections: GridSection[] } | null = null
   /** Set while this writes the line itself, so those keys go straight to readline. */
   let writing = false
+  /** Ctrl-R in progress, and the pattern the last one ended with. */
+  let search: HistorySearch | null = null
+  let lastPattern = ''
 
   const clear = () => {
     if (rows === 0) return
@@ -184,6 +211,11 @@ function installCompletion(rl: MenuInterface, complete: (line: string) => Promis
   const setHead = (head: string, rest: string) => {
     if (head.endsWith(', ') && /^\s*,/.test(rest)) head = head.slice(0, -2)
     else if (head.endsWith(' ') && /^\s/.test(rest)) head = head.slice(0, -1)
+    setLine(head, rest)
+  }
+
+  /** Make the line `head + rest`, with the cursor between them. */
+  const setLine = (head: string, rest: string) => {
     if (head + rest === rl.line && rl.cursor === head.length) return
     writing = true
     try {
@@ -198,9 +230,10 @@ function installCompletion(rl: MenuInterface, complete: (line: string) => Promis
 
   /** The list as screen lines, and which one holds the selection. */
   const listLines = (): { lines: string[]; at: number } => {
-    const lines = notes.map((e) =>
+    const lines = search ? [searchPrompt(search)] : []
+    lines.push(...notes.map((e) =>
       e.kind === 'error' ? sgr(STYLE.red, e.text) : e.kind === 'warning' ? sgr(STYLE.yellow, e.text) : e.text,
-    )
+    ))
     let at = -1
     if (menu) {
       const { view, sections } = menu
@@ -257,7 +290,7 @@ function installCompletion(rl: MenuInterface, complete: (line: string) => Promis
   const tab = () => {
     const line = rl.line.slice(0, rl.cursor)
     const rest = rl.line.slice(rl.cursor)
-    complete(line)
+    complete(line, rest)
       .then((res) => {
         // Typed on while asking: the answer is for a line that is gone.
         if (rl.line.slice(0, rl.cursor) !== line) return
@@ -278,11 +311,42 @@ function installCompletion(rl: MenuInterface, complete: (line: string) => Promis
       .catch(() => {})
   }
 
+  /** Show a search's line, the cursor at its match, and its status line. */
+  const showSearch = (next: HistorySearch) => {
+    search = next
+    const { line, caret } = searchLine(next, rl.history)
+    setLine(line.slice(0, caret), line.slice(caret))
+    draw()
+  }
+
+  /** End the search; `keep` leaves its line, else the line it started from comes back. */
+  const endSearch = (keep: boolean) => {
+    if (!search) return
+    if (search.pattern !== '') lastPattern = search.pattern
+    const original = search.original
+    search = null
+    if (!keep) setLine(original, '')
+    close()
+  }
+
   const ARROWS: Record<string, MenuMove> = { up: 'up', down: 'down', left: 'left', right: 'right' }
 
   rl._ttyWrite = (str, key) => {
     if (writing || !key) return ttyWrite(str, key)
     const plain = !key.ctrl && !key.meta
+    if (search) {
+      if (key.ctrl && !key.meta && key.name === 'r') return showSearch(repeatSearch(search, rl.history, lastPattern))
+      if (key.name === 'escape' || (key.ctrl && (key.name === 'g' || key.name === 'c'))) return endSearch(false)
+      if (key.name === 'backspace' && plain) return showSearch(backspaceSearch(search))
+      if (plain && typeof str === 'string' && str.length === 1 && str >= ' ') return showSearch(typeSearch(search, str, rl.history))
+      // Any other key keeps the match and does what it does (Tab completes, Enter runs).
+      endSearch(true)
+    } else if (key.ctrl && !key.meta && key.name === 'r') {
+      close()
+      search = startSearch(rl.line)
+      draw()
+      return
+    }
     if (key.name === 'tab' && plain) {
       if (menu) walk(key.shift ? 'prev' : 'next')
       else if (!key.shift) tab()
@@ -566,8 +630,8 @@ async function interactive(appInfo: ConsoleInfoResponse | null): Promise<number>
     historySize: HISTORY_SIZE,
     removeHistoryDuplicates: true,
   })
-  installCompletion(rl as MenuInterface, (line) =>
-    post<ConsoleCompleteResponse>('/console/complete', { dialect: session.dialect, line, cwd: session.cwd }),
+  installCompletion(rl as MenuInterface, (line, rest) =>
+    post<ConsoleCompleteResponse>('/console/complete', { dialect: session.dialect, line, rest, cwd: session.cwd }),
   )
   const prompt = () => {
     rl.setPrompt(promptText())

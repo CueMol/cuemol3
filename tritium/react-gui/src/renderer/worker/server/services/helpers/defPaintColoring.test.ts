@@ -26,7 +26,7 @@ vi.mock('@renderer/worker/server/services/scene/listSceneObjects', () => ({
   listSceneObjects: () => ({ objects: objects.list }),
 }))
 
-import { createDefPaintColoring } from './defPaintColoring'
+import { createDefPaintColoring, listPaintThemes } from './defPaintColoring'
 
 /** Global themes: okabeito with two colours, tolbright with three (#0n0000 for the n-th). */
 const GLOBAL = ['okabeito_1', 'okabeito_2', 'tolbright_3', 'tolbright_1', 'tolbright_2', 'Red']
@@ -114,5 +114,39 @@ describe('the default painting', () => {
       '*': 'FloralWhite',
     })
     expect(legacy.setColor).not.toHaveBeenCalled()
+  })
+
+  it("paints a menu choice: a theme colour as the main colour, or CueMol2's colours in any look", () => {
+    const chosen = makeCtx('okabeito')
+    createDefPaintColoring(chosen.ctx, 1, 20, 'tolbright_3')
+    expect(painted(chosen.append).nucleic).toBe('tolbright_3{mod_h:15}')
+    expect(chosen.setColor.mock.calls.map((c) => c[0])).toEqual(['tolbright_3'])
+
+    const cm2 = makeCtx('okabeito')
+    createDefPaintColoring(cm2.ctx, 1, 20, 'cuemol2')
+    expect(painted(cm2.append).helix).toBe('khaki')
+  })
+})
+
+describe('the themes the Paint coloring menu offers', () => {
+  it('lists labelled themes that have colours, the default theme first, with colour names', () => {
+    const labels: Record<string, string> = {
+      okabeito: 'Okabe-Ito', tolbright: 'Tol bright', empty: 'Empty', okabeito_1: 'Orange',
+    }
+    const ctx = {
+      styleMgr: {
+        getStrDataDefsJSON: () => JSON.stringify(['tolbright', 'okabeito', 'empty']),
+        getStrData: (cat: string, key: string) => (cat === 'palette' ? 'okabeito' : labels[key]),
+        getColorDefsJSON: () => JSON.stringify(GLOBAL),
+        getColor: () => ({ r: () => 255, g: () => 0, b: () => 16 }),
+      },
+    } as unknown as WorkerContext
+    const themes = listPaintThemes(ctx, 1)
+    expect(themes.map((t) => [t.theme, t.label, t.colors.map((c) => c.name)])).toEqual([
+      ['okabeito', 'Okabe-Ito', ['okabeito_1', 'okabeito_2']],
+      ['tolbright', 'Tol bright', ['tolbright_1', 'tolbright_2', 'tolbright_3']],
+    ])
+    expect(themes[0].colors[0]).toEqual({ name: 'okabeito_1', hex: '#ff0010', label: 'Orange' })
+    expect(themes[0].colors[1].label).toBe('')
   })
 })

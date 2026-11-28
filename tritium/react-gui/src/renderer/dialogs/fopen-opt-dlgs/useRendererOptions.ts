@@ -53,7 +53,10 @@ const MAP_CENTER_POLICIES: readonly MapCenterPolicy[] = ['auto', 'setMapCenter',
 function viewPrefs(host: RendererOptionsHost) {
     return createDialogPrefs<ViewPrefs>({
         key: `cuemol2.ui.histories.renderer_options.${host}`,
-        defaults: { centerView: true, mapCenterPolicy: 'auto' },
+        // A loaded file is centred on; a renderer added to a molecule already
+        // on screen keeps the view the user is looking at, until they choose
+        // otherwise (the choice is then remembered).
+        defaults: { centerView: host === 'fileOpen', mapCenterPolicy: 'auto' },
         fields: { centerView: isBool, mapCenterPolicy: isOneOf(MAP_CENTER_POLICIES) },
     });
 }

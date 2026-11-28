@@ -10,7 +10,7 @@ using namespace qsys;
 
 MouseEventHandler::MouseEventHandler()
      : m_prevPt_x(0), m_prevPt_y(0), m_startPt_x(0), m_startPt_y(0),
-       m_prevClickTime(0),
+       m_prevClickTime(0), m_nPrevClickBtn(0), m_prevClick_x(0), m_prevClick_y(0),
        m_nState(DRAG_NONE)
 {
   m_cbuf.set_capacity(EVENTBUF_SIZE);
@@ -90,12 +90,20 @@ bool MouseEventHandler::buttonUp(InDevEvent &ev)
     MB_DPRINTLN("buttonUp> state=%d", m_nState);
   if (m_nState==DRAG_CHECK) {
     const qlib::time_value currt = qlib::EventManager::sGetCurrentTime();
-    const qlib::time_value del_t = currt - m_prevClickTime;
-    MB_DPRINTLN("prev %f currt %f del_t %f", double(m_prevClickTime), double(currt), double(del_t));
+    const int btn = ev.getModifier() &
+      (InDevEvent::INDEV_LBTN | InDevEvent::INDEV_MBTN | InDevEvent::INDEV_RBTN);
+    const int xx = ev.getX();
+    const int yy = ev.getY();
 
-    if (del_t<qlib::time_value(DBLCLICK_TIME)) {
-      MB_DPRINTLN("del_t %f < DBLCLICK_TIME %f", double(del_t), double(DBLCLICK_TIME));
+    // A double click is a second click of the same button, at about the same
+    // place, soon after the first one.
+    const bool bDbl = m_prevClickTime != qlib::time_value(0) &&
+      currt - m_prevClickTime < qlib::time_value(DBLCLICK_TIME) &&
+      btn == m_nPrevClickBtn &&
+      qlib::abs<int>(xx - m_prevClick_x) <= DBLCLICK_DIST &&
+      qlib::abs<int>(yy - m_prevClick_y) <= DBLCLICK_DIST;
 
+    if (bDbl) {
       // Mouse button doubleclicked
       if (ev.isLButtonOn())
         ev.setType(InDevEvent::INDEV_LBTN_DBLCLICK);
@@ -107,9 +115,10 @@ bool MouseEventHandler::buttonUp(InDevEvent &ev)
         LOG_DPRINTLN("buttonUp dblclk> ERROR: unknown btnclick (%d)", ev.getModifier());
         ev.setType(InDevEvent::INDEV_LBTN_DBLCLICK);
       }
+      // The double click consumes the first click: a third click starts over.
+      m_prevClickTime = qlib::time_value(0);
     }
     else {
-        MB_DPRINTLN("del_t %f >= DBLCLICK_TIME %f", double(del_t), double(DBLCLICK_TIME));
       // Mouse button clicked
       if (ev.isLButtonOn())
         ev.setType(InDevEvent::INDEV_LBTN_CLICK);
@@ -121,8 +130,11 @@ bool MouseEventHandler::buttonUp(InDevEvent &ev)
         LOG_DPRINTLN("buttonUp> ERROR: unknown btnclick (%d)", ev.getModifier());
         ev.setType(InDevEvent::INDEV_LBTN_CLICK);
       }
+      m_prevClickTime = currt;
+      m_nPrevClickBtn = btn;
+      m_prevClick_x = xx;
+      m_prevClick_y = yy;
     }
-    m_prevClickTime = currt;
   }
   else if (m_nState == DRAG_DRAG) {
     // mouse drag has been initiated

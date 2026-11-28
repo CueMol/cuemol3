@@ -10,7 +10,8 @@
  *     focus routing happens downstream in editClipboard;
  *   - a disabled item (no scene for Save) and a non-matching chord do nothing;
  *   - while a modal is open only the text-edit items get through;
- *   - an IME-composing key is left alone;
+ *   - an IME-composing key is left alone, and so is a key an element around
+ *     the target claims (`data-own-keys`: the console's Ctrl+R);
  *   - on macOS nothing is installed (the native menu owns the keys).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -129,6 +130,21 @@ describe('useMenuKeyBindings on Windows', () => {
     unmount = h.unmount
     expect(press(host, 's', { ctrlKey: true })).toBe(false)
     expect(dispatched).toEqual([])
+  })
+
+  it('leaves a key claimed where it is typed (the console prompt\'s Ctrl+R) to that element', () => {
+    const { h, dispatched } = mount('win32')
+    unmount = h.unmount
+    const prompt = document.createElement('div')
+    prompt.setAttribute('data-own-keys', 'ctrl+r')
+    const field = document.createElement('textarea')
+    prompt.append(field)
+    document.body.append(prompt)
+    expect(press(field, 'r', { ctrlKey: true })).toBe(false)
+    expect(dispatched).toEqual([])
+    // Elsewhere it is still Reload Scene.
+    expect(press(host, 'r', { ctrlKey: true })).toBe(true)
+    expect(dispatched).toHaveLength(1)
   })
 
   it('ignores a chord that is not an accelerator, and a bare key', () => {

@@ -17,7 +17,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { WorkerContext } from '@renderer/worker/server/types/WorkerContext'
 import { services } from '@renderer/worker/server/services/select/select.service'
 
-const { getMolChains, getMolResidues, getMolAtoms } = services
+const { getMolChains, getMolResidues, getMolAtoms, getMolStructInfo } = services
 
 interface FakeObj {
     /** Set when the object should pass the MolCoord-like probe. */
@@ -291,5 +291,45 @@ describe('getMolAtoms — residue atom enumeration', () => {
                 residueIndex: '10',
             }),
         ).toEqual({ ok: false, atoms: [] })
+    })
+})
+
+describe('getMolStructInfo -- the Properties page of a residue / atom', () => {
+    it('reads an atom\'s values and a residue\'s secondary structure, and says not-found for a part that is gone', () => {
+        const atom = {
+            name: 'CA', element: 'C', chainName: 'A', residIndex: '49', residName: 'ALA',
+            confid: 'B', pos: { x: 1.5, y: -2, z: 3.25 }, bfac: 12.5, occ: 0.5,
+        }
+        const props: Record<string, string> = { secondary: 'helix', secondary2: 'Gs' }
+        const residue = {
+            sindex: '49', name: 'ALA',
+            getAtomsJSON: () => '[{"id":1},{"id":2}]',
+            getPropStr: (n: string) => props[n] ?? '',
+            getAtom: (n: string) => (n === 'CA' ? atom : null),
+        }
+        const chain = { getResidue: (i: string) => (i === '49' ? residue : null), getResidsJSON: () => '[]' }
+        const mol = {
+            getChainsJSON: () => '["A"]',
+            getChain: (n: string) => (n === 'A' ? chain : null),
+            getAtomByID: (id: number) => (id === 7 ? atom : null),
+        }
+        const { scene } = makeScene({ sceneDataJSON: '', objects: { 11: mol } })
+        const ctx = makeCtx({ 100: scene })
+
+        const a = getMolStructInfo(ctx, { sceneId: 100, molId: 11, target: { kind: 'atom', chain: 'A', index: '49', atomId: 7 } })
+        expect(a).toEqual({
+            ok: true,
+            info: {
+                kind: 'atom', id: 7, name: 'CA', element: 'C', chain: 'A', residueIndex: '49', residueName: 'ALA',
+                altloc: 'B', pos: [1.5, -2, 3.25], bfac: 12.5, occ: 0.5,
+            },
+        })
+
+        const r = getMolStructInfo(ctx, { sceneId: 100, molId: 11, target: { kind: 'resid', chain: 'A', index: '49' } })
+        expect(r).toMatchObject({ ok: true, info: { kind: 'resid', atomCount: 2, secondary: 'helix', secondary2: 'Gs', hasCA: true } })
+
+        // Deleted atom: the inspector empties on not-found.
+        const gone = getMolStructInfo(ctx, { sceneId: 100, molId: 11, target: { kind: 'atom', chain: 'A', index: '49', atomId: 8 } })
+        expect(gone).toMatchObject({ ok: false, code: 'not-found' })
     })
 })

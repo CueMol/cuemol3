@@ -106,6 +106,12 @@ void main()
     if (bEdge || v_hitName == 0u) discard;
     o_Pick = uvec4(u_rend_idx, v_hitName, u_outer_name, 0u);
 #else
+    // The silhouette ring and a material lit by the ambient light alone are
+    // drawn without a normal: no AO, no tone curve, and no occluder in the
+    // occluder-only pass (the probe bake).
+    bool noNormal = bEdge || isAmbientOnlyLight();
+    if (noNormal && isOccluderPass()) discard;
+
     // color calculation
     vec4 color;
     if (bEdge) {
@@ -121,7 +127,7 @@ void main()
 
     // Eye-space sphere normal (sentinel on the silhouette edge ring).
     // Length encodes the ambient fraction (AO applies to the ambient only).
-    o_Normal = bEdge ? vec4(0.0, 0.0, 0.0, 1.0) : encodeNormalAmbient(normal, g_ambientFraction);
-    o_Material = bEdge ? vec4(0.0) : encodeMaterial();
+    o_Normal = noNormal ? vec4(0.0, 0.0, 0.0, 1.0) : encodeNormalAmbient(normal, g_ambientFraction);
+    o_Material = noNormal ? vec4(0.0) : encodeMaterial();
 #endif
 }

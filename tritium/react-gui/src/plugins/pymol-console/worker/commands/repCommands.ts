@@ -29,7 +29,7 @@ import type { SceneTreeNode } from '@renderer/worker/shared/sceneTreeTypes'
 import type { SceneObjectEntry } from '@renderer/worker/server/services/scene/listSceneObjects'
 import type { WorkerContext } from '@renderer/worker/server/types/WorkerContext'
 import type { CmdContext, CmdOutcome, PymCommand } from './types'
-import { OWNED, isAllSelection, moleculeSelections, molecules, renderersOf, runOp, setMolSelection, setVisible } from './helpers'
+import { OWNED, isAllSelection, moleculeSelections, molecules, renderersOf, runOp, setVisible } from './helpers'
 import type { MoleculeSelection } from './helpers'
 import { removeConsoleLabels, setConsoleLabelsVisible } from './labelCommands'
 import { interpretShortcut } from '@plugins/console/worker/dialect-api'
@@ -124,18 +124,6 @@ function readProp(
   if (!props.ok) return null
   const entry = props.entries.find((e) => e.key === propName)
   return entry === undefined ? null : String(entry.value)
-}
-
-/**
- * A molecule's own selection, as an expression ('' when it has none), so a
- * command that has to set it can put it back.
- */
-function readMolSelection(ctx: WorkerContext, sceneId: number, molId: number): string {
-  const props = getGenericProps(ctx, { sceneId, nodeId: molId, nodeType: 'object' })
-  if (!props.ok) return ''
-  const entry = props.entries.find((e) => e.key === 'sel')
-  const value = entry?.value
-  return value === null || value === undefined ? '' : String(value)
 }
 
 /** Write a renderer's selection expression (`set_renderer_selection`). */
@@ -439,13 +427,10 @@ const color: PymCommand = {
 
     let painted = 0
     for (const { obj, selStr } of sels.items) {
-      // add_paint reads its region from the molecule's selection, which it
-      // sets; what the user had selected is put back afterwards.
-      const before = readMolSelection(ctx, cc.sceneId, obj.uid)
-      let attempted = false
+      // add_paint paints the expression itself; the molecule's selection
+      // (what the user had selected) is not touched.
       for (const rend of renderersOf(ctx, cc.sceneId, obj.uid)) {
         if (!rend.name.startsWith(OWNED)) continue
-        attempted = true
         // add_paint switches the renderer to paint colouring only when it is
         // not one already, so earlier colours stay.
         const res = await runOp(ctx, cc, 'add_paint', {
@@ -456,7 +441,6 @@ const color: PymCommand = {
         })
         if (res.ok) painted += 1
       }
-      if (attempted) await setMolSelection(ctx, cc, obj.uid, before)
     }
     if (painted === 0) {
       return {

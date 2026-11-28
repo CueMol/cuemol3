@@ -44,6 +44,7 @@ export interface SceneCtxPayload {
     clipboardKind: 'object' | 'renderer' | 'style' | 'camera' | null
     supportsColoring: boolean
     paintStyles: { name: string; label: string }[]
+    paintThemes: { label: string; colors: { name: string; hex: string; label: string }[] }[]
     canPaint: boolean
     rendStyle?: {
         typeStyles: { name: string; label: string; pattern: string; flags: string }[]
@@ -98,6 +99,7 @@ export async function buildSceneCtxPayload(
 
     // Pre-fetch renderer-specific submenu data in parallel.
     let paintStyles: { name: string; label: string }[] = []
+    let paintThemes: SceneCtxPayload['paintThemes'] = []
     let canPaint = false
     let rendStyle: SceneCtxPayload['rendStyle'] | undefined
     let rendChangeTypes: string[] = []
@@ -121,6 +123,7 @@ export async function buildSceneCtxPayload(
                 coloringPromises[0], coloringPromises[1], stylePromise, changeTypesPromise,
             ])
             paintStyles = styles?.entries ?? []
+            paintThemes = styles?.themes ?? []
             canPaint = paintInfo?.canPaint === true
             if (styleEntries?.ok) {
                 rendStyle = {
@@ -183,6 +186,7 @@ export async function buildSceneCtxPayload(
         clipboardKind,
         supportsColoring,
         paintStyles,
+        paintThemes,
         canPaint,
         rendStyle,
         bgColor,

@@ -5,13 +5,14 @@
 import type { WorkerContext } from '@renderer/worker/server/types/WorkerContext';
 import type { ObjReader } from '@cuemol/core/src/wrappers/ObjReader';
 import type { FileOpenOptions } from '@renderer/worker/shared/fileOpenTypes';
+import { removeUnrendered, requiredRendererError } from '../rend/requiredRenderer';
 import { setupRenderer } from '../rend/setupRenderer';
 import { undoTxnResult } from '../withUndoTxn';
 import { streamFetchToReader, cancelStream } from '@renderer/worker/server/services/helpers/streamFetchToReader';
 import { applyReaderOptions } from '@renderer/worker/server/services/helpers/applyReaderOptions';
 import { fail, failFrom, ok, type Result } from '@renderer/worker/shared/result';
 import { getSceneOrNull } from '@renderer/worker/server/services/helpers/sceneResolver';
-import { formatLoad, recordOp } from '@renderer/worker/server/actions/serviceOps';
+import { formatLoad, recordOp, recordedRendererName } from '@renderer/worker/server/actions/serviceOps';
 import { pickCoordUrl } from '@renderer/worker/shared/pdbUrls';
 import { setPlddtMolColoring } from '@renderer/worker/server/services/coloring/plddtColoring';
 
@@ -70,7 +71,7 @@ function recordFetch(ctx: WorkerContext, sceneId: number, args: StreamLoadFromUr
     const renderer = {
         rendererType: rend.presetName ? null : rend.rendererType || null,
         selection: rend.selectionEnabled ? rend.selection : null,
-        rendererName: rend.presetName || !rend.rendererName ? null : rend.rendererName,
+        rendererName: recordedRendererName(ctx, sceneId, rend),
         preset: rend.presetName ? rend.presetName : null,
         centerView: rend.centerView ? null : false,
     };
@@ -131,6 +132,11 @@ export async function streamLoadFromUrl(
     return undoTxnResult(scene, 'Get PDB', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (obj as any).name = args.objectName;
+        // Before the scene changes (see requiredRenderer.ts).
+        if (args.options.renderer.requireRenderer) {
+            const bad = requiredRendererError(ctx, scene.uid, obj, args.options.renderer);
+            if (bad) return fail(bad, 'invalid-args');
+        }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (scene as any).addObject(obj);
         recordFetch(ctx, scene.uid, args);
@@ -139,7 +145,8 @@ export async function streamLoadFromUrl(
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (obj as any).name = args.options.renderer.objectName;
         }
-        setupRenderer(ctx, obj, args.options.renderer, true);
+        const rend = setupRenderer(ctx, obj, args.options.renderer, true);
+        if (!rend && args.options.renderer.requireRenderer) return removeUnrendered(scene, obj);
         // An AlphaFold model opens coloured by pLDDT (its B-factors), as in
         // ChimeraX: on the molecule, which the default renderers colour from.
         // Part of the fetch: replaying fetch_entry colours it again.

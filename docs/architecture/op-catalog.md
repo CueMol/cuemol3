@@ -96,8 +96,9 @@ dialect の plugin は console の内部を `@plugins/console/worker/dialect-api
 ```ts
 defineOp({
   name, description, params, mutates,
+  toolNote?,                   // モデルにだけ見せる文 (tool と MCP の説明で description の後に足す)
   expose: { tool: 'core' | ToolsetId | false, console: boolean, mcp?: boolean },
-  aliases?: [{ name, fixed?, defaults?, order?, summary? }],
+  aliases?: [{ name, fixed?, defaults?, order?, summary?, group? }],
   group,                       // help の分類 (OP_GROUPS)
   outsideTxn?(args): boolean,  // txn の外で走らせる (例: .qsc の load)。console の文字列でも JSON の値でも呼ばれる
   format?(data): string[],     // console での表示 (無ければ汎用の key: value 表示)
@@ -105,6 +106,11 @@ defineOp({
 })
 ```
 
+- `description` は agent・MCP の tool 説明と console の help で共通。モデルにだけ向けた文 (console に無い
+  `capture_view` を勧める文など) は `toolNote` に書く。tool の説明は `toolDescription(op)` (description の後に
+  空行を挟んで toolNote) で、console の help と Summary は `description` だけを使う。
+- alias の `group` は、op と別の主題で探されるもの (`set_bgcolor` は `set_prop` の alias だが `viewing` に出す)。
+  省くと op の `group`。
 - `OpContext` は `sceneId` / `viewId` / `callId` / `markMutated` / `noteStream` / `streamId` と、
   UI を持つ呼び出し元だけが渡す `openScene`、中断を伝える `cancelled()`、書き込み先の制限
   `fileAccess` (`'any'` = console、既定は desktop のみ。`catalog/outputFile.ts`)。
@@ -114,6 +120,10 @@ defineOp({
   (`catalog/argValues.ts`) で検査する。整数に 1.5、真偽値に `maybe` は、どちらから来ても断る。
   文字列の真偽値・数値は `parseBoolText` / `parseNumberText` (空は数値にしない) で読み、property 値・
   アニメーションの property・reader のオプション・PyMOL dialect も同じ関数を使う。
+- MCP と agent の JSON の引数では、省略できる引数の文字列 `"null"` を null と同じに読む
+  (`readToolArgs(op, input, { nullString: true })`)。モデルは nullable の引数の null を文字列で書くことがあり、
+  自由な文字列の引数ではそれが名前として通ってしまう (`preset: "null"`)。qax の再生はこれをしない
+  (記録の `"null"` は op が実際に受け取った値)。console の native で引用符の無い `null` を省略とするのと揃う。
 - 入力ファイルのパスは `callerPath` (`catalog/outputFile.ts`) で絶対パスにする: `~` は home、相対は
   desktop から (console は自分の cwd で解決済み)。出力の `outputPath` と同じ基準。
 - 一覧の番号は 1 から (`worker/shared/numbered.ts` の `numbered` / `pickByNumber` / `checkPosition` /
@@ -199,7 +209,17 @@ selection を selector として読む) のため)、`complete` (Tab。書き戻
 理由を返した知らないコマンドは、`Warning: <理由>; skipped` と出して飛ばし、残りを実行する (txn はそのまま 1 つ。
 今これを使うのは ChX: [console-chimerax-dialect](console-chimerax-dialect.md) §1)。
 lone `undo` / `redo` と `outsideTxn` のコマンドは txn の外、script は最大 8 段のネスト、Stop で
-ダウンロードも中断。
+ダウンロードも中断。`outsideTxn` のコマンドは他と同じ行・script に置けない (`Error: this <name> must be the
+only command on the line; run it on its own after the script`) が、op が `deferAtEnd` を持つもの
+(`save_scene` だけ) は投入の**末尾**に置ける: runtime はそれを txn の commit 後まで持ち越して順に実行する
+(`runCommand.ts` の `runDeferred`)。図を作って保存するまでを 1 本の script にするため。
+- 持ち越した後に通常のコマンドが来たら `must come at the end of the script` で止める。判定は
+  「持ち越しが空でない状態で通常のコマンドが来た」なので、入れ子の script でも投入全体の末尾かで決まる
+- txn が失敗・中断したら持ち越しは実行しない (保存しない)
+- qax の中 (`<cmd>`) では持ち越さず従来どおりエラー。qax を単独で流す経路は txn ごとに実行し、
+  持ち越しを実行する箇所を通らないため。持ち越しがある状態で qax を実行するのも同じ理由で断る
+- シーンファイルの `load_file` は持ち越さない: worker は `openScene` の要求を返すだけで、窓が開くのは
+  応答の後なので、後続の `save_scene` が開く前のシーンを保存してしまう
 terminal からは thin client `tritium_cli` で同じ runtime を使える (作業ディレクトリは client 側。
 [local-api-server.md](local-api-server.md) §5)。
 
@@ -210,6 +230,11 @@ terminal からは thin client `tritium_cli` で同じ runtime を使える (作
   既定 (`defaults`)・並べ替え (`order`) できる。ユーザー定義のコマンド列とは別物。
 - 引数は PyMOL と同じくカンマ区切り (`zoom 1crn, chain A and resid 10:20`)。selection が空白を
   含むため、空白区切りは採らない。括弧と引用符の中のカンマは区切りにしない (`parser/parseArgs.ts`)。
+- param の説明は JSON の呼び出し元に合わせて書く (`Null leaves it.`、`[x, y, z]`) ので、console もその書き方を
+  受け付ける。省略できる引数に引用符なしの `null` を書くと省略と同じ (bind 直後の文字列で判定するので、
+  引用符付きの `"null"` は `null` という名前のまま)。数値の並び (vec3 / quat) は `x y z` と `[x, y, z]` の
+  どちらでも書ける。逆向きに、記録や Copy as commands でコマンドを書き出す `quoteArg` (`catalog/cmlFormat.ts`)
+  は文字列の `null` を引用符で囲む。
 - 行の読み方は dialect ごと (`ConsoleDialect.syntax`、下記)。native と PyMOL はカンマ文法 (`parser/commaSyntax.ts`)
   を、引数の割り当て規則だけ変えて使う (`rule`、`parser/bindArgs.ts` の `assignArgs`):
   - native は **Python の呼び出しと同じ**: 位置引数は先頭から順に埋まり、名前付き (`name=value`) の後には書けない。
@@ -221,7 +246,7 @@ terminal からは thin client `tritium_cli` で同じ runtime を使える (作
   コマンド (`open_log`) として走り、`1a0m 1crn` という名前の log を書いたことがあるため。省略形は Tab の補完で
   使える (補完の規則は変えない)。PyMOL dialect は PyMOL のとおり省略形で実行する (PyMOL の script が使う)。
 - 主な alias: `show` / `hide`、`select`、`zoom` / `center`、`turn`、`view` / `slab` / `fit_slab`、
-  `load` (`.qsc` は panel が開く) / `fetch`、`set` / `get` (property path)、`props`、`scene`、
+  `load` (`.qsc` は panel が開く) / `fetch`、`set` / `get` (property path)、`set_bgcolor`、`props`、`scene`、
   `count`、`delete` / `rename` / `retype`、`render` (ray tracing / GI。Stop で中断)、
   `save` / `write`、`save_view` / `restore_view` / `cameras`、`projection` / `pan` / `focus`、
   `contour`、`define`、`style`。
@@ -290,7 +315,7 @@ native の生成コマンドは通らない)。worker service は読み取りに
 はその場で ray tracing する。
 
 **panel**: toolbar の CueMol / PyMOL 切り替え、または `native` / `pymol` と打つと切り替わる。
-選択は plugin preference (`console.dialect`)、履歴は dialect ごと (PyMOL は旧 key を引き継ぐ)。
+選択は plugin preference (`console.dialect`)、履歴は dialect ごと (PyMOL は旧 key を引き継ぐ)。`Ctrl-R` で履歴を検索できる ([console-history-search.md](console-history-search.md))。
 
 ## 5.1 コマンド名の規約
 
@@ -330,6 +355,8 @@ op 名 (= console のコマンド名、MCP と agent の tool 名) と alias は
   - 1 語の動詞 (`load`、`save`、`write`、`delete`、`select`、`focus`、`turn`、`render`、`count`)。
   - 名詞だけの alias は「引数なしで表示、引数ありで設定」するものに限る (`scenes`、`cameras`、`props`、
     `scene`、`view`、`slab`、`projection`、`style`、`contour`)。作成や書き出しに名詞の alias は付けない。
+  - op 名と同じ形 (`動詞_目的語`) の alias は、汎用の op の特定の使い方を別の主題に出すときだけ
+    (`set_bgcolor` = `set_prop` の path が `bgcolor`。help の View に出す)。
   - PyMOL の語 (`ray`、`png`) は PyMOL dialect が持ち、native には入れない。
 
 ## 6. 未対応 (範囲外)
@@ -359,13 +386,25 @@ Animation panel と element inspector が使う service をそのまま呼ぶの
 再生・停止・時刻移動は既存の `animate`。
 
 - `list_anims`: 長さ・再生状態・loop・開始カメラと、要素ごとの番号 (1 から)・名前・型・`#uid`・
-  絶対時刻 (相対時刻と追従先)。時刻の参照が解決しないときはその理由。
+  絶対時刻 (相対時刻と追従先)。時刻の参照が解決しないときはその理由。対象 (`rend` / `endcam` / `mol`)
+  が今のシーンで解決しない要素には `[No renderer "x".]` などを添える (保存後に renderer を消した場合など、
+  再生しても何も起きない要素)。
+- `list_anim_props element` (`anim_props`): 要素の property を `set_anim_prop` の名前と型で並べる表
+  (読んだ行をそのまま書き戻せる)。`startMs` / `endMs` は `set_anim_time` で書く相対時刻。見つからない対象には
+  `not found` を添える。inspector の読み出し (`getAnimElementDetail`) を使い、専用の inspector 欄の無い
+  `RealPropAnim` (`rend` / `startValue` / `endValue`) と `RendXformAnim` (`rend`) も読む。
 - `add_anim type [, name] [, before]`: `spin` / `camera` / `show` / `hide` / `slidein` / `slideout` /
   `mol` / `wait`。直前の要素に追従する (panel の追加と同じ)。
 - `remove_anim` / `move_anim element, by|to|end` / `set_anim_time element, startMs, endMs` (追従先からの相対 ms)。
 - `set_anim_prop element, prop, value`: inspector で書ける property (`name`、`timeRefName`、`disabled`、
   `quadric`、`angle`、`axis` (`"0 1 0"`)、`endcam`、`ignore*`、`rend`、`hide`、`fade`、`tgtAlpha`、
   `direction`、`distance`、`mol`、`startValue`、`endValue`)。値は property の型に変換する。
+  `rend` / `endcam` / `mol` は名前を再生時と同じ解決で確かめ、無ければエラーにする
+  (`services/anim/targets.ts` の `findMissingTarget`。C++ は名前を持つだけで再生時に引くので、打ち間違いは
+  黙って何も再生しない)。`rend` はカンマ区切りの `obj/rend` か object 名なしの `rend`
+  (`Object::getRendByName` / `Scene::getRendByName`。renderer group も引ける)、`endcam` は scene のカメラ、
+  `mol` は MorphMol の object。空は「なし」として通す。あとから作る renderer を先に指定したいときは
+  検証しない `set_anim_generic_prop` を使う。
 - `set_anim_options [loop] [, startCamera]`。
 - 要素は `list_anims` の番号、`#uid`、名前で指定する (同名が複数なら番号か uid を求める)。
   `list_morph_frames` などの番号も同じく 1 から。
@@ -382,7 +421,12 @@ dialog・context menu・panel が使う service をそのまま呼ぶ (undo の�
 - `create_group objId [, name]`、`create_surface_from_map rendId` (map の isosurf のみ)、`recalc_surface surfId [, density] [, backend]`
 - `list_interactions` / `remove_interaction rendId, number` (距離・角度・二面角の個別削除)
 - `list_paint` / `set_paint` / `remove_paint` / `move_paint` (paint の各エントリー。原子は最初に一致したエントリーの色)、
-  `add_paint_at nodeId, selection, color [, at]` (`at` 番の前に挿入、null で末尾。`add_paint` と違い selection を変えない)、
+  `add_paint_at nodeId, selection, color [, at]` (`at` 番の前に挿入、null で末尾)、
+  (`add_paint` も含め、paint の op は molecule の selection を変えない。`add_paint` は selection 式を
+  paint service (`paintRendererSelection` / `paintObjectSelection` の `selStr`) に直接渡し、原子に当たるかを
+  先に確かめてから、配色が `PaintColoring` でないときだけ切り替える。判定は配色の class だけで行う: Paint
+  メニューの判定 (`getRendererPaintInfo`) は molecule の選択が空だと偽になるので、それを使うと 2 回目の
+  `add_paint` で配色が作り直され 1 回目の色が消える。GUI の Paint メニューは従来どおり今の選択を塗る)、
   `set_multigrad_nodes rendId, nodes` (`"-1 blue; 0 white; 1 red"`)
 - `set_atom_label objId, atoms, on` (原子 1 つの名前ラベル)、`set_atom_labels objId, selection, format, rendererName` (selection の原子すべてに書式付きの名前ラベル。format が null なら外す。rendererName の `*namelabel` が無ければ DefaultLabel の style で作る。null は navigate tool の名前の無い renderer。PyMOL の `label`)、`measure_selections objId, selections, label` (selection どうし。`"a; b"`)、
   `measure_geometry` の `atomObjects` (2 つ目以降の原子の object。object をまたぐ計測)
@@ -420,7 +464,9 @@ set は名前で指す。同じ名前があれば scene の set を global (syst
 ### 視点・frame・書き出しの op (PyMOL dialect の op 化で足したもの)
 
 - `set_view` の `rotation`: camera の向きを quaternion `[a, x, y, z]` で書く (param 種別 `quat`。`vec3` と同じく
-  console では空白区切り、qax では `a x y z`)。書く順は rotation -> center -> distance -> slab -> zoom
+  console では空白区切りか `[a, x, y, z]`、qax では `a x y z`)。`set_view` (と alias の `view`) の報告は zoom・slab・
+  distance・center に加えて `rotation [a, x, y, z]` (小数 4 桁) を出し、そのまま `rotation=` に貼り戻せる。
+  camera file (`.qcm`) の `rotation` 属性は x, y, z, w の順で、並びが違う (param の説明に書いてある)。書く順は rotation -> center -> distance -> slab -> zoom
   (`setViewXform`)。C++ の `View::setSlabDepth` が slab をその時点の distance の 2 倍までに切り詰めるので、
   distance を先に書かないと遠い視点の slab が欠ける。
 - `focus_nodes nodeIds` (console の `focus`): object・renderer・renderer group を混ぜて、向きを変えずに全部が
@@ -465,6 +511,15 @@ set は名前で指す。同じ名前があれば scene の set を global (syst
     水 -> `simple` (結合の無い原子は十字)。group 名は GUI の preset と同じ命名 (`defaultpym_1`)。
     `rendererType` か `selection` を指定すれば従来どおり renderer 1 本、分子でない object はその object の
     既定 renderer (map なら `contour`)。明示の `preset` はこれより優先する。
+  - load / fetch の op は、指定した renderer (preset・`rendererType`) を必ず作る (`requireRenderer`。
+    `applyRendererArgs` が付ける)。読み取ったオブジェクトがそれを持てるかを、シーンに足す前に確かめる
+    (`services/rend/requiredRenderer.ts`。preset はそのクラスの `-rendpreset`、種類はファイルを開くダイアログと
+    同じ一覧で、内部用の `*group` は含まない)。持てなければシーンを変えずに失敗し、使えるものを
+    `Available: ...` で並べる。シーンに足す前に断るのは、agent のターンのように外側に undo transaction が
+    あると、内側の rollback では足したオブジェクトが残るため。確かめた後で作成が失敗したときは、
+    オブジェクトを `destroyObject` で消してから失敗する。GUI の読み込みは厳密にせず、renderer が作れなくても
+    オブジェクトを残す (DEV_ISSUES 23)。fetch の op の失敗の文言は、ダウンロードの失敗だけに
+    `1EMA could not be downloaded:` を付ける。
     PyMOL との差: organic の nb_spheres、50 原子未満 / 50 万原子超の特例、炭素の object 色は無い。
     GUI の File Open は対象外 (履歴の無いときの初期値は `simple` のまま)。
   - オプションを変えるときは形式ごとの op (console / MCP、agent には出さない)。引数名は `fileOpenTypes.ts` の

@@ -99,9 +99,18 @@ scan** of `AnimMgr`'s current list (`findByUid`).
 ### Inspector integration
 - `useInspectorState` gains an `{kind:'animElement'; sceneId; uid}` target
   (precedent: the bottom Render panel already drives the inspector's non-node
-  `renderSettings` target). `AnimationPanel` emits the selected uid via
-  `onInspectAnimElement`; deletion / scene-switch clears it (panel effect +
-  worker `gone` signal). The PROPCHG listener in `useInspectorState` is gated to
+  `renderSettings` target). `AnimationPanel` opens the element only on a user
+  selection (`selectElement`: a strip or label click -- a re-click reopens it
+  after the Inspector moved elsewhere --, delete-to-neighbour, a paste);
+  an empty-lane click clears it. A timeline refetch never re-shows the element:
+  the timeline is refetched on every scene / camera event too, and re-showing
+  there took the Inspector back from a scene being edited (fixed 2026-11-27).
+  A selected element that leaves the timeline clears the selection and the
+  page (panel effect + worker `gone` signal). A scene switch resets only the
+  panel's selection; the Inspector restores what the new scene was showing,
+  which clearing it would forget. A paste selects what it pasted only if the
+  scene and the selection did not change while it waited on the clipboard and
+  the worker. The PROPCHG listener in `useInspectorState` is gated to
   `kind==='node'`; anim sync lives entirely in the component's SEM_ANIM listener.
 - `AnimElementInspector` self-fetches (the generic bridge can't target an
   AnimObj). An `editingRef` gate keeps an in-progress draft from being clobbered
@@ -321,6 +330,11 @@ read-only (the manager derives it). Editing while playing ends in a pause, as
     `AnimMgrState` and `useAnimEdit` forwards it to `useAnimTransport.adoptMgr`.
     Without that hand-off the header select would show a stale "(none)" whenever
     a transport op had already latched a live snapshot.
+  - The other way round, a refetched timeline whose manager state differs from
+    the last one (compared by value) drops the latched snapshot: it was read
+    after the reply, and an edit that changes the length (an element's
+    duration) fires no transport reply, so the header's total length would
+    otherwise stay at the value of the last play / seek / add.
   - No seeding happens when no view is active (`viewId` omitted).
 
 

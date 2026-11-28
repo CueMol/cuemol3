@@ -30,10 +30,11 @@ function balanced(text: string): boolean {
 /**
  * A value as one console argument: bare when the parser would read it back
  * whole, else in the first quotes it does not contain. The parser has no
- * escapes, so a value holding every kind of quote is shown as JSON.
+ * escapes, so a value holding every kind of quote is shown as JSON. The
+ * string `null` is quoted too: bare, the console reads it as left out.
  */
 export function quoteArg(text: string): string {
-  const plain = text !== '' && text.trim() === text && !/[,;'"#]/.test(text) && balanced(text)
+  const plain = text !== '' && text !== 'null' && text.trim() === text && !/[,;'"#]/.test(text) && balanced(text)
   if (plain) return text
   if (!text.includes('"')) return `"${text}"`
   if (!text.includes("'")) return `'${text}'`

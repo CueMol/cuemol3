@@ -50,3 +50,40 @@ TEST(MouseEventHandler, ClickWithoutDragHasNoVelocity)
     EXPECT_NEAR(up.getVeloX(), 0.0, 1e-9);
     EXPECT_NEAR(up.getVeloY(), 0.0, 1e-9);
 }
+
+namespace {
+
+/// Press and release one button at (x, y) and return the released event type.
+int click(MouseEventHandler &h, int btn, int x, int y)
+{
+    InDevEvent down = at(x, y);
+    down.setModifier(btn);
+    h.buttonDown(down);
+    InDevEvent up = at(x, y);
+    up.setModifier(btn);
+    h.buttonUp(up);
+    return up.getType();
+}
+
+}  // namespace
+
+// A quick click of another button is not the second half of a double click:
+// a left click right after a right click (closing a context menu) stays a click.
+TEST(MouseEventHandler, DoubleClickNeedsTheSameButton)
+{
+    MouseEventHandler h;
+    EXPECT_EQ(click(h, InDevEvent::INDEV_RBTN, 5, 5), InDevEvent::INDEV_RBTN_CLICK);
+    EXPECT_EQ(click(h, InDevEvent::INDEV_LBTN, 5, 5), InDevEvent::INDEV_LBTN_CLICK);
+    // ... nor is a click of the same button far away.
+    EXPECT_EQ(click(h, InDevEvent::INDEV_LBTN, 50, 5), InDevEvent::INDEV_LBTN_CLICK);
+}
+
+// A double click consumes its first click, so a third quick click is a click
+// again (select, then not deselect).
+TEST(MouseEventHandler, ThirdClickAfterDoubleClickIsAClick)
+{
+    MouseEventHandler h;
+    EXPECT_EQ(click(h, InDevEvent::INDEV_LBTN, 5, 5), InDevEvent::INDEV_LBTN_CLICK);
+    EXPECT_EQ(click(h, InDevEvent::INDEV_LBTN, 6, 5), InDevEvent::INDEV_LBTN_DBLCLICK);
+    EXPECT_EQ(click(h, InDevEvent::INDEV_LBTN, 5, 5), InDevEvent::INDEV_LBTN_CLICK);
+}

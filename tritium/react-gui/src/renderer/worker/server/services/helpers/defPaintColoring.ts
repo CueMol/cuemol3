@@ -75,6 +75,20 @@ const LEGACY_PAINT_ENTRIES: { sel: string; color: string }[] = [
     { sel: '*', color: 'FloralWhite' },
 ];
 
+/** CueMol1's default paint (the `WoodyHSCPaint` style of `data/default_style.xml`). */
+const CUEMOL1_PAINT_ENTRIES: { sel: string; color: string }[] = [
+    { sel: 'sheet', color: '#7FFF7F' },
+    { sel: 'helix', color: '#FF7F7F' },
+    { sel: '*', color: '#FFFFBF' },
+];
+
+/**
+ * What a Paint coloring menu item asks for: CueMol2's or CueMol1's fixed
+ * colours, or a theme colour name (`okabeito_3`) to paint the molecule with.
+ */
+export const PAINT_CHOICE_CUEMOL2 = 'cuemol2';
+export const PAINT_CHOICE_CUEMOL1 = 'cuemol1';
+
 /** `#rrggbb` from 0-255 components. */
 function toHex(r: number, g: number, b: number): string {
     return '#' + [r, g, b].map((v) => (v & 0xff).toString(16).padStart(2, '0')).join('');
@@ -99,14 +113,18 @@ function themeColors(ctx: WorkerContext, theme: string): string[] {
         .map((e) => e.name);
 }
 
+/** The name of the theme the scene paints new molecules with ('' when none is set). */
+function defaultThemeName(ctx: WorkerContext, sceneUid: number): string {
+    try {
+        return ctx.styleMgr.getStrData('palette', 'default_paint', sceneUid).trim();
+    } catch {
+        return '';
+    }
+}
+
 /** The colours of the theme the scene paints new molecules with. */
 function currentTheme(ctx: WorkerContext, sceneUid: number): string[] {
-    let theme = '';
-    try {
-        theme = ctx.styleMgr.getStrData('palette', 'default_paint', sceneUid).trim();
-    } catch {
-        theme = '';
-    }
+    const theme = defaultThemeName(ctx, sceneUid);
     const colors = theme === '' ? [] : themeColors(ctx, theme);
     if (colors.length > 0) return colors;
     if (theme !== '') log.warn(`palette theme "${theme}" has no colours; using ${FALLBACK_THEME}`);
@@ -149,6 +167,80 @@ function ensureSceneColor(ctx: WorkerContext, sceneUid: number, name: string): v
     ctx.styleMgr.setColor(name, makeColor(ctx, hex, sceneUid), sceneUid, setId);
 }
 
+/** A style string (`<cat id="key" value="..."/>`), '' when there is none. */
+function strData(ctx: WorkerContext, cat: string, key: string, sceneUid: number): string {
+    try {
+        return ctx.styleMgr.getStrData(cat, key, sceneUid).trim();
+    } catch {
+        return '';
+    }
+}
+
+/** One theme of the Paint coloring menu, with its colours in order. */
+export interface PaintTheme {
+    /** Theme name, the prefix of its colour names (`okabeito`). */
+    theme: string;
+    /** Menu name (`<palette_label>` of the style). */
+    label: string;
+    /**
+     * Colour names (`okabeito_1`, ...), their values in the scene, and their
+     * menu names (`<palette_color_label>`; '' when the style gives none).
+     */
+    colors: { name: string; hex: string; label: string }[];
+}
+
+/**
+ * The themes the Paint coloring menu offers: those with a `<palette_label>`
+ * and at least one colour. The scene's default theme comes first, the rest
+ * by label (the style manager keeps no definition order). A colour's value is
+ * resolved in the scene, so a scene that redefined it shows its own.
+ */
+export function listPaintThemes(ctx: WorkerContext, sceneUid: number): PaintTheme[] {
+    let names: string[] = [];
+    try {
+        names = JSON.parse(ctx.styleMgr.getStrDataDefsJSON('palette_label', 0)) as string[];
+    } catch {
+        names = [];
+    }
+    const themes: PaintTheme[] = [];
+    for (const theme of new Set(names)) {
+        const colors: { name: string; hex: string; label: string }[] = [];
+        for (const name of themeColors(ctx, theme)) {
+            let hex: string;
+            try {
+                const c = ctx.styleMgr.getColor(name, sceneUid);
+                hex = toHex(c.r(), c.g(), c.b());
+            } catch {
+                // An unresolvable colour is left out of the menu.
+                continue;
+            }
+            colors.push({ name, hex, label: strData(ctx, 'palette_color_label', name, sceneUid) });
+        }
+        if (colors.length === 0) continue;
+        const label = strData(ctx, 'palette_label', theme, sceneUid) || theme;
+        themes.push({ theme, label, colors });
+    }
+    const first = defaultThemeName(ctx, sceneUid);
+    return themes.sort((a, b) =>
+        Number(b.theme === first) - Number(a.theme === first) || a.label.localeCompare(b.label));
+}
+
+/** A PaintColoring of fixed colours (CueMol2's or CueMol1's default). */
+function fixedPaintColoring(
+    ctx: WorkerContext,
+    sceneUid: number,
+    entries: { sel: string; color: string }[],
+): PaintColoring | null {
+    const coloring = ctx.svc.createObj('PaintColoring') as PaintColoring;
+    if (!coloring) return null;
+    for (const entry of entries) {
+        const sel = makeSel(ctx, entry.sel, sceneUid);
+        if (!sel) return null;
+        coloring.append(sel, makeColor(ctx, entry.color, sceneUid));
+    }
+    return coloring;
+}
+
 /**
  * Build a `PaintColoring` carrying the default painting of one molecule.
  *
@@ -158,31 +250,34 @@ function ensureSceneColor(ctx: WorkerContext, sceneUid: number, name: string): v
  *   (uid 0) silently fails to resolve, and every caller has a scene in hand,
  *   so a default here would only make that mistake reachable.
  * @param molUid - the molecule painted, which picks its palette colour.
+ * @param choice - a menu choice: `cuemol2` / `cuemol1` for those versions'
+ *   fixed colours, or a theme colour name to paint with. Omitted, the
+ *   colour is picked automatically (as a loaded molecule is painted).
  * @returns the coloring, or null when the object, any selection, or the
  *   palette could not be had (the caller then leaves the coloring alone).
- * @remarks Follows the scene's look: the palette for CueMol3, CueMol2's four
- *   fixed colours for the legacy look.
+ * @remarks Without a choice, follows the scene's look: the palette for
+ *   CueMol3, CueMol2's four fixed colours for the legacy look.
  */
 export function createDefPaintColoring(
     ctx: WorkerContext,
     sceneUid: number,
     molUid: number,
+    choice?: string,
 ): PaintColoring | null {
-    if (sceneLookOf(ctx, sceneUid) === 'cuemol2') {
-        const legacy = ctx.svc.createObj('PaintColoring') as PaintColoring;
-        if (!legacy) return null;
-        for (const entry of LEGACY_PAINT_ENTRIES) {
-            const sel = makeSel(ctx, entry.sel, sceneUid);
-            if (!sel) return null;
-            legacy.append(sel, makeColor(ctx, entry.color, sceneUid));
-        }
-        return legacy;
+    if (choice === PAINT_CHOICE_CUEMOL1) return fixedPaintColoring(ctx, sceneUid, CUEMOL1_PAINT_ENTRIES);
+    if (choice === PAINT_CHOICE_CUEMOL2 || (choice === undefined && sceneLookOf(ctx, sceneUid) === 'cuemol2')) {
+        return fixedPaintColoring(ctx, sceneUid, LEGACY_PAINT_ENTRIES);
     }
-    const theme = currentTheme(ctx, sceneUid);
-    if (theme.length === 0) return null;
+    let base: string;
+    if (choice !== undefined) {
+        base = choice;
+    } else {
+        const theme = currentTheme(ctx, sceneUid);
+        if (theme.length === 0) return null;
+        base = paletteColorOf(ctx, sceneUid, molUid, theme);
+    }
     const coloring = ctx.svc.createObj('PaintColoring') as PaintColoring;
     if (!coloring) return null;
-    const base = paletteColorOf(ctx, sceneUid, molUid, theme);
     ensureSceneColor(ctx, sceneUid, base);
     for (const entry of DEFAULT_PAINT_ENTRIES) {
         const sel = makeSel(ctx, entry.sel, sceneUid);

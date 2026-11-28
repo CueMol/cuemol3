@@ -391,6 +391,14 @@ float fastGIVisibility(vec3 vP, vec3 vN, float searchDistance, int sliceCount, i
                 vec2 suv = ssStart.xy + ssDir.xy * time;
                 float sd = texture(u_depthTex, suv).r;
                 if (sd >= 1.0) continue;  // background
+                // A primitive drawn without a normal (line, label, edge line,
+                // unlit surface) is no occluder: skip it for the occlusion,
+                // the thickness estimate and the bounce alike (the GTAO path
+                // drops these samples the same way).
+                if (u_hasNormal != 0) {
+                    vec3 sn = texture(u_normalTex, suv).xyz;
+                    if (dot(sn, sn) < 0.5) continue;
+                }
 
                 float sViewZ = glViewPos(suv, sd).z;
                 float minThick = pixelDepthThicknessAt(sViewZ, avgPix);

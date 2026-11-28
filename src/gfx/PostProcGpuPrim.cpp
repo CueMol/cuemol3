@@ -148,7 +148,11 @@ void PostProcGpuPrim::drawComposite(DisplayContext *pDC, RenderTarget *sceneRT,
         aoRT->bindColorTex(0, RT_TU_NORMAL);   // AO term on unit 2
         sceneRT->bindDepthTex(RT_TU_DEPTH);    // scene depth for the upsample
     }
-    if (ambientOnly) sceneRT->bindColorTex(1, RT_TU_NOISE);  // normal + ambient fraction
+    // Full-resolution scene normal: the ambient fraction (bitmask AO) and,
+    // for both AO methods, the pixels drawn without a normal (no AO, no tone
+    // curve).
+    const bool hasSceneNormal = aoRT != nullptr && sceneRT->hasNormal();
+    if (hasSceneNormal) sceneRT->bindColorTex(1, RT_TU_NOISE);
     // Material of each pixel (unit 5; the SMAA search texture is not in use).
     const bool hasMaterial = aoRT != nullptr && sceneRT->hasMaterial();
     if (hasMaterial) sceneRT->bindColorTex(2, RT_TU_SMAA_SEARCH);
@@ -179,6 +183,7 @@ void PostProcGpuPrim::drawComposite(DisplayContext *pDC, RenderTarget *sceneRT,
     m_pCompPO->setUniform("u_debugView", consts.debugView);
     m_pCompPO->setUniform("u_ambientOnly", ambientOnly ? 1 : 0);
     m_pCompPO->setUniform("u_sceneNormalTex", RT_TU_NOISE);
+    m_pCompPO->setUniform("u_hasSceneNormal", hasSceneNormal ? 1 : 0);
     m_pCompPO->setUniform("u_bounceTex", RT_TU_SMAA_AREA);
     m_pCompPO->setUniform("u_sceneMaterialTex", RT_TU_SMAA_SEARCH);
     m_pCompPO->setUniform("u_hasMaterial", hasMaterial ? 1 : 0);

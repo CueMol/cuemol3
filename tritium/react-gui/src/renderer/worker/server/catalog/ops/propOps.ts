@@ -252,7 +252,10 @@ export const setProp = defineOp({
   // is for a person at a prompt.
   expose: { tool: false, console: true },
   group: 'properties',
-  aliases: [{ name: 'set', summary: 'Set a property: set 1crn/cartoon1.width, 2 / set bgcolor, white' }],
+  aliases: [
+    { name: 'set', summary: 'Set a property: set 1crn/cartoon1.width, 2 / set bgcolor, white' },
+    { name: 'set_bgcolor', fixed: { path: 'bgcolor' }, group: 'viewing', summary: 'Set the background colour: set_bgcolor white' },
+  ],
   // The service answers with every property of the node, which is what an
   // inspector redraws from; at a prompt a write that worked says nothing.
   format: () => [],

@@ -4,6 +4,8 @@
 //    fragment shader
 //
 
+#include <fog_inc.glsl>
+
 in float v_fogCoord;
 
 ////////////////////
@@ -27,6 +29,9 @@ layout(location = 2) out vec4 o_Material;
 
 void main (void)
 {
+  // Drawn without a normal: casts no AO, so not part of the occluder-only
+  // pass (the probe bake, fog_inc.glsl isOccluderPass).
+  if (isOccluderPass()) discard;
   o_FragColor = vec4(u_color.rgb, u_color.a * frag_alpha);
   o_Normal = vec4(0.0, 0.0, 0.0, 1.0);
   o_Material = vec4(0.0);

@@ -25,6 +25,7 @@ import {
   runExclusive,
   runInTxn,
   serializeToolOutput,
+  toolDescription,
   toolSchema,
   TXN_BUSY_MESSAGE,
   txnBusy,
@@ -55,7 +56,7 @@ function listTools(): Result<ListToolsOutcome> {
   return ok({
     tools: MCP_OPS.map((op) => ({
       name: op.name,
-      description: op.description,
+      description: toolDescription(op),
       inputSchema: toolSchema(op) as unknown as Record<string, unknown>,
     })),
   })
@@ -84,7 +85,7 @@ async function callTool(ctx: WorkerContext, args: CallToolArgs): Promise<Result<
   const scene = args.sceneId > 0 ? getSceneOrNull(ctx, args.sceneId) : null
   if (!scene) return ok(mcpErrorResult('No scene is open in CueMol. Open a scene (a tab) first.'))
   if (txnBusy()) return ok(mcpErrorResult(TXN_BUSY_MESSAGE))
-  const input = readToolArgs(op, args.arguments ?? {})
+  const input = readToolArgs(op, args.arguments ?? {}, { nullString: true })
   if (typeof input === 'string') return ok(mcpErrorResult(input))
 
   const state: CallState = { cancelled: false, streams: new Set() }

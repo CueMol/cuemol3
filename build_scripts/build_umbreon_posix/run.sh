@@ -59,6 +59,7 @@ cmake -G Ninja -S "$UMBREON_SRC" -B "$BUILD_DIR" \
       -DUMBREON_WITH_OIDN=ON \
       -DOpenImageDenoise_DIR="$BASEDIR/oidn-$OIDN_VER/lib/cmake/OpenImageDenoise-$OIDN_VER" \
       -DCMAKE_INSTALL_PREFIX="$BASEDIR/umbreon" \
+      -DCMAKE_INSTALL_LIBDIR=lib \
       $MSVC_OPT
 
 # Build only the library target: the bench CLI and the umbreon unit tests (and

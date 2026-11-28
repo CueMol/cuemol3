@@ -11,6 +11,9 @@
 #include "Scene.hpp"
 #include "InOutHandler.hpp"
 
+#include <set>
+#include <vector>
+
 namespace qlib {
   class LDom2InStream;
   class LObjInStream3;
@@ -80,6 +83,23 @@ namespace qsys {
     /// Get error message
     LString getErrMsg() const {
       return m_errmsg;
+    }
+
+  private:
+    /// Data the scene file refers to that could not be loaded (see read())
+    std::vector<LString> m_loadErrors;
+
+    /// Chunk IDs the XML part asked for that have not been read yet
+    std::set<LString> m_pendingChunks;
+
+  public:
+    /// Data the scene file refers to that could not be loaded by the last
+    /// read(): a data chunk or a file that failed to read, or a chunk the
+    /// XML part asks for that the file does not contain (e.g. a truncated
+    /// file). read() logs these and goes on, so the scene loads without that
+    /// data; a caller that must not work from such a scene checks this.
+    const std::vector<LString> &getLoadErrors() const {
+      return m_loadErrors;
     }
 
   private:

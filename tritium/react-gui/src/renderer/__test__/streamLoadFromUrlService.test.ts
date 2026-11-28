@@ -47,7 +47,7 @@ interface MockEnv {
     ctx: WorkerContext
     reader: { __reader: true }
     obj: { __obj: true; name?: string } | null
-    scene: { addObject: ReturnType<typeof vi.fn> }
+    scene: { addObject: ReturnType<typeof vi.fn>; getRendByName: ReturnType<typeof vi.fn> }
     createHandler: ReturnType<typeof vi.fn>
     loadObjectAsync: ReturnType<typeof vi.fn>
     supplyDataAsync: ReturnType<typeof vi.fn>
@@ -59,7 +59,8 @@ interface MockEnv {
 function makeEnv(opts?: { obj?: { __obj: true; name?: string } | null }): MockEnv {
     const reader = { __reader: true } as const
     const obj = opts?.obj === undefined ? { __obj: true } as { __obj: true; name?: string } : opts.obj
-    const scene = { addObject: vi.fn() }
+    // Renderer names are numbered against the scene (empty here).
+    const scene = { addObject: vi.fn(), getRendByName: vi.fn(() => null) }
 
     const createHandler = vi.fn(() => reader)
     const loadObjectAsync = vi.fn(() => 42)
@@ -201,6 +202,27 @@ describe('streamLoadFromUrl service', () => {
         expect(op).toBe('fetch_entry')
         // The default name is not recorded, so a replay names it the same way.
         expect(opArgs).toMatchObject({ source: 'pdbj', id: '1CRN', format: null, name: null })
+    })
+
+    it('records a renderer name the user chose (a preset group too), and not the default one', async () => {
+        const fetchOnce = async (rendererName: string) => {
+            const env = makeEnv()
+            globalThis.fetch = fetchYieldingChunks([new Uint8Array([1])]) as unknown as typeof fetch
+            const options = makeOptions()
+            options.renderer.presetName = 'Default1RendPreset'
+            options.renderer.rendererName = rendererName
+            vi.mocked(recordOp).mockClear()
+            await streamLoadFromUrl(env.ctx, {
+                reqId: 'req-n', url: 'https://files.rcsb.org/download/1mbn.cif', readerName: 'mmcif',
+                objectName: '1mbn', sceneId: 7, options,
+            })
+            return (vi.mocked(recordOp).mock.calls[0][3] as { rendererName: string | null }).rendererName
+        }
+        // The preset group and its children are named after it, so a replay
+        // that renumbered it would break later steps that name them.
+        expect(await fetchOnce('modelA')).toBe('modelA')
+        // The default is left out, so a replay numbers it the same way.
+        expect(await fetchOnce('default1_1')).toBeNull()
     })
 
     it('colours an AlphaFold entry by pLDDT inside the fetch, and no other entry', async () => {

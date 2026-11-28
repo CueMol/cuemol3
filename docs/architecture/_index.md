@@ -32,6 +32,8 @@ architecture, it belongs here.
   `completion.ts` が段組みとメニューの状態遷移を持つ。ファイル名の一致規則 (dot file、
   大小無視の再試行、load の拡張子優先、cd はディレクトリだけ)。
 
+- [Console の履歴の検索 (Ctrl-R)](console-history-search.md) (日本語) -- console panel と tritium_cli の、zsh と同じインクリメンタル検索。console-kit の状態遷移、Windows / Linux のメニューの `Ctrl-R` との分け方 (`data-own-keys`)
+
 - [Console の help と Markdown 出力](console-help-markdown.md) (日本語) -- `format: 'markdown'` の
   entry を `@cuemol/console-kit` の `markdown.ts` (`marked` の lexer) で読み、panel は React、
   tritium_cli は ANSI で描く。help は主題 -> コマンド -> 引数の 3 段で、op のコマンドの説明は
@@ -42,6 +44,18 @@ architecture, it belongs here.
   Explorer に置き、View activity view は非表示)。Camera に `ui_order` property (nopersist) を足し、
   qsc には `<camera>` 要素の並び順として保存する (object / renderer と同じ仕組み)。
   save / apply の with show/hide 版を含むツールバー、drag での並べ替え、既存名の上書き挙動。
+
+- [Mol Struct の Properties](molstruct-inspector.md) (日本語) --
+  Mol Struct pane の Properties で、1 つ選んだ chain / residue / atom を inspector に読み取り専用で出す
+  (残基の二次構造、原子の座標・B-factor・occupancy など)。`MolResidue.getPropStr` を script に公開。
+
+- [Renderer の既定名](renderer-default-name.md) (日本語) --
+  名前を指定しない renderer の名前は scene 全体で一意な `<型名 or preset 接頭辞><n>`。dialog・
+  `add_renderer`・load / fetch 系の op で同じ規則。記録は既定名なら null、利用者が付けた名前は残す。
+
+- [分子ビューのクリックとダブルクリックの判定](view-mouse-clicks.md) (日本語) --
+  `MouseEventHandler` のダブルクリックは 500 ms 以内・同じボタン・4 px 以内の 2 回目の単クリック。
+  ダブルクリックは 1 回目を使い切る。
 
 - [Camera inspector](camera-inspector.md) (日本語) --
   Camera pane の Property / 右クリックで camera を inspector に出す (Name、Source、読み取り専用の
@@ -74,6 +88,9 @@ architecture, it belongs here.
   (GUI の選択の追加・Selection Builder・console の dialect) を、C++ の構文木に同値な書き換え規則を繰り返して
   短くし、再コンパイルできる文字列に戻す (`SelSimplifier`、`SelCommand::simplify`)。規則の一覧、同一性の判定と
   書き戻しの方針、簡単にする場所、context menu の Invert / Toggle sidechain / Around を構文木で行うこと。
+- [主鎖・側鎖の選択 (`bymainch` / `bysidech`)](selection-main-side-chain.md) (日本語) -- 原子名とトポロジーの
+  mainch / sidech リストの完全一致で判定すること、リストの無い残基 (水など) はどちらにも選ばれないこと、
+  核酸のリストに並べる原子名の表記ゆれ (チミンのメチル基、リン酸の酸素)。
 - [Op catalog と console (native / PyMOL / ChimeraX dialect)](op-catalog.md) (日本語) --
   AI agent の tool と console のコマンドを生成する core の op catalog。`.qif` 型に合わせた param DSL と
   意味型 (node 名・property path・selection)、`invokeOp` / `runInTxn`、agent の toolset と
@@ -369,6 +386,8 @@ architecture, it belongs here.
 - [分子の既定の色分け (パレットのテーマ)](default-paint-palette.md) (日本語) -- 読み込んだ分子の
   PaintColoring: n 番目の分子が style で選んだテーマ (既定 Okabe-Ito) の n 番目の色を主色にし、
   核酸 / coil は NamedColor の修飾子で派生させる。使った色は scene の style set に複製して qsc に保存する。
+  Paint coloring メニューの構成 (Molecule color、CueMol2 / CueMol1 の固定色、テーマの色名、style プリセット)、
+  ドロップダウンを platform のメニューで出す `usePopupMenu`。
 - [Surface atom colouring: `AtomColorMemo` and the shared colouring pass](surface-atom-coloring.md) --
   how `dsurface`, `molsurf` and the map isosurface colour a vertex by its
   atom (molecule colour mode and `showsel`): the molstr pieces they share
@@ -436,3 +455,8 @@ architecture, it belongs here.
   0.8 s を超えたら、文言・経過秒数・バーのカードをどのタブでも見える位置に出す (入力は止めない)。
   service が呼び出しごとの `ctx.reportTask` で名乗る opt-in 方式、`invokeOp` / console の `runCommand` では名乗らない理由、
   transport の `subscribeLongTasks`、保存時間の大半が xz 圧縮という計測。
+
+- [cuetty の Linux 持ち運び版](cuetty-linux-portable.md) (日本語) -- ヘッドレスの計算ノード (RHEL 8 系を含む) で
+  umbreon の静止画と動画を描く `cuetty-<version>-linux-x64.tar.gz`。manylinux_2_28 でのビルドと glibc / CPU
+  (x86-64-v3) の下限、実行ファイルの位置からの設定探索、`--shard` で先頭から状態を進めて担当フレームだけ描く
+  分担の仕組み、読み込み・書き込みの失敗を終了コード 1 にする規則、`CUEMOL_TBB_THREADS` によるスレッド数、CI の確認。

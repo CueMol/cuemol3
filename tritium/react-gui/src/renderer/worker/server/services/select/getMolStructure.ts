@@ -13,7 +13,10 @@ import type { MolCoord } from '@cuemol/core/src/wrappers/MolCoord';
 import type { MolChain } from '@cuemol/core/src/wrappers/MolChain';
 import type { MolResidue } from '@cuemol/core/src/wrappers/MolResidue';
 import type { WorkerContext } from '@renderer/worker/server/types/WorkerContext';
+import type { MolAtom } from '@cuemol/core/src/wrappers/MolAtom';
 import { getSceneOrNull } from '@renderer/worker/server/services/helpers/sceneResolver';
+import { fail, failFrom, ok, type Result } from '@renderer/worker/shared/result';
+import type { MolStructInfo, MolStructRef } from '@renderer/worker/shared/molStructInfo';
 
 export interface GetMolChainsArgs {
     sceneId: number;
@@ -242,4 +245,87 @@ export function getMolAtoms(
         return { ok: false, atoms: [] };
     }
     return { ok: true, atoms: parseAtomsJSON(json) };
+}
+
+export interface GetMolStructInfoArgs {
+    sceneId: number;
+    molId: number;
+    target: MolStructRef;
+}
+
+export type GetMolStructInfoResult = Result<{ info: MolStructInfo }>;
+
+/** Count the entries of a JSON array string (0 when it does not parse). */
+function jsonArrayLength(json: string): number {
+    try {
+        const parsed: unknown = JSON.parse(json);
+        return Array.isArray(parsed) ? parsed.length : 0;
+    } catch {
+        return 0;
+    }
+}
+
+/** The values of one chain / residue / atom, for the read-only inspector page. */
+function readMolStructInfo(mol: MolCoord, target: MolStructRef): MolStructInfo | null {
+    if (target.kind === 'atom') {
+        const atom = mol.getAtomByID(target.atomId) as MolAtom | null;
+        if (!atom) return null;
+        const pos = atom.pos as unknown as { x: number; y: number; z: number };
+        return {
+            kind: 'atom',
+            id: target.atomId,
+            name: atom.name,
+            element: atom.element,
+            chain: atom.chainName,
+            residueIndex: atom.residIndex,
+            residueName: atom.residName,
+            altloc: atom.confid,
+            pos: [pos.x, pos.y, pos.z],
+            bfac: atom.bfac,
+            occ: atom.occ,
+        };
+    }
+    const chain = mol.getChain(target.chain) as MolChain | null;
+    if (!chain) return null;
+    if (target.kind === 'chain') {
+        const residues = parseResiduesJSON(chain.getResidsJSON());
+        return {
+            kind: 'chain',
+            name: target.chain,
+            residueCount: residues.length,
+            firstResidue: residues[0]?.index ?? null,
+            lastResidue: residues[residues.length - 1]?.index ?? null,
+        };
+    }
+    const res = chain.getResidue(target.index) as MolResidue | null;
+    if (!res) return null;
+    return {
+        kind: 'resid',
+        chain: target.chain,
+        index: res.sindex,
+        name: res.name,
+        atomCount: jsonArrayLength(res.getAtomsJSON()),
+        secondary: res.getPropStr('secondary'),
+        secondary2: res.getPropStr('secondary2'),
+        hasCA: !!res.getAtom('CA'),
+    };
+}
+
+/**
+ * Read one chain, residue or atom of a molecule (Mol Struct pane >
+ * Properties). Read-only, so no undo txn. `not-found` when the molecule or
+ * the part is gone (deleted, or a renumbered chain).
+ */
+export function getMolStructInfo(ctx: WorkerContext, args: GetMolStructInfoArgs): GetMolStructInfoResult {
+    const scene = getSceneOrNull(ctx, args.sceneId);
+    if (!scene) return fail(`scene ${args.sceneId} not found`, 'not-found');
+    const obj = scene.getObject(args.molId) as CueMolObject | null;
+    if (!isMolCoordLike(obj)) return fail(`molecule ${args.molId} not found`, 'not-found');
+    try {
+        const info = readMolStructInfo(obj, args.target);
+        if (!info) return fail('no such chain, residue or atom', 'not-found');
+        return ok({ info });
+    } catch (e) {
+        return failFrom(e, 'native');
+    }
 }

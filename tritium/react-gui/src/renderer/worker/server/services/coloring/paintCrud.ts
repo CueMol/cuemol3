@@ -14,6 +14,7 @@ import type { Renderer } from '@cuemol/core/src/wrappers/Renderer';
 import type { MolRenderer } from '@cuemol/core/src/wrappers/MolRenderer';
 import type { MolCoord } from '@cuemol/core/src/wrappers/MolCoord';
 import type { PaintColoring } from '@cuemol/core/src/wrappers/PaintColoring';
+import type { MolSelection } from '@cuemol/core/src/wrappers/MolSelection';
 import type { WorkerContext } from '@renderer/worker/server/types/WorkerContext';
 import { withUndoTxn } from '@renderer/worker/server/services/withUndoTxn';
 import { recordOp } from '@renderer/worker/server/actions/serviceOps';
@@ -43,6 +44,15 @@ import type {
 } from './types';
 
 /**
+ * The atoms a paint call colours: `selStr` compiled when given (the molecule's
+ * own selection is not touched), else the molecule's current selection.
+ */
+function paintSel(ctx: WorkerContext, sceneId: number, mol: MolCoord, selStr: string | undefined): MolSelection | null {
+    if (selStr === undefined) return getMolSel(mol);
+    return makeSel(ctx, selStr, sceneId) as unknown as MolSelection | null;
+}
+
+/**
  * Insert a paint entry (color + selection) into a renderer's coloring.
  *
  * The selection is read from the renderer's parent MolCoord (not the
@@ -60,7 +70,7 @@ export function paintRendererSelection(
     if (!rend) return { ok: false };
     const mol = getMolFromRenderer(rend);
     if (!mol) return { ok: false };
-    const sel = getMolSel(mol);
+    const sel = paintSel(ctx, scene.uid, mol, args.selStr);
     if (!sel || isSelEmpty(sel)) return { ok: false };
 
     if (getColoringClassName(rend) !== 'PaintColoring') return { ok: false };
@@ -68,12 +78,12 @@ export function paintRendererSelection(
 
     const color = makeColor(ctx, args.colorValue, scene.uid);
     withUndoTxn(scene, 'Insert paint entry', () => {
-        // add_paint first sets the molecule's selection to this expression
-        // (the one it already has) and then inserts the entry at the top.
+        // add_paint paints the expression without touching the molecule's
+        // selection; from the Paint menu, the expression is that selection.
         recordOp(ctx, scene.uid, 'add_paint', {
             nodeId: args.rendId,
             nodeType: 'renderer',
-            selection: sel.toString(),
+            selection: args.selStr ?? sel.toString(),
             color: args.colorValue,
         }, ['nodeId']);
         coloring.insertBefore(0, sel, color);
@@ -95,18 +105,18 @@ export function paintObjectSelection(
     if (!scene) return { ok: false };
     const mol = scene.getObject(args.objId) as MolCoord | null;
     if (!mol) return { ok: false };
-    const sel = getMolSel(mol);
+    const sel = paintSel(ctx, scene.uid, mol, args.selStr);
     if (!sel || isSelEmpty(sel)) return { ok: false };
     if (getObjectColoringClassName(mol) !== 'PaintColoring') return { ok: false };
 
     const coloring = (mol as unknown as { coloring: PaintColoring }).coloring;
     const color = makeColor(ctx, args.colorValue, scene.uid);
     withUndoTxn(scene, 'Insert paint entry', () => {
-        // As for a renderer: add_paint sets this same selection, then inserts.
+        // As for a renderer.
         recordOp(ctx, scene.uid, 'add_paint', {
             nodeId: args.objId,
             nodeType: 'object',
-            selection: sel.toString(),
+            selection: args.selStr ?? sel.toString(),
             color: args.colorValue,
         }, ['nodeId']);
         coloring.insertBefore(0, sel, color);

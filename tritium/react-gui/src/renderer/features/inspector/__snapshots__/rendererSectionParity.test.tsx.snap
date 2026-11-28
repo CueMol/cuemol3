@@ -1485,14 +1485,14 @@ exports[`renderer Properties page > dsurface / default 1`] = `
     "rows": [
       "Drawing mode [select] {resettable} options=[fill|line|point] selected=fill",
       "Line/Point size [drag-numeric] {resettable,disabled}",
-      "Algorithm [select] {resettable} options=[distfield|meshms|edtsurf] selected=distfield",
+      "Algorithm [select] {resettable} options=[distfield|meshms|edtsurf] selected=meshms",
       "Surface type [select] {resettable} options=[sas|ses|vdw] selected=ses",
       "Detail [select] {resettable} options=[1|2|4|6|8|16|24|32] selected=6",
     ],
     "writes": [
       "Drawing mode -> set drawmode="line"",
       "Line/Point size -> (nothing)",
-      "Algorithm -> set surfalgor="meshms"",
+      "Algorithm -> set surfalgor="distfield"",
       "Surface type -> set surftype="sas"",
       "Detail -> set detail=1",
     ],

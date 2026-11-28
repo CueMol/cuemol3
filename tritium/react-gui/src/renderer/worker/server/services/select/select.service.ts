@@ -9,7 +9,7 @@
 
 import { applyMolSelString, selectAndFocusMol } from './applyMolSelString';
 import { focusMolSelection } from './focusMolSelection';
-import { getMolAtoms, getMolChains, getMolResidues } from './getMolStructure';
+import { getMolAtoms, getMolChains, getMolResidues, getMolStructInfo } from './getMolStructure';
 import { getSelDefs } from './getSelDefs';
 import { getSelHitCount } from './getSelHitCount';
 import { lassoSelect } from './lassoSelect';
@@ -26,6 +26,7 @@ export const services = {
     getMolChains,
     getMolResidues,
     getMolAtoms,
+    getMolStructInfo,
     getSelDefs,
     getSelHitCount,
     lassoSelect,

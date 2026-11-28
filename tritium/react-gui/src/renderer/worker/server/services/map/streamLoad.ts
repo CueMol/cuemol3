@@ -7,7 +7,7 @@
 import type { WorkerContext } from '@renderer/worker/server/types/WorkerContext';
 import type { ObjReader } from '@cuemol/core/src/wrappers/ObjReader';
 import { setupDensityMapRenderers, type DensityMapType } from './setupRenderers';
-import { isEmDensityMap } from './emDefaults';
+import { isEmDensityMap, setMapRenderersCenterToView } from './emDefaults';
 import { fitViewToMap } from './mapFit';
 import { undoTxnResult } from '../withUndoTxn';
 import { streamFetchToReader } from '@renderer/worker/server/services/helpers/streamFetchToReader';
@@ -182,9 +182,17 @@ export async function streamLoadDensityMap(
         const kind: DensityMapType = args.mapType === 'auto' ? (isEmDensityMap(obj) ? 'em' : '2fofc') : args.mapType;
         setupDensityMapRenderers(ctx, scene, obj, kind, args.contourLevel ?? null);
 
-        // Fit the view to the new map as it is drawn (UXP renderer.js
-        // L196-198 centred it on the whole map): its contour's extent.
-        fitViewToMap(ctx, scene, obj, view);
+        if (kind === 'em') {
+            // A cryo-EM map is the whole subject: fit the view to it as it
+            // is drawn (its contour's extent).
+            fitViewToMap(ctx, scene, obj, view);
+        } else {
+            // A crystallographic map is read around the model already on
+            // screen (Get PDB loads the coordinates first): draw it around
+            // the view centre, as opening a map file does ("Set map center"),
+            // rather than moving the view to the unit cell.
+            setMapRenderersCenterToView(obj, view);
+        }
 
         return ok({ objId: (obj as unknown as { uid: number }).uid });
     });
