@@ -42,11 +42,13 @@ import {
     appendCoordFile,
     appendStructFrame,
     appendTrajFile,
+    applyLoadSel,
     fileAtomCount,
     unsupportedTrajFormat,
     type TrajAppendTarget,
 } from './trajBlocks';
 import { COORD_BLOCK_READER_BY_TOPOLOGY } from '../trajFormats';
+import { recordAddTrajBlock } from './recordTraj';
 import { baseName, reportTask } from '@renderer/worker/server/services/helpers/taskReport';
 
 const log = console;
@@ -116,6 +118,18 @@ export interface AttachTrajectoryArgs {
     trajPaths: string[];
     /** Keep every Nth frame (applied to every file). Default 1. */
     nevery?: number;
+    /** The block reader for every file; by default each file's extension picks one. */
+    reader?: string | null;
+    /**
+     * Keep only the atoms this selection picks. Only for a molecule being
+     * converted (applied before frame 0): a Trajectory has dropped atoms for good.
+     */
+    loadSel?: string | null;
+    /**
+     * Replace the frames instead of adding after them: a converted molecule
+     * gets no frame 0 of its own coordinates, and a Trajectory loses its blocks.
+     */
+    replace?: boolean;
 }
 
 /**
@@ -229,12 +243,17 @@ export function listAttachTargets(
  * Convert `mol` into a Trajectory in place (same name and scene-tree
  * position) and append its own coordinates as frame 0 (see the file header).
  * Runs inside the caller's txn.
+ *
+ * @param loadSel - applied to the new Trajectory before frame 0 is appended
+ * @param frame0 - whether to append the molecule's own coordinates as frame 0
  */
 function convertToTrajectory(
     ctx: WorkerContext,
     scene: SceneHandle,
     mol: MolHandle,
     noCoords: boolean,
+    loadSel: string | null,
+    frame0: boolean,
 ): TrajAppendTarget {
     const name = mol.name;
     const uiOrder = mol.ui_order;
@@ -255,9 +274,17 @@ function convertToTrajectory(
     // ui_order is not persisted, so the round trip gave the new object one of
     // its own (the end of the scene tree); put it back where the molecule was.
     traj.ui_order = uiOrder;
+    if (loadSel) applyLoadSel(ctx, scene.uid, traj, loadSel);
+    if (!frame0) return traj;
     if (coord) appendCoordFile(ctx, traj, coord.path, coord.reader);
     else if (!noCoords) appendStructFrame(ctx, traj, srcPath, srcType);
     return traj;
+}
+
+/** Remove every block of a Trajectory (its frames), last first. Runs inside the caller's txn. */
+function removeAllBlocks(traj: TrajAppendTarget): void {
+    const t = traj as unknown as { nblock: number; removeBlock(index: number): void };
+    for (let i = t.nblock - 1; i >= 0; i--) t.removeBlock(i);
 }
 
 /** Attach trajectory files to a molecule or Trajectory of the scene (one undo step). */
@@ -266,7 +293,7 @@ export function attachTrajectory(
     args: AttachTrajectoryArgs,
 ): AttachTrajectoryResult {
     if (!args.trajPaths.length) return fail('no trajectory files given', 'invalid-args');
-    const unsupported = unsupportedTrajFormat(args.trajPaths);
+    const unsupported = unsupportedTrajFormat(args.trajPaths, args.reader);
     if (unsupported) return fail(unsupported, 'unsupported');
     const scene = ctx.sceMgr.getScene(args.sceneId) as unknown as SceneHandle | null;
     if (!scene) return fail(`scene ${args.sceneId} not found`, 'not-found');
@@ -278,6 +305,12 @@ export function attachTrajectory(
         return fail('a morph animation cannot take a trajectory', 'unsupported');
     }
     const isTraj = className === 'Trajectory';
+    if (isTraj && args.loadSel) {
+        return fail(
+            `"${mol.name}" is already a trajectory: a load selection can only be given when a molecule becomes one`,
+            'invalid-args',
+        );
+    }
     if (!isTraj) {
         const reason = conversionRefusal(mol);
         if (reason) return fail(`"${mol.name}" ${reason}, so a trajectory cannot be attached`, 'unsupported');
@@ -289,13 +322,25 @@ export function attachTrajectory(
     // A throw (atom-count mismatch, missing reader) rolls the conversion and
     // every block back and comes out as a Fail.
     const res = undoTxnResult(scene as unknown as Parameters<typeof undoTxnResult>[0], 'Attach MD trajectory', () => {
-        const traj = isTraj ? (mol as unknown as TrajAppendTarget) : convertToTrajectory(ctx, scene, mol, noCoords);
+        // While objId still names the molecule (a conversion replaces it).
+        recordAddTrajBlock(ctx, scene.uid, {
+            objId: args.objId,
+            paths: args.trajPaths,
+            reader: args.reader ?? null,
+            nevery,
+            loadSel: args.loadSel ?? null,
+            replace: args.replace ?? false,
+        });
+        const traj = isTraj
+            ? (mol as unknown as TrajAppendTarget)
+            : convertToTrajectory(ctx, scene, mol, noCoords, args.loadSel ?? null, !args.replace);
+        if (isTraj && args.replace) removeAllBlocks(traj);
         // One step per file, reported before its synchronous read (long-task
         // indicator).
         const total = args.trajPaths.length;
         args.trajPaths.forEach((p, i) => {
             reportTask(ctx, { label: 'Attaching MD trajectory', detail: baseName(p), step: i + 1, total });
-            appendTrajFile(ctx, traj, p, nevery);
+            appendTrajFile(ctx, traj, p, nevery, args.reader);
         });
         const nframe = safeRead(() => (traj as unknown as { nframe: number }).nframe) ?? 0;
         return ok({ objId: traj.uid, nframe });

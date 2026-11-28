@@ -121,6 +121,18 @@ function readNodeList(ctx: WorkerContext, cc: CmdContext, name: string, text: st
 }
 
 /**
+ * A `paths` argument: every word a file, patterns expanded in place, each
+ * resolved against the console's directory. A pattern that matches nothing
+ * is warned about; a list left empty is an error.
+ */
+function readPaths(cc: CmdContext, name: string, raw: string): { value: string[] } | string {
+  const list = readPathList(cc.cwd, raw)
+  for (const u of list.unmatched) cc.warn(`no matches found: ${u}`)
+  if (list.files.length === 0) return `${name}: no files given`
+  return { value: list.files.map((f) => resolvePath(cc.cwd, f)) }
+}
+
+/**
  * One typed argument read into its parameter's type.
  *
  * @returns the value, or the reason it cannot be one.
@@ -133,6 +145,7 @@ function readArg(
   raw: string,
 ): { value: unknown } | string {
   if (p.kind === 'nodes') return readNodeList(ctx, cc, name, raw)
+  if (p.kind === 'paths') return readPaths(cc, name, raw)
   const text = unquote(raw)
   const refKind = p.semantic ? REF_KIND[p.semantic] : undefined
   if (refKind) {
@@ -440,7 +453,7 @@ function completionOf(p: Param<unknown>, rel: RelatedParams, opens = false): Arg
     case 'propPath':
       return { source: 'propPath', description: 'property', list: true }
     case 'path':
-      return opens ? { source: 'files', description: 'file', files: 'openable', list: true } : { source: 'files', description: 'file' }
+      return opens || p.kind === 'paths' ? { source: 'files', description: 'file', files: 'openable', list: true } : { source: 'files', description: 'file' }
     default:
       // Free text (a name, a chain, a property) has nothing to offer, and
       // listing files for it would only mislead.

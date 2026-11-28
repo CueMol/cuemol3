@@ -15,9 +15,10 @@ import type { ToolSet } from 'ai'
 import type { WorkerContext } from '@renderer/worker/server/types/WorkerContext'
 import type { ModelMessage } from 'ai'
 import {
+  allOps,
   invokeOp,
   readToolArgs,
-  TOOL_OPS,
+  toolOps,
   TOOLSETS,
   toolDescription,
   toolSchema,
@@ -67,15 +68,38 @@ function byName(a: AgentTool, b: AgentTool): number {
 /** The name of the tool that switches toolsets on. */
 export const ENABLE_TOOLSETS = 'enable_toolsets'
 
-/** The tools each toolset adds once it is on. */
-const TOOLSET_TOOLS: ReadonlyMap<string, readonly AgentTool[]> = new Map(
-  TOOLSETS.map((ts) => [ts.id, toolsetOps(ts.id).map(opTool)]),
-)
+/** The tool lists made from the catalogue. */
+interface ToolTables {
+  ops: readonly AnyOp[]
+  /** The tools each toolset adds once it is on. */
+  toolsetTools: ReadonlyMap<string, readonly AgentTool[]>
+  /** Which toolset a tool belongs to; absent for a core tool. */
+  toolsetOf: ReadonlyMap<string, string>
+  /** The tools always offered: the core ops, and the switch for the rest. */
+  core: readonly AgentTool[]
+  /** Every tool a turn may offer, toolsets included, by name. */
+  all: readonly AgentTool[]
+}
 
-/** Which toolset a tool belongs to; absent for a core tool. */
-const TOOLSET_OF: ReadonlyMap<string, string> = new Map(
-  [...TOOLSET_TOOLS].flatMap(([id, tools]) => tools.map((t) => [t.name, id] as const)),
-)
+let tables: ToolTables | null = null
+
+/**
+ * The tool lists, made from the catalogue on first use and again only when it
+ * changes: a plugin's ops are registered after this module has loaded (the
+ * glob order of the worker services), and a turn never starts before that.
+ */
+function toolTables(): ToolTables {
+  const ops = allOps()
+  if (tables?.ops === ops) return tables
+  const toolsetTools = new Map(TOOLSETS.map((ts) => [ts.id as string, toolsetOps(ts.id).map(opTool)]))
+  const toolsetOf = new Map(
+    [...toolsetTools].flatMap(([id, tools]) => tools.map((t) => [t.name, id] as const)),
+  )
+  const core = [...toolOps().map(opTool), enableToolsets].sort(byName)
+  const all = [...core, ...[...toolsetTools.values()].flat()].sort(byName)
+  tables = { ops, toolsetTools, toolsetOf, core, all }
+  return tables
+}
 
 /**
  * Switch toolsets on for the rest of the conversation.
@@ -105,7 +129,7 @@ const enableToolsets: AgentTool = {
   mutates: false,
   run(_ctx, input, turn) {
     const asked = Array.isArray(input.toolsets) ? input.toolsets.map(String) : []
-    const unknown = asked.filter((id) => !TOOLSET_TOOLS.has(id))
+    const unknown = asked.filter((id) => !toolTables().toolsetTools.has(id))
     if (unknown.length > 0) {
       return { ok: false, error: `No toolset named ${unknown.join(', ')}. Known: ${TOOLSETS.map((t) => t.id).join(', ')}.` }
     }
@@ -114,20 +138,21 @@ const enableToolsets: AgentTool = {
       ok: true,
       data: {
         enabled: [...turn.toolsets],
-        tools: asked.flatMap((id) => (TOOLSET_TOOLS.get(id) ?? []).map((t) => t.name)),
+        tools: asked.flatMap((id) => (toolTables().toolsetTools.get(id) ?? []).map((t) => t.name)),
       },
     }
   },
 }
 
 /** The tools always offered: the core ops, and the switch for the rest. */
-export const AGENT_TOOLS: readonly AgentTool[] = [...TOOL_OPS.map(opTool), enableToolsets].sort(byName)
+export function agentTools(): readonly AgentTool[] {
+  return toolTables().core
+}
 
 /** Every tool a turn may offer, toolsets included, by name. */
-export const ALL_AGENT_TOOLS: readonly AgentTool[] = [
-  ...AGENT_TOOLS,
-  ...[...TOOLSET_TOOLS.values()].flat(),
-].sort(byName)
+export function allAgentTools(): readonly AgentTool[] {
+  return toolTables().all
+}
 
 /**
  * The names to offer this step: every tool that is core (or unknown to the
@@ -136,7 +161,7 @@ export const ALL_AGENT_TOOLS: readonly AgentTool[] = [
 export function activeToolNames(tools: readonly AgentTool[], enabled: ReadonlySet<string>): string[] {
   return tools
     .filter((t) => {
-      const ts = TOOLSET_OF.get(t.name)
+      const ts = toolTables().toolsetOf.get(t.name)
       return ts === undefined || enabled.has(ts)
     })
     .map((t) => t.name)
@@ -154,7 +179,7 @@ export function toolsetsEnabledIn(history: readonly ModelMessage[]): Set<string>
       if (part.type !== 'tool-call' || part.toolName !== ENABLE_TOOLSETS) continue
       const ids = (part.input as { toolsets?: unknown } | undefined)?.toolsets
       if (!Array.isArray(ids)) continue
-      for (const id of ids) if (TOOLSET_TOOLS.has(String(id))) out.add(String(id))
+      for (const id of ids) if (toolTables().toolsetTools.has(String(id))) out.add(String(id))
     }
   }
   return out
@@ -162,7 +187,7 @@ export function toolsetsEnabledIn(history: readonly ModelMessage[]): Set<string>
 
 /** Lookup by the name the model used. */
 export function findTool(name: string): AgentTool | undefined {
-  return ALL_AGENT_TOOLS.find((t) => t.name === name)
+  return allAgentTools().find((t) => t.name === name)
 }
 
 /**

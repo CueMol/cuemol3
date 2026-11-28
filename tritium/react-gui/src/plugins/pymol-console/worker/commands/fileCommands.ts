@@ -40,6 +40,7 @@ import {
   resolveRenderers,
   runOp,
 } from './helpers'
+import { isTrajFile, loadTrajInto } from './trajCommands'
 
 /** Arguments PyMOL's `load` takes that have no counterpart here. */
 const LOAD_IGNORED: ReadonlyArray<[string, string]> = [
@@ -248,6 +249,8 @@ const load: PymCommand = {
   ],
   async run(ctx, args, cc) {
     for (const [name, def] of LOAD_IGNORED) {
+      // A trajectory's state says whether its frames replace or follow (load_traj).
+      if (name === 'state' && isTrajFile(args.filename)) continue
       if (!isDefaulted(args[name], def)) cc.warn(`load: ${name} is ignored (not supported)`)
     }
     if (isUrl(args.filename)) return loadUrl(ctx, args, cc)
@@ -264,6 +267,12 @@ const load: PymCommand = {
       cc.openScene(filePath)
       cc.print(` Load: opening scene "${filePath}".`)
       return { ok: true }
+    }
+
+    // Trajectory frames go into a molecule, as PyMOL's load appends a DCD to
+    // the latest object; load_traj says which one.
+    if (args.format.trim() === '' && isTrajFile(filePath)) {
+      return loadTrajInto(ctx, { filename: filePath, object: args.object, state: args.state === '0' ? '0' : '1' }, cc)
     }
 
     // An explicit format skips the extension / content lookup, which is the

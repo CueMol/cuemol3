@@ -47,7 +47,7 @@ import type { CreateModel } from './modelProvider'
 import { runInTxn, TXN_BUSY_MESSAGE, txnBusy, txnLabel } from '@renderer/worker/server/catalog'
 import { buildSceneSnapshot, formatSceneSnapshot } from '@renderer/worker/server/catalog/ops/sceneSnapshot'
 import { SYSTEM_PROMPT } from './prompt/systemPrompt'
-import { ALL_AGENT_TOOLS, activeToolNames, buildAiSdkTools, toolsetsEnabledIn } from './tools/index'
+import { allAgentTools, activeToolNames, buildAiSdkTools, toolsetsEnabledIn } from './tools/index'
 import type { AgentTool, TurnContext } from './tools/types'
 import { summarizeOutcome } from './toolOutput'
 
@@ -204,7 +204,7 @@ interface TurnRun {
  */
 async function streamTurn(run: TurnRun): Promise<AgentRunTurnResult> {
   const { ctx, args, deps, spec, turn, controller, messages, userItem } = run
-  const offered = deps.tools ?? ALL_AGENT_TOOLS
+  const offered = deps.tools ?? allAgentTools()
   let finalText = ''
   let toolCalls = 0
   let finishReason = ''

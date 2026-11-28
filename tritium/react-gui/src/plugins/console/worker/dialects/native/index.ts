@@ -21,7 +21,8 @@ import { openTarget, readerTarget } from '@renderer/worker/server/catalog/fileLo
 import { getGenericProps } from '@renderer/worker/server/services/props/read'
 import type { GenericPropEntry } from '@renderer/worker/shared/genericProps'
 import { getSceneOrNull } from '@renderer/worker/server/services/helpers/sceneResolver'
-import { CONSOLE_COMMAND_OPS } from '@renderer/worker/server/catalog'
+import { consoleCommandOps } from '@renderer/worker/server/catalog'
+import type { AnyOp } from '@renderer/worker/server/catalog'
 import type { Param } from '@renderer/worker/server/catalog/params'
 import { commandHelp, table } from '../../help/helpMarkdown'
 import { OP_GROUPS } from '@renderer/worker/server/catalog/op'
@@ -50,10 +51,35 @@ import {
 import type { RefKind } from '@renderer/worker/server/catalog/refs'
 import type { PropTarget } from '@renderer/worker/server/catalog/refs'
 
-const GENERATED = catalogCommands(CONSOLE_COMMAND_OPS)
+/** The commands made from the catalogue, and the op each runs (for `help`). */
+interface Generated {
+  ops: readonly AnyOp[]
+  commands: readonly ConsoleCommand[]
+  origins: ReadonlyMap<string, CommandOrigin>
+}
 
-/** The op each generated command runs, for `help`. */
-const ORIGINS = new Map<string, CommandOrigin>(GENERATED.map((g) => [g.command.name, g.origin]))
+let generated: Generated | null = null
+
+/**
+ * The native commands, made from the catalogue's console ops. Rebuilt when the
+ * catalogue changes (a plugin registers ops after this module has loaded).
+ */
+function nativeTables(): Generated {
+  const ops = consoleCommandOps()
+  if (generated?.ops === ops) return generated
+  const made = catalogCommands(ops)
+  generated = {
+    ops,
+    commands: [...made.map((g) => g.command), ...NATIVE_BUILTINS, help].sort((a, b) => a.name.localeCompare(b.name)),
+    origins: new Map(made.map((g) => [g.command.name, g.origin])),
+  }
+  return generated
+}
+
+/** Every native command, sorted by name. */
+function nativeCommands(): readonly ConsoleCommand[] {
+  return nativeTables().commands
+}
 
 /** `help syntax`: how a native command is written. */
 const SYNTAX_TOPIC = 'syntax'
@@ -74,7 +100,7 @@ const NATIVE_SYNTAX = `# Writing commands
 - **Properties** follow their node after a dot: \`set 1crn/cartoon1.width, 2\``
 
 function commandsOf(group: OpGroup): readonly ConsoleCommand[] {
-  return NATIVE_COMMANDS.filter((c) => c.group === group)
+  return nativeCommands().filter((c) => c.group === group)
 }
 
 /** `help`: the subjects only, so the list stays short; each subject's help has the commands. */
@@ -101,6 +127,7 @@ function subjectHelp(group: OpGroup): string {
 function typeOf(p: Param<unknown>): string {
   if (p.kind === 'enum' && p.values) return `one of ${p.values.map((v) => `\`${v}\``).join(', ')}`
   if (p.kind === 'boolean') return '`true` or `false`'
+  if (p.kind === 'paths') return 'files (one or more, patterns allowed)'
   if (p.objClass) return `${p.objClass} object`
   return PARAM_TYPE_NAMES[p.semantic ?? p.kind] ?? p.semantic ?? p.kind
 }
@@ -118,7 +145,7 @@ const PARAM_TYPE_NAMES: Readonly<Record<string, string>> = {
 /** A command's help: for one made from an op, the op's own text, which the MCP server sends too. */
 function nativeCommandHelp(cmd: ConsoleCommand): string {
   const usage = usageLine(cmd.name, cmd.params).replace(/^Usage: /, '')
-  const origin = ORIGINS.get(cmd.name)
+  const origin = nativeTables().origins.get(cmd.name)
   if (!origin) {
     return commandHelp({
       name: cmd.name,
@@ -175,23 +202,17 @@ const help: ConsoleCommand = {
       cc.printMarkdown(NATIVE_SYNTAX)
       return { ok: true }
     }
-    const found = lookupCommand(topic, NATIVE_COMMANDS.map((c) => c.name))
+    const found = lookupCommand(topic, nativeCommands().map((c) => c.name))
     if (found.kind === 'ambiguous') {
       return { ok: false, error: `Error: ambiguous command: ${found.candidates.join(', ')}` }
     }
-    const cmd = found.kind === 'found' ? NATIVE_COMMANDS.find((c) => c.name === found.name) : undefined
+    const cmd = found.kind === 'found' ? nativeCommands().find((c) => c.name === found.name) : undefined
     if (!cmd) return { ok: false, error: `Error: unknown command: "${topic}"` }
     cc.printMarkdown(nativeCommandHelp(cmd))
     return { ok: true }
   },
 }
 
-/** Every native command, sorted by name. */
-const NATIVE_COMMANDS: readonly ConsoleCommand[] = [
-  ...GENERATED.map((g) => g.command),
-  ...NATIVE_BUILTINS,
-  help,
-].sort((a, b) => a.name.localeCompare(b.name))
 
 /** An argument as typed, without the quotes around it. */
 function unquoted(text: string): string {
@@ -297,8 +318,8 @@ function propPathCandidates(ctx: WorkerContext, sc: SourceContext): (string | Co
 
 /** The candidates for one source id, read fresh on every Tab. */
 function candidates(id: string, ctx: WorkerContext, sc: SourceContext): (string | CompletionItem)[] | null {
-  if (id === 'commands') return NATIVE_COMMANDS.map((c) => c.name)
-  if (id === 'helpTopics') return [...Object.keys(OP_GROUPS), SYNTAX_TOPIC, ...NATIVE_COMMANDS.map((c) => c.name)]
+  if (id === 'commands') return nativeCommands().map((c) => c.name)
+  if (id === 'helpTopics') return [...Object.keys(OP_GROUPS), SYNTAX_TOPIC, ...nativeCommands().map((c) => c.name)]
   if (id === 'none') return []
   if (id === 'scenes') return sceneNames(ctx)
   if (id.startsWith('enum:')) return id.slice('enum:'.length).split('|')
@@ -434,7 +455,7 @@ export const NATIVE_DIALECT: ConsoleDialect = {
     exactNames: true,
     pythonRefusal: 'Error: a line starting with "/" is Python, which this console does not run',
   }),
-  commands: () => NATIVE_COMMANDS,
+  commands: nativeCommands,
   expand,
   refuseScript: (filePath) => {
     if (/\.(py|pym)$/i.test(filePath)) return `Error: ${filePath} is a Python script, which this console does not run`

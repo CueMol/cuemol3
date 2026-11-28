@@ -20,7 +20,7 @@ import {
   findOp,
   invokeOp,
   isMcpOp,
-  MCP_OPS,
+  mcpOps,
   readToolArgs,
   runExclusive,
   runInTxn,
@@ -54,7 +54,7 @@ function describe(): Result<DescribeOutcome> {
 
 function listTools(): Result<ListToolsOutcome> {
   return ok({
-    tools: MCP_OPS.map((op) => ({
+    tools: mcpOps().map((op) => ({
       name: op.name,
       description: toolDescription(op),
       inputSchema: toolSchema(op) as unknown as Record<string, unknown>,
